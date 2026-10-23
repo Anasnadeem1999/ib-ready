@@ -1,0 +1,22 @@
+# One-click deploy on Render (render.com -> New -> Blueprint -> pick this repo).
+services:
+  - type: web
+    name: tick-and-tie
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn ticktie.server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: PORTKEY_API_KEY
+        sync: false          # paste the key in the Render dashboard; never in git
+      - key: TICKTIE_ADMIN_TOKEN
+        generateValue: true
+      - key: TICKTIE_DATA_DIR
+        value: /var/data
+    disk:
+      name: ticktie-data
+      mountPath: /var/data
+      sizeGB: 1

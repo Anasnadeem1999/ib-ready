@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tick &amp; Tie · IB technical interview coach</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">✓</span>
+      <div>
+        <div class="brand-name">Tick &amp; Tie</div>
+        <div class="brand-sub">IB technicals, diagnosed</div>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-view="interview" class="tab active">Interview</button>
+      <button data-view="map" class="tab">Weakness map</button>
+      <button data-view="trace" class="tab">Agents &amp; cost</button>
+      <button data-view="club" class="tab">Finance Club</button>
+    </nav>
+    <div class="top-right">
+      <div class="meter" id="meter" title="Tokens used this session vs. the session budget">
+        <div class="meter-label"><span id="meter-cost">$0.0000</span> · <span id="meter-tokens">0</span> tokens</div>
+        <div class="meter-bar"><div id="meter-fill"></div></div>
+      </div>
+      <button class="chip" id="profile-chip" title="Switch profile">—</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ======================= START ======================= -->
+    <section id="view-start" class="view">
+      <div class="hero">
+        <h1>Find out <em>why</em> you got it wrong.</h1>
+        <p class="lead">An AI interviewer for investment banking technicals. Every number you say is checked by a
+          calculator, every mistake is matched to a named misconception, and the next question goes straight at
+          your weakest spot.</p>
+        <div class="hero-points">
+          <div><b>Calculator-checked</b><span>The AI never grades your math. Code does.</span></div>
+          <div><b>Fresh numbers every time</b><span>You can't memorise your way through.</span></div>
+          <div><b>A weakness map that remembers</b><span>Misconceptions clear only after you beat them twice.</span></div>
+        </div>
+      </div>
+
+      <form class="card setup" id="setup">
+        <div class="row2 even">
+          <label class="field">
+            <span>Your name</span>
+            <input id="name" maxlength="40" placeholder="e.g. Anas" autocomplete="username" required />
+          </label>
+          <label class="field">
+            <span>Password</span>
+            <input id="password" type="password" minlength="6" maxlength="200" placeholder="6+ characters" autocomplete="current-password" required />
+          </label>
+        </div>
+        <p class="fine-muted" id="signin-note">First time? Pick any name and password and you get a private profile with your own weakness map. Next time, use the same pair to pick up where you left off.</p>
+
+        <div class="field">
+          <span>Session type</span>
+          <div class="choice" id="mode-choice">
+            <button type="button" data-v="diagnostic" class="opt sel"><b>Diagnostic</b><small>One question per area to build your map</small></button>
+            <button type="button" data-v="drill" class="opt"><b>Targeted drill</b><small>Goes after your weakest skill and active mistakes</small></button>
+            <button type="button" data-v="mixed" class="opt"><b>Mixed</b><small>Drill plus a few curveballs, like a real Superday</small></button>
+          </div>
+        </div>
+
+        <div class="row2">
+          <div class="field">
+            <span>Interviewer</span>
+            <div class="choice small" id="persona-choice">
+              <button type="button" data-v="associate" class="opt sel"><b>Associate</b><small>Friendly first round</small></button>
+              <button type="button" data-v="vp" class="opt"><b>VP</b><small>Superday, rapid-fire</small></button>
+            </div>
+          </div>
+          <label class="field">
+            <span>Focus (optional)</span>
+            <select id="focus">
+              <option value="">All areas</option>
+            </select>
+          </label>
+        </div>
+
+        <button class="primary big" type="submit" id="start-btn">Start interview</button>
+        <p class="fine" id="key-warning" hidden>No API key found. Add <code>PORTKEY_API_KEY</code> to a <code>.env</code> file (see README).</p>
+      </form>
+    </section>
+
+    <!-- ======================= INTERVIEW ======================= -->
+    <section id="view-interview" class="view" hidden>
+      <div class="interview">
+        <div class="chat-col">
+          <div class="chat" id="chat"></div>
+          <form class="composer" id="composer">
+            <textarea id="answer" rows="3" placeholder="Answer like you would out loud: direction, size, and why. Enter to send, Shift+Enter for a new line."></textarea>
+            <div class="composer-row">
+              <span class="hint" id="attempt-hint"></span>
+              <div class="composer-actions">
+                <button type="button" class="ghost mic" id="mic-btn" title="Answer out loud (Chrome or Edge)">
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
+                  <span id="mic-label">Speak</span>
+                </button>
+                <button type="button" class="ghost" id="end-btn">End &amp; debrief</button>
+                <button type="submit" class="primary" id="send-btn">Submit answer</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <aside class="side-col">
+          <div class="card diag" id="diag">
+            <div class="card-title">Live diagnosis</div>
+            <div class="empty" id="diag-empty">Answer the question to see how each line item is graded.</div>
+            <div id="diag-body" hidden>
+              <div class="verdict" id="verdict"></div>
+              <ul class="checks" id="checks"></ul>
+              <div id="mis-wrap"></div>
+              <div class="rationale" id="rationale"></div>
+              <details class="solution" id="solution-wrap" hidden>
+                <summary>Worked solution (calculator)</summary>
+                <p id="solution"></p>
+              </details>
+            </div>
+          </div>
+          <div class="card shield" id="shield" hidden>
+            <div class="card-title">Safety</div>
+            <ul id="shield-list"></ul>
+          </div>
+          <div class="card mini-trace">
+            <div class="card-title">This turn's agents <button class="link" data-goto="trace">full trace →</button></div>
+            <ul id="turn-trace" class="trace-list compact"></ul>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ======================= MAP ======================= -->
+    <section id="view-map" class="view" hidden>
+      <div class="page-head">
+        <h2>Your weakness map</h2>
+        <p class="muted">Mastery is a Bayesian estimate updated after every question. A misconception stays
+          <span class="tag active">active</span> until you answer two questions that test it cleanly.</p>
+      </div>
+      <div class="map-grid">
+        <div class="card">
+          <div class="card-title">Skills</div>
+          <div id="skills"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Misconceptions, with your own words as evidence</div>
+          <div id="mis-list" class="mis-list"></div>
+        </div>
+      </div>
+      <div class="map-actions">
+        <button class="primary" id="drill-btn">Start a targeted drill</button>
+      </div>
+    </section>
+
+    <!-- ======================= TRACE & COST ======================= -->
+    <section id="view-trace" class="view" hidden>
+      <div class="page-head">
+        <h2>Agents &amp; cost</h2>
+        <p class="muted">Every step of this session: what the director decided, what each agent did, what the
+          calculator checked, what the guard blocked, and exactly what it cost (gpt-6-luna,
+          $0.10 / $0.01 / $0.50 per 1M input / cached / output tokens).</p>
+      </div>
+      <div class="trace-grid">
+        <div class="card">
+          <div class="card-title">Session trace</div>
+          <ul id="trace" class="trace-list"></ul>
+        </div>
+        <div class="stack">
+          <div class="card">
+            <div class="card-title">This session</div>
+            <div class="kpis" id="kpis"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">All sessions on this install, by agent</div>
+            <table class="tbl" id="agent-tbl"></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= CLUB ======================= -->
+    <section id="view-club" class="view" hidden>
+      <div class="page-head">
+        <h2>Finance Club view</h2>
+        <p class="muted">Anonymised and aggregated across every member on this install. Shows which misconceptions
+          are most common, so the club's technical-training workshops can target them. No names or answers are shown.</p>
+      </div>
+      <div class="map-grid">
+        <div class="card"><div class="card-title">Most common misconceptions</div><div id="club-mis"></div></div>
+        <div class="card"><div class="card-title">Average mastery by skill</div><div id="club-skills"></div></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ======================= DEBRIEF ======================= -->
+  <div class="modal" id="debrief" hidden>
+    <div class="modal-card">
+      <button class="x" id="debrief-close" aria-label="Close">×</button>
+      <div class="card-title">Session debrief</div>
+      <h3 id="db-headline"></h3>
+      <div class="db-grid">
+        <div>
+          <h4>Mastery, start → end</h4>
+          <div id="db-mastery"></div>
+        </div>
+        <div>
+          <h4>Strengths</h4>
+          <ul id="db-strengths"></ul>
+          <h4>Focus next</h4>
+          <div id="db-focus"></div>
+        </div>
+      </div>
+      <p class="next" id="db-next"></p>
+      <div class="db-foot" id="db-foot"></div>
+
+      <form class="survey" id="survey">
+        <h4>Quick feedback (30 seconds), which helps us improve this</h4>
+        <div class="survey-grid">
+          <label class="field"><span>How useful was this session? (1 = not at all, 10 = extremely)</span>
+            <div class="scale" id="rating">
+              <button type="button">1</button><button type="button">2</button><button type="button">3</button><button type="button">4</button><button type="button">5</button>
+              <button type="button">6</button><button type="button">7</button><button type="button">8</button><button type="button">9</button><button type="button">10</button>
+            </div>
+          </label>
+          <label class="field"><span>Compared with how you prep today, this is…</span>
+            <select id="vs-current"><option value="">Choose…</option><option>Much better</option><option>Somewhat better</option><option>About the same</option><option>Worse</option></select>
+          </label>
+          <label class="field"><span>Did it find a weak spot you didn't know you had?</span>
+            <select id="found-new"><option value="">Choose…</option><option>Yes</option><option>Partly</option><option>No</option></select>
+          </label>
+          <label class="field"><span>With your usual prep, how long would finding these weak spots take?</span>
+            <select id="time-to-find"><option value="">Choose…</option><option>Under 15 minutes</option><option>15–60 minutes</option><option>1–3 hours</option><option>More than 3 hours</option><option>I probably wouldn't find them</option></select>
+          </label>
+          <label class="field wide"><span>How do you prep for technicals today? (guides, question banks, mock partners, coaches, ChatGPT…)</span>
+            <input id="prep-today" maxlength="300" placeholder="e.g. BIWS guide + 1 mock a week with a friend" />
+          </label>
+          <label class="field wide"><span>Anything else, in your own words?</span>
+            <textarea id="quote" rows="2" maxlength="1000" placeholder="What worked, what didn't, what you'd change"></textarea>
+          </label>
+          <label class="consent wide"><input type="checkbox" id="consent" /> It's OK to quote me by first name in an MGT 409 class report.</label>
+        </div>
+        <div class="survey-actions"><span class="muted" id="survey-status"></span><button class="ghost" type="submit">Send feedback</button></div>
+      </form>
+
+      <div class="modal-actions">
+        <button class="ghost" data-goto="map">Open weakness map</button>
+        <button class="primary" id="db-again">Start another session</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

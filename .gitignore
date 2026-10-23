@@ -1,0 +1,23 @@
+# secrets
+.env
+.env.*
+!.env.example
+.token_cache.json
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# local data (created on first run)
+data/*.db
+data/*.db-journal
+data/llm_calls.jsonl
+
+# tools / OS
+.claude/
+.vscode/
+.DS_Store
+Thumbs.db
