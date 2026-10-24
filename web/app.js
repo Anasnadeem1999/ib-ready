@@ -918,7 +918,7 @@ function renderDiag(r) {
     if (c.expected !== null && c.expected !== undefined && c.status !== "correct") val += ` · answer: <b>${fmt(c.expected)}</b>`;
     return `<li class="${cls}"><span class="ic" aria-hidden="true">${ic}</span><span>${esc(c.name)}${c.required ? "" : ' <span class="muted">(optional)</span>'}<span class="sr-only"> (${st})</span></span><span class="val">${val}</span></li>`;
   }).join("");
-  $("#mis-wrap").innerHTML = diag ? "" : (r.misconceptions || []).map((m) => `<div class="mis"><span class="lbl">Mistake pattern</span> ${tip("mistake pattern")}<b>${esc(m.name)}</b><p>${esc(m.fix)}</p></div>`).join("");
+  $("#mis-wrap").innerHTML = diag ? "" : (r.misconceptions || []).map((m) => `<div class="mis"><span class="lbl">Mistake pattern</span> ${tip("mistake pattern")}<b>${esc(m.name)}</b><p>${esc(m.fix)}</p></div>`).join("") + lengthHTML(r.length);
   $("#rationale").textContent = diag ? "" : r.rationale ? `Why: ${r.rationale}` : (!r.resolved && r.verdict !== "correct" ? "Details unlock after your next try, so you can fix it yourself first." : "");
   $("#solution-wrap").hidden = diag || !r.solution; $("#solution").textContent = r.solution || "";
   $("#solution-label").textContent = r.answered_question?.kind === "numeric" ? "Worked solution (calculator)" : "Model answer";
@@ -933,6 +933,24 @@ function renderDiag(r) {
     $("#chat").appendChild(el);
     setTimeout(() => el.scrollIntoView({ block: "end" }), 0);
   }
+}
+// answer length: computed by the app from the model answer, coaching only (it never changes the grade)
+function lengthHTML(ln) {
+  if (!ln) return "";
+  if (!ln.too_long) return `<div class="len ok"><span class="lbl">Answer length</span> <b>Nicely concise</b><p>${ln.words} words, within the ${ln.target}-word target.</p></div>`;
+  return `<div class="len long"><span class="lbl">Answer length</span> <b>Too long: ${ln.words} words (target about ${ln.target})</b><p>${esc(ln.tip || "")}</p></div>`;
+}
+function deliveryHTML(dl) {
+  if (!dl) return "";
+  const title = dl.long ? `${dl.long} of ${dl.of} answers ran long` : `All ${dl.of} answers were concise`;
+  return `<h3>Answer length</h3><div class="focus"><b class="nm">${esc(title)}</b><p>${esc(dl.tip || "")}</p></div>`;
+}
+function conciseHTML(c) {
+  if (!c) return "";
+  const trend = c.pct_long_before == null ? "" : c.pct_long < c.pct_long_before ? ` Down from ${c.pct_long_before}% before. ▼ Getting tighter.` : c.pct_long > c.pct_long_before ? ` Up from ${c.pct_long_before}% before.` : "";
+  return `<div class="mis-item len-trend"><div class="top"><span class="chip ${c.pct_long > 30 ? "working" : "fixed"}">${c.pct_long > 30 ? "Still working on it" : "On track ✓"}</span>
+    <b>Concise answers</b><span class="small muted">last ${c.answers} technical answers</span></div>
+    <p>${c.pct_long}% ran longer than the target.${trend} Lead with the result, then one line of why.</p></div>`;
 }
 function openSheet() { if (!isMobile()) return; $("#side-col").classList.add("open"); $("#sheet-scrim").hidden = false; $("#sheet-close").focus(); }
 function closeSheet() { $("#side-col").classList.remove("open"); $("#sheet-scrim").hidden = true; }
@@ -1065,7 +1083,8 @@ function renderResults(r) {
     $("#res-notes").innerHTML = `<div class="notes"><h2 class="section-title">Your coach's notes</h2>${d.headline ? `<p class="headline">${esc(mapLevels(d.headline))}</p>` : ""}
       ${d.went_well.length ? `<h3>What went well</h3><ul>${d.went_well.map((s) => `<li>${esc(mapLevels(s))}</li>`).join("")}</ul>` : ""}
       <h3>One thing to work on ${tip("mistake pattern")}</h3>${d.work_on.length ? focusHTML(d.work_on[0]) : `<p class="mt-0">No mistake patterns this session. That's a clean run.</p>`}
-      ${d.work_on.length > 1 ? `<details class="more-focus"><summary>${d.work_on.length - 1} more thing${d.work_on.length > 2 ? "s" : ""} to work on</summary>${d.work_on.slice(1).map(focusHTML).join("")}</details>` : ""}</div>`;
+      ${d.work_on.length > 1 ? `<details class="more-focus"><summary>${d.work_on.length - 1} more thing${d.work_on.length > 2 ? "s" : ""} to work on</summary>${d.work_on.slice(1).map(focusHTML).join("")}</details>` : ""}
+      ${deliveryHTML(r.debrief?.delivery)}</div>`;
     $("#res-next").innerHTML = `<span class="eyebrow">Your next step</span>${d.next_step ? `<p class="nstep">${esc(mapLevels(d.next_step))}</p>` : ""}
       ${next ? `<p class="task-line">${esc(taskTitle(next))}</p><p class="small muted mt-0">${esc(taskSub(next))}</p>
         <button class="primary big" data-task="${next.id}">Start</button>`
@@ -1141,6 +1160,7 @@ async function renderProgress() {
     return `<div class="mis-item"><div class="top"><span class="chip ${x.active ? "working" : "fixed"}">${x.active ? "Still working on it" : "Fixed ✓"}</span>
       <b>${esc(x.name)}</b><span class="small muted">seen ${x.hits}×</span></div>${ev}<p>${esc(x.fix)}</p></div>`;
   }).join("") : `<div><p class="mt-0"><b>No mistake patterns yet.</b></p><p class="small muted">That's either a clean run or you're just getting started.</p></div>`;
+  $("#mis-list").insertAdjacentHTML("afterbegin", conciseHTML(d.concise));
   $("#mis-list").insertAdjacentHTML("beforeend", `<details class="more-focus"><summary>What's a mistake pattern?</summary><div class="prose small">${misHTML(true)}</div></details>`);
 }
 

@@ -486,6 +486,7 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
 
     # ---------- 3. deterministic adjudication (the code makes the call)
     verdict, error_type, mids, checks = _adjudicate(q, d, explain_only)
+    length = length_check(q, ic.text, explain_only)
     locked_verdict = verdict
     manipulated = d.manipulation_attempt or any(
         f in ic.flags for f in ("grade manipulation", "instruction override", "score tampering", "role hijack",
@@ -594,7 +595,7 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
                 misconceptions=mids, interviewer=msg,
                 diagnosis={"diagnosis": d.model_dump(), "checks": [c.to_dict() for c in checks],
                            "action": action, "final_verdict": final_verdict, "explain_only": explain_only,
-                           "flags": ic.flags},
+                           "flags": ic.flags, "length": length if verdict != "redirect" else None},
                 input_tokens=use_turn["input_tokens"], cached_tokens=use_turn["cached_tokens"],
                 output_tokens=use_turn["output_tokens"], cost_usd=use_turn["cost_usd"])
 
@@ -614,6 +615,7 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
         "misconceptions": [{"id": m, "name": LIBRARY[m].name, "fix": LIBRARY[m].fix} for m in mids] if show_detail else [],
         "rationale": (grading_note(q, checks, error_type) or d.rationale) if show_detail else None,
         "note": grading_note(q, checks, error_type),
+        "length": length if verdict != "redirect" else None,
         "solution": solution,
         "answered_question": {"title": q.title, "skill": q.skill, "kind": q.kind, "seconds": seconds, "target": q.target_seconds},
         "session": _public_session(sid, {**s, "state": state}),
@@ -731,6 +733,62 @@ def grading_note(q: bank.Question, checks: list, error_type: str | None) -> str 
     if error_type == "hedged":
         return hedge_note(checks)
     return None
+
+
+# ---------------------------------------------------------------- delivery: answer length (code, not the model)
+CONCISE_MIN_WORDS = 45   # about 20 seconds spoken: the floor for any technical answer
+CONCISE_FACTOR = 1.75    # room over the model answer before it counts as long
+CONCISE_TIPS = {
+    "numeric": "Lead with the number, then give one line of why. Stop there and let the interviewer ask for more.",
+    "conceptual": "Answer in one sentence first, then add two or three supporting points. Stop there and let the interviewer ask for more.",
+}
+
+
+def length_check(q: bank.Question, text: str, explain_only: bool = False) -> dict | None:
+    """Word count against a target built from the model answer. Coaching only: it never changes the grade.
+
+    Fit answers are exempt (they should run about two minutes), and so is the short "why" follow-up.
+    """
+    if q.kind not in CONCISE_TIPS or explain_only:
+        return None
+    words = len(text.split())
+    target = max(CONCISE_MIN_WORDS, 5 * round(CONCISE_FACTOR * len(q.solution.split()) / 5))
+    too_long = words > target
+    return {"words": words, "target": target, "too_long": too_long,
+            "tip": CONCISE_TIPS[q.kind] if too_long else None}
+
+
+def delivery_summary(questions: list[dict]) -> dict | None:
+    """Session-level read on answer length, from the per-answer checks."""
+    rated = [q for q in questions if q.get("word_target")]
+    if not rated:
+        return None
+    long = [q for q in rated if q.get("too_long")]
+    avg = lambda k, xs: round(sum(x[k] for x in xs) / len(xs))  # noqa: E731
+    if long:
+        tip = ("Your long answers averaged " + str(avg("words", long)) + " words against a target of about "
+               + str(avg("word_target", long)) + ". " + CONCISE_TIPS["conceptual"])
+    else:
+        tip = "Your answers were the right length. Interviewers notice that."
+    return {"long": len(long), "of": len(rated), "tip": tip}
+
+
+def concise_trend(pid: str, last: int = 20) -> dict | None:
+    """Share of the candidate's recent technical answers that ran long, across sessions."""
+    checks = []
+    for t in db.profile_turns(pid):
+        try:
+            ln = json.loads(t["diagnosis"] or "{}").get("length")
+        except (TypeError, ValueError):
+            ln = None
+        if ln:
+            checks.append(bool(ln.get("too_long")))
+    if not checks:
+        return None
+    recent, before = checks[-last:], checks[:-last][-last:]
+    return {"answers": len(recent), "long": sum(recent),
+            "pct_long": round(100 * sum(recent) / len(recent)),
+            "pct_long_before": round(100 * sum(before) / len(before)) if before else None}
 
 
 def _near_miss(q: bank.Question, c) -> bool:
@@ -972,7 +1030,8 @@ async def _end_session(s: dict, tz: int | None) -> dict:
                                             if c.get("status") == "correct"],
                        "misconceptions": t["misconceptions"] or [],
                        "evidence": (t["diagnosis"] or {}).get("diagnosis", {}).get("evidence_quote", ""),
-                       "seconds": round(t["seconds"]) if t["seconds"] else None}
+                       "seconds": round(t["seconds"]) if t["seconds"] else None,
+                       **_length_fields((t["diagnosis"] or {}).get("length"))}
                       for t in ts if t["verdict"]],
         "misconceptions_seen": sorted({m for t in ts for m in (t["misconceptions"] or [])}),
         "mastery_start": {bank.SKILLS[k]: round(v["p"] * 100) for k, v in s["mastery_start"].items() if k in bank.SKILLS},
@@ -1007,10 +1066,15 @@ async def _end_session(s: dict, tz: int | None) -> dict:
                          {"error": str(e)[:200]})
     if debrief is None:
         debrief = _fallback_debrief(summary, db.get_plan(pid))
+    debrief["delivery"] = delivery_summary(summary["questions"])
     debrief["plan_event"] = plan_event
     db.end_session(sid, debrief)
     db.add_event(sid, "Director", "end", "Session ended.", {})
     return _report(sid, tz)
+
+
+def _length_fields(ln: dict | None) -> dict:
+    return {"words": ln["words"], "word_target": ln["target"], "too_long": ln["too_long"]} if ln else {}
 
 
 def _map_debrief(output) -> dict:
@@ -1218,5 +1282,6 @@ def dashboard(pid: str, tz: int | None = None) -> dict:
         "plan": plan, "progress": planmod.progress(plan, today) if plan else None,
         "streak": _streak(pid, today, tz), "sessions": db.count_ended_sessions(pid), "answered": wm["answered"],
         "skills": wm["skills"], "misconceptions": wm["misconceptions"],
+        "concise": concise_trend(pid),
         "group_name": bank.GROUPS.get(intake.get("group", "generalist"), "Generalist"),
     }

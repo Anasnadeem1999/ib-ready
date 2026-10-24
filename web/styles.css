@@ -366,6 +366,12 @@ legend { padding: 0; }
 .mis .lbl { font-size: 12px; font-weight: 700; color: var(--bad); text-transform: uppercase; letter-spacing: .05em; }
 .mis b { display: block; margin: 2px 0 3px; }
 .mis p { margin: 0; font-size: 14px; }
+.len { border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--line, #e6e1ef); }
+.len.long { background: #fff8ec; border-color: #f2d9a8; }
+.len.ok { background: #f1faf4; border-color: #bfe3cb; }
+.len .lbl { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted, #6b6680); }
+.len b { display: block; margin: 2px 0 3px; }
+.len p { margin: 0; font-size: 14px; }
 .rationale { font-size: 14px; color: #4a4562; margin: 8px 0; overflow-wrap: anywhere; }
 .solution summary { cursor: pointer; color: var(--primary); font-weight: 700; font-size: 14.5px; min-height: 32px; }
 .solution p { font-size: 14px; overflow-wrap: anywhere; white-space: pre-wrap; }

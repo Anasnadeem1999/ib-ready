@@ -509,3 +509,57 @@ def test_drill_trace_admits_when_it_leaves_the_exact_target(pid):
         assert "closest one" in pick["detail"]["reason"]
     else:
         assert "closest one" not in pick["detail"]["reason"]
+
+
+# ---------------------------------------------------------------- answer length (concise coaching)
+def test_length_check_targets_and_exemptions():
+    import random
+    from ticktie import bank
+    num = bank.instantiate("acc_da", random.Random(1))
+    target = engine.length_check(num, "x")["target"]
+    assert target >= engine.CONCISE_MIN_WORDS
+    assert engine.length_check(num, num.solution)["too_long"] is False  # the model answer itself is never "long"
+    long = engine.length_check(num, "word " * (target + 1))
+    assert long["too_long"] and "Lead with the number" in long["tip"]
+    fit = bank.instantiate("b_why_ib", random.Random(1))
+    assert engine.length_check(fit, "word " * 400) is None        # fit answers should run long
+    assert engine.length_check(num, "word " * 400, explain_only=True) is None
+
+
+def test_every_model_answer_fits_its_own_target():
+    import random
+    from ticktie import bank
+    for tid in bank.TEMPLATES:
+        for seed in range(3):
+            q = bank.instantiate(tid, random.Random(seed))
+            ln = engine.length_check(q, q.solution)
+            assert ln is None or not ln["too_long"], tid
+
+
+def test_delivery_summary_counts_long_answers():
+    qs = [{"word_target": 50, "words": 120, "too_long": True}, {"word_target": 60, "words": 40, "too_long": False}, {}]
+    d = engine.delivery_summary(qs)
+    assert (d["long"], d["of"]) == (1, 2) and "120 words" in d["tip"]
+    assert engine.delivery_summary([{}]) is None
+    assert "right length" in engine.delivery_summary([qs[1]])["tip"]
+
+
+def test_long_answers_flow_to_answer_debrief_and_dashboard(pid, fake_llm):
+    run(engine.end_session(finish_diagnostic(pid)))
+    sid = engine.start_session(pid, "drill", "associate", "accounting")["id"]
+    seen = []
+    for _ in range(6):
+        if db.session(sid)["state"].get("complete"):
+            break
+        r = answer(sid, "So basically " + "I think the answer depends on a few things " * 30)
+        if r.get("blocked"):
+            continue
+        if r["answered_question"]["kind"] != "behavioral" and not r["explain_only"]:
+            assert r["length"]["too_long"], r["length"]
+            seen.append(r["length"])
+    assert seen, "no technical answer was graded"
+    rep = run(engine.end_session(sid))
+    dl = rep["debrief"]["delivery"]
+    assert dl["long"] >= 1 and dl["long"] <= dl["of"]
+    c = engine.dashboard(pid)["concise"]
+    assert c["long"] >= 1 and 0 < c["pct_long"] <= 100

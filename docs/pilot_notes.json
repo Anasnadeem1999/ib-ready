@@ -1,7 +1,23 @@
 {
-  "anas_prep_today": "Anas (Yale SOM MBA, recruiting for investment banking) prepares for technicals with the Finance Club's technical-session prep guides, Breaking Into Wall Street and Wall Street Prep questions, the 400 Questions IB guide, second-year MBA students as mock-interview partners, Yale's Career Development Office coaches, and an AI chat assistant. He spends roughly 15 hours a week on technicals and has not paid for any of it, because Yale provides these resources. In his words, nothing frustrates him about it so far.",
+  "anas_prep_today": "Anas (Yale SOM MBA, recruiting for investment banking) prepares for technicals with the Finance Club's technical-session prep guides, Breaking Into Wall Street and Wall Street Prep questions, the 400 Questions IB guide, second-year MBA students as mock-interview partners, Yale's Career Development Office coaches, and an AI chat assistant. Anas spends roughly 15 hours a week on technicals and has paid nothing for any of it, because Yale provides these resources. In Anas's words, nothing frustrates them about it so far.",
+  "anas_story": {
+    "title": "Where my prep falls short",
+    "intro": "My resources don't fail me on content. Where they fall short is diagnosis. After using them, two things are clear to me:",
+    "findings": [
+      "My recurring mistake: my answers run too long. I usually know the material, but I give long answers where a short, structured one would do.",
+      "What I should do with my next hour: solidify my foundations. Before adding more advanced material, I need to deepen and lock in the core concepts."
+    ],
+    "gaps": [
+      "They teach what to say, not how briefly to say it. The question banks and guides give model answers, but none of them flags when my answer is too long or shows me how to cut it down.",
+      "Finding my weak spots took about two hours. I only saw these patterns after two hours of practice and reflection. Nothing pointed them out to me as I went."
+    ],
+    "closing": "That is the gap IB Ready is built to close. It should spot my weak points within a session rather than after two hours, and turn them into a focused plan for the next hour of practice."
+  },
   "anas_hours_per_week": 15,
   "anas_money_spent": 0,
+  "anas_hours_to_find_weak_spots": 2,
+  "anas_top_pain_point": "answers too long; no resource coaches concision",
   "anas_sources": ["Finance Club technical-session guides", "Breaking Into Wall Street", "Wall Street Prep questions", "400 Questions IB guide", "Second-year MBA mock partners", "Yale CDO coaches", "AI chat assistant"],
+  "product_response": "Concise-answer coaching added to v2: each technical answer is compared with a word target based on the model answer (calculated in code, no extra API cost), the session debrief counts long answers, and Progress tracks the share of long answers across sessions.",
   "recorded": "2026-10-24, in conversation with the developer"
 }
