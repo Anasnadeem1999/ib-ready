@@ -1505,11 +1505,18 @@ MORE_CONCEPTUAL = [
 ]
 
 # =========================================================================== FIT & BEHAVIORAL
-def _fit(tid: str, diff: int, title: str, question: str, key_points: list[str], mis: list[str], model: str, secs: int = 120) -> Template:
-    return Template(id=tid, skill="fit", difficulty=diff, kind="behavioral", title=title,
-                    text=lambda p, q=question: q.replace("{group}", str(p.get("group", "this group"))),
+def _fit(tid: str, diff: int, title: str, question: str, key_points: list[str], mis: list[str], model: str, secs: int = 120,
+         generalist_question: str | None = None) -> Template:
+    def text(p: Params, q: str = question, gq: str | None = generalist_question) -> str:
+        if gq and p.get("generalist"):
+            return gq  # a candidate with no team picked yet
+        return q.replace("{group}", str(p.get("group", "this group")))
+    return Template(id=tid, skill="fit", difficulty=diff, kind="behavioral", title=title, text=text,
                     key_points=key_points, misconceptions=mis, explain=lambda p, v, a=model: a, target_seconds=secs)
 
+
+# Questions that ask nearly the same thing: never served in the same session (QA D-08).
+TWINS: dict[str, set[str]] = {"b_why_ib": {"b_why_group"}, "b_why_group": {"b_why_ib"}}
 
 BEHAVIORAL = [
     _fit("b_resume", 1, "Walk me through your resume", "Walk me through your resume.",
@@ -1528,13 +1535,14 @@ BEHAVIORAL = [
          "decisions, each backed by evidence from your own experience: a project where you enjoyed financial analysis, a"
          " deal you followed, conversations with bankers. Show a realistic view of the job, including the hours and "
          "analytical work. Keep it from sounding mainly about money or prestige, and link it to your longer-term goals."),
-    _fit("b_why_group", 2, "Why this group", "Why do you want to work in {group}?",
+    _fit("b_why_group", 2, "Why this team", "Why do you want to work in {group}?",
          ["Knowledge of the group's sector or product", "A specific trend or recent deal in the space", "A personal connection or prior experience",
           "How your skills fit the group's work"],
          ["FIT_GENERIC", "FIT_NO_EVIDENCE"],
          "Show knowledge of the group's sector or product and what it does, mention a specific trend or recent deal in "
          "the space, explain a personal connection or prior experience that makes it genuinely interesting to you, and "
-         "say how your skills fit the group's work."),
+         "say how your skills fit the group's work.",
+         generalist_question="Why banking, and what kind of team interests you?"),
     _fit("b_why_firm", 2, "Why our firm", "Why our firm over the other banks you're talking to?",
          ["Specific differentiators (deal flow, group strengths, culture)", "People you've met and what you learned from them",
           "Fit between you and the firm", "Not generic praise"],

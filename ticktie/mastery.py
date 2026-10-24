@@ -120,9 +120,12 @@ def pick_targeted(group: str | None, skill: str, lvl: int, subskill: str | None,
 
 def _fresh(cands: list[bank.Template], asked: list[str]) -> list[bank.Template]:
     """Numeric questions may come back (new numbers each time) but never back to back; word questions
-    (conceptual, behavioral) are not repeated within the last 8 questions."""
+    (conceptual, behavioral) are not repeated within the last 8 questions, and a question's twin (one that
+    asks nearly the same thing, bank.TWINS) is not asked in the same session."""
     recent = set(asked[-8:])
-    return [t for t in cands if (t.kind == "numeric" and asked[-1:] != [t.id]) or t.id not in recent]
+    seen = set(asked)
+    return [t for t in cands if ((t.kind == "numeric" and asked[-1:] != [t.id]) or t.id not in recent)
+            and not (bank.TWINS.get(t.id, set()) & seen)]
 
 
 def available_levels(group: str | None, skill: str) -> list[int]:

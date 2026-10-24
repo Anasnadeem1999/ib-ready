@@ -94,6 +94,7 @@ main:focus { outline: none; }
 .menu .danger { color: var(--bad); }
 
 main { margin: 0 auto; padding: 28px 28px 80px; }
+body.in-session main { padding-bottom: 12px; } /* the interview fits the viewport: no page scroll (QA D-04) */
 .view { margin-inline: auto; }
 .w-narrow { max-width: var(--w-narrow); }
 .w-default { max-width: var(--w-default); }
@@ -301,6 +302,8 @@ legend { padding: 0; }
 /* ---------- interview ---------- */
 .interview { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 20px; align-items: start; }
 .chat-col { display: grid; grid-template-rows: auto 1fr auto; gap: 10px; height: calc(100vh - var(--topbar-h) - 56px); min-height: 520px; min-width: 0; }
+.session-bar { scroll-margin-top: calc(var(--topbar-h) + 12px); }
+.msg, .qcard { scroll-margin-top: calc(var(--topbar-h) + 76px); }
 .session-bar { position: relative; display: flex; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; box-shadow: var(--shadow); flex-wrap: wrap; }
 .mode-pill { background: var(--primary-soft); color: var(--primary); }
 .session-bar .progress { flex: 1; min-width: 160px; }
@@ -585,6 +588,12 @@ details.bts[open] > summary, details.disclosure[open] > summary { margin-bottom:
   .change-row .nums { justify-content: flex-start; grid-column: 1 / -1; }
   .msg, .qcard { max-width: 100%; }
   .session-bar { gap: 8px; padding: 8px 10px; flex-wrap: nowrap; }
+  /* QA D-03: the one next step comes straight after the results header on a phone */
+  .results .res-grid { display: contents; }
+  .results > *, .results .res-grid > * { order: 3; }
+  .results > .page-head { order: 0; }
+  .results #res-next { order: 1; }
+  .results #res-encourage, .results #res-levelups { order: 2; }
   .session-bar .progress { min-width: 0; }
   .mode-pill { max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
   .sb-more { display: inline-block; }

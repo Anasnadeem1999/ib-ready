@@ -160,8 +160,10 @@ def _pick(pid: str, state: dict, sid: str) -> bank.Question:
         reason += " Re-tests: " + ", ".join(LIBRARY[h].name for h in hits) + "."
     params = t.gen(rng)
     if t.kind == "behavioral":
-        params = {"group": bank.GROUPS.get(group, "this group").split(" (")[0]
-                  if group and group != "generalist" else "investment banking"}
+        generalist = not group or group == "generalist"
+        params = {"group": "investment banking" if generalist else bank.GROUPS.get(group, "this group").split(" (")[0]}
+        if generalist:
+            params["generalist"] = True
     q = bank.build(t, params)
     asked.append(t.id)
     state["current"] = {**q.to_state(), "whatif": False}
@@ -1066,6 +1068,10 @@ async def _end_session(s: dict, tz: int | None) -> dict:
                          {"error": str(e)[:200]})
     if debrief is None:
         debrief = _fallback_debrief(summary, db.get_plan(pid))
+    # The next step is tied to the task the results card shows (code, not the coach, picks it: QA D-01).
+    nxt = (planmod.progress(plan_now, planmod.user_today(tz))["next"] if (plan_now := db.get_plan(pid)) else None)
+    if nxt:
+        debrief["next_step"] = next_step_line(nxt)
     debrief["delivery"] = delivery_summary(summary["questions"])
     debrief["plan_event"] = plan_event
     db.end_session(sid, debrief)
@@ -1143,6 +1149,34 @@ def _fallback_debrief(summary: dict, plan: dict | None = None) -> dict:
             "encouragement": encouragement}
 
 
+def next_task_title(task: dict) -> str:
+    """The task's name as the UI shows it ("Accounting practice", "Mock interview")."""
+    if task.get("type") == "mock":
+        return "Final mock interview" if task.get("final") else "Mock interview"
+    return f"{bank.SKILLS.get(task.get('skill'), 'Topic')} practice"
+
+
+def next_task_why(task: dict | None) -> str:
+    """One plain line on why the next plan task comes next. Code writes it from the task itself,
+    so the sentence above the task card can never talk about a different topic (QA D-01)."""
+    if not task:
+        return ""
+    if task.get("type") == "mock":
+        if task.get("final"):
+            return "It's your last full run-through before the interview, with mixed questions like the real thing."
+        return "Mixed questions, like the real interview, so you practice switching between topics."
+    sub = bank.SUBSKILLS.get(task.get("subskill") or "", (None, None))[1]
+    if sub:
+        return f"It's first on your plan because your answers showed {sub.lower()} needs work. Fixing it lifts the whole topic."
+    lvl = bank.LEVELS.get(task.get("level") or 0)
+    return ("It's first on your plan, which starts with the topics that need the most work"
+            + (f". The questions are pitched at {lvl}." if lvl else "."))
+
+
+def next_step_line(task: dict | None) -> str:
+    return f"Next: {next_task_title(task)}. {next_task_why(task)}" if task else ""
+
+
 async def build_plan(pid: str, sid: str | None = None, tz: int | None = None, partial: list[str] | None = None) -> dict:
     """Code computes the plan; the Planner agent only writes the plain-English summary of it.
     Completed tasks from the previous plan are kept (with their dates); only the remaining work is rebuilt."""
@@ -1154,7 +1188,7 @@ async def build_plan(pid: str, sid: str | None = None, tz: int | None = None, pa
     plan["placement_partial_skills"] = partial if partial is not None else (old or {}).get("placement_partial_skills", [])
     facts = {k: plan[k] for k in ("group_name", "days_left", "hours_per_week", "overall_label", "target_label", "drills",
                                   "mocks", "questions", "hours_planned", "hours_available", "compressed",
-                                  "minutes_per_practice_day", "final_prep", "interview_passed")}
+                                  "minutes_per_practice_day", "final_prep", "interview_passed", "stage")}
     facts["skills"] = [{"skill": r["name"], "now": bank.LEVELS.get(r["current"], bank.LEVEL0_LABEL),
                         "target": bank.LEVELS[r["target"]], "drills": r["drills"],
                         "weak_subskills": [w["name"] for w in r["weak_subskills"]]} for r in plan["skills"]]
@@ -1211,7 +1245,10 @@ def _report(sid: str, tz: int | None = None) -> dict:
         "levels_start": start_levels, "levels_end": end_levels,
         "level_ups": [{"skill": k, "name": bank.SKILLS[k], "from": bank.LEVELS.get(start_levels.get(k, 0), bank.LEVEL0_LABEL),
                        "to": bank.LEVELS.get(v, bank.LEVEL0_LABEL)} for k, v in end_levels.items() if v > start_levels.get(k, 0)],
-        "plan_progress": planmod.progress(plan, planmod.user_today(tz)) if plan else None,
+        "plan_progress": (prog := planmod.progress(plan, planmod.user_today(tz)) if plan else None),
+        "next_why": next_task_why(prog["next"]) if prog else "",
+        # questions finished (a second attempt or a follow-up is not a new question); "turns" counts every answer
+        "questions_done": int(s["state"].get("done_q", 0)),
         "turns": [{"question": t["question"], "verdict": t["verdict"], "skill": t["skill"],
                    "misconceptions": t["misconceptions"], "seconds": t["seconds"]} for t in ts],
         "usage": db.session_usage(sid),

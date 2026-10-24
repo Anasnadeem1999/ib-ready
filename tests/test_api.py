@@ -563,3 +563,38 @@ def test_long_answers_flow_to_answer_debrief_and_dashboard(pid, fake_llm):
     assert dl["long"] >= 1 and dl["long"] <= dl["of"]
     c = engine.dashboard(pid)["concise"]
     assert c["long"] >= 1 and 0 < c["pct_long"] <= 100
+
+
+# ---------------------------------------------------------------- results card (UX QA round 2: D-01, D-07)
+def test_next_step_matches_the_next_plan_task(pid, fake_llm):
+    rep = run(engine.end_session(finish_diagnostic(pid)))
+    nxt = rep["plan_progress"]["next"]
+    assert nxt is not None
+    title = engine.next_task_title(nxt)
+    assert rep["debrief"]["next_step"].startswith(f"Next: {title}.")  # the coach's sentence is replaced
+    assert rep["next_why"] and rep["next_why"] in rep["debrief"]["next_step"]
+    sid = engine.start_session(pid, "drill", "associate", None)["id"]
+    answer_until(sid, 3)
+    rep = run(engine.end_session(sid))
+    nxt = rep["plan_progress"]["next"]
+    assert rep["next_why"] == engine.next_task_why(nxt)
+    assert rep["debrief"]["next_step"] == engine.next_step_line(nxt)
+    assert "diagnostic" not in rep["debrief"]["next_step"].lower() and "drill" not in rep["next_why"].lower()
+
+
+def test_next_task_why_is_plain_and_tied_to_the_task():
+    sub = next(iter(engine.bank.SUBSKILLS))
+    skill, name = engine.bank.SUBSKILLS[sub]
+    assert name.lower() in engine.next_task_why({"type": "drill", "skill": skill, "subskill": sub, "level": 1})
+    assert "Coffee-chat ready" in engine.next_task_why({"type": "drill", "skill": "dcf", "subskill": None, "level": 1})
+    assert "last full run-through" in engine.next_task_why({"type": "mock", "final": True})
+    assert engine.next_task_title({"type": "drill", "skill": "dcf"}) == "DCF & WACC practice"
+    assert engine.next_task_why(None) == "" and engine.next_step_line(None) == ""
+
+
+def test_report_counts_questions_not_answers(pid):
+    sid = engine.start_session(pid, "drill", "associate", None)["id"]
+    answer_until(sid, 2)
+    rep = run(engine.end_session(sid))
+    assert rep["questions_done"] == db.session(sid)["state"]["done_q"] == 2
+    assert len([t for t in rep["turns"] if t["verdict"]]) >= rep["questions_done"]

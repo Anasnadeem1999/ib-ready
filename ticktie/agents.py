@@ -239,7 +239,7 @@ class Debrief(BaseModel):
     headline: str = Field(description="One sentence, at most 25 words: a grounded reason for confidence, then the main gap.")
     went_well: list[str] = Field(default_factory=list, description="Up to 3 short, specific, real strengths.")
     work_on: list[WorkOn] = Field(default_factory=list, description="Up to 2 items, most important first.")
-    next_step: str = Field(description="One sentence: the mode and focus for the next session.")
+    next_step: str = Field(description="One sentence: the focus for the next practice.")
     encouragement: str = Field(default="", description="One honest, specific, steadying closing sentence.")
 
     @field_validator("headline", "next_step", "encouragement")

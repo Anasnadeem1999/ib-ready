@@ -16,7 +16,7 @@ const OLD_LEVEL = { Foundations: 0, Basic: 1, Intermediate: 2, Advanced: 3 };
 // Server text may still say Basic / Intermediate / Advanced: show the student-facing milestone names instead.
 function mapLevels(text) {
   if (!text) return text;
-  return String(text).replace(/(Foundations|Basic|Intermediate|Advanced)( level| drill)?/g, (m, w, suf) =>
+  return String(text).replace(/\b(Foundations|Basic|Intermediate|Advanced)( level| drill)?\b/g, (m, w, suf) =>
     suf === " level" ? `${LEVEL_SHORT[OLD_LEVEL[w]].toLowerCase()} level` : suf === " drill" ? `${LEVEL_SHORT[OLD_LEVEL[w]]} drill` : LEVEL_NAMES[OLD_LEVEL[w]]);
 }
 function journey(level, { title = true } = {}) {
@@ -65,7 +65,7 @@ const FALLBACK = {
   misconception_explainer: "**What's a mistake pattern?** It's the specific wrong idea behind a wrong number, like \"forgot that interest is tax-deductible\". Fix the idea once and every question that uses it gets easier.",
   empty_states: {
     dashboard: "Let's find your starting point. A 15-minute placement interview shows where you already are and where to focus. There's no pass or fail, just a map.",
-    plan: "Your plan appears here after the placement interview. It counts back from your interview date and fits the hours you said you have, so you only practice what moves the needle.",
+    plan: "It counts back from your interview date and fits the hours you have, so you only practice what moves the needle.",
     progress: "Your progress fills in as you answer questions. Each topic moves from Getting started to Superday ready, and the sub-skills that need work are where your next drills go.",
   },
   encouragement: {
@@ -90,7 +90,7 @@ function levelUpLine(skill, level) {
 }
 function misHTML(short) {
   const m = C("misconception_explainer");
-  const body = typeof m === "string" ? m.replace(/^\*\*What's a (misconception|mistake pattern)\?\*\*\s*/i, "").replace(/A misconception is/, "A mistake pattern (or misconception) is") : "";
+  const body = typeof m === "string" ? m.replace(/^\*\*What's a (misconception|mistake pattern)\?\*\*\s*/i, "").replace(/A misconception is/, "A mistake pattern is") : "";
   return `${short ? "" : "<h3>What's a mistake pattern?</h3>"}${body ? `<p>${inline(body)}</p>` : rich(m)}`;
 }
 function levelsHTML(x) {
@@ -98,7 +98,7 @@ function levelsHTML(x) {
   const rows = [lv.getting_started, lv.Basic, lv.Intermediate, lv.Advanced].map((v, i) => ({
     label: v?.label || LEVEL_NAMES[i], stage: v?.stage || "", text: v?.explanation || v?.meaning || LEVEL_MEANING[i] }));
   const how = typeof lv.how_you_level_up === "string" ? mapLevels(lv.how_you_level_up) : "You reach a milestone once you've shown it on at least two questions. Everyone starts at the beginning and moves up only when ready.";
-  return `<h3>How milestones work</h3><p>${inline(mapLevels(lv.intro) || "Every topic moves through four milestones, named after the stage of recruiting you're ready for.")}</p>
+  return `<h3>How milestones work</h3><p>${inline(mapLevels(lv.intro) || "Every topic moves through three milestones after Getting started, each named after the stage of recruiting you're ready for.")}</p>
     <ol class="journey static">${rows.map((r, i) => `<li class="${i ? "todo" : "here"}"><span class="jdot" aria-hidden="true"></span><b>${esc(LEVEL_SHORT[i])}</b></li>`).join("")}</ol>
     <ul>${rows.map((r) => `<li><b>${esc(r.label)}</b>${r.stage ? ` <span class="muted">(${esc(r.stage)})</span>` : ""}: ${inline(r.text)}</li>`).join("")}</ul><p>${inline(how)}</p>`;
 }
@@ -204,13 +204,14 @@ function buildGlossary() {
   GLOSS.map = {};
   GLOSS.list.forEach((e) => {
     const base = e.term.toLowerCase().replace(/\s*\(.*?\)\s*/g, " ").trim();
-    [e.term.toLowerCase(), base, ...base.split(/\s*\/\s*/)].forEach((k) => { if (k && !GLOSS.map[k]) GLOSS.map[k] = e; });
+    const acr = (e.term.match(/\(([A-Za-z&]{2,6})\)/) || [])[1];
+    [e.term.toLowerCase(), base, ...base.split(/\s*\/\s*/), acr && acr.toLowerCase()].forEach((k) => { if (k && !GLOSS.map[k]) GLOSS.map[k] = e; });
   });
 }
 function tipData(key) {
   const k = String(key).toLowerCase();
   const own = TIPS[k];
-  const aliases = { superday: "superday", drill: "drill", "mock interview": "mock", "sub-skill": "sub-skill", "mistake pattern": "misconception", confidence: "mastery" };
+  const aliases = { "mistake pattern": "misconception", confidence: "mastery", sbc: "stock-based compensation" };
   const g = GLOSS.map[k] || (aliases[k] && GLOSS.map[aliases[k]]);
   if (own) return { label: own[0], def: own[1] };
   if (g) return { label: mapLevels(g.term), def: mapLevels(g.def) };
@@ -221,6 +222,30 @@ function tip(key, label) {
   if (!d) return "";
   return `<button type="button" class="tip" data-tip="${esc(key)}" aria-label="What is ${esc(label || d.label)}?" aria-expanded="false">?</button>`;
 }
+// Finance terms a newcomer may not know. In coach and plan prose the first use of each gets a "?" (QA D-10).
+const JARGON = ["CAPM", "MOIC", "IRR", "D&A", "SBC", "WACC", "DCF", "EBITDA", "EBIT", "EV/EBITDA", "UFCF", "NOPAT", "LBO", "M&A", "EPS", "P/E",
+  "treasury stock method", "paper LBO", "returns math", "terminal value", "enterprise value", "equity value", "diluted shares", "accretive", "dilutive",
+  "goodwill", "working capital", "stock-based compensation", "mm"];
+const reEsc = (t) => t.replace(/[.*+?^$()|[\]\\/{}]/g, "\\$&");
+const JARGON_RE = new RegExp("(^|[^A-Za-z/&])(" + JARGON.slice().sort((a, b) => b.length - a.length)
+  .map((t) => reEsc(t).replace(/&/g, "&amp;")).join("|") + ")(?![A-Za-z])", "gi");
+// Takes text that is already HTML-escaped. Acronyms match case-sensitively; phrases match any case. "mm" only right after a number.
+function linkTerms(html, seen = new Set()) {
+  return html.replace(JARGON_RE, (m, pre, term) => {
+    const raw = term.replace(/&amp;/g, "&");
+    const canon = JARGON.find((t) => t.toLowerCase() === raw.toLowerCase());
+    if (!canon) return m;
+    if (/^[A-Z&/]+$/.test(canon) && raw !== canon) return m;
+    if (canon === "mm" && !/\d$/.test(pre)) return m;
+    const key = canon.toLowerCase();
+    if (seen.has(key) || !tipData(key)) return m;
+    seen.add(key);
+    return `${pre}${term}${tip(key, canon)}`;
+  });
+}
+// Coach prose: show milestone names, avoid internal words, explain jargon.
+const plainWords = (t) => mapLevels(t || "").replace(/\bdiagnostics?\b/gi, "practice").replace(/\bpractise\b/g, "practice").replace(/\bmastery\b/g, "confidence");
+const coachHTML = (t, seen) => linkTerms(esc(plainWords(t)), seen);
 function hydrateTips(root = document) { $$("[data-tipkey]", root).forEach((el) => { el.outerHTML = tip(el.dataset.tipkey); }); }
 const POP = { el: null, btn: null, pinned: false };
 function openTip(btn, pinned) {
@@ -247,10 +272,13 @@ document.addEventListener("focusin", (e) => { const b = e.target.closest?.(".tip
 window.addEventListener("scroll", () => { if (POP.btn) closeTip(); }, true);
 
 // ------------------------------------------------------------------ api
+const OFFLINE_MSG = "We can't reach IB Ready right now. Check your connection and try again. Nothing you've done is lost.";
 async function api(path, body, { authRedirect = true } = {}) {
   const headers = { "Content-Type": "application/json", "X-TZ-Offset": String(new Date().getTimezoneOffset()) };
   if (S.token) headers["X-Auth-Token"] = S.token;
-  const r = await fetch(path, body === undefined ? { headers } : { method: "POST", headers, body: JSON.stringify(body) });
+  let r;
+  try { r = await fetch(path, body === undefined ? { headers } : { method: "POST", headers, body: JSON.stringify(body) }); }
+  catch { const e = new Error(OFFLINE_MSG); e.offline = true; throw e; }  // the browser's "Failed to fetch" means a network problem
   const data = await r.json().catch(() => ({}));
   if (r.status === 401 && authRedirect && S.token) { signOut(); const e = new Error("Please sign in again."); e.status = 401; throw e; }
   if (!r.ok) {
@@ -311,7 +339,8 @@ function render(view, sec) {
   if (view === "progress") renderProgress();
   if (view === "how") renderHow(sec);
   if (view === "intake") fillIntake();
-  if (!(view === "how" && sec) && !inInterview) window.scrollTo({ top: 0 });
+  // the interview is sized to the viewport: always show it from the top, so the session bar is never under the header (QA D-04)
+  if (!(view === "how" && sec)) window.scrollTo({ top: 0 });
   if (prev !== view) { const h = $(`#view-${section} h1`); if (h && !inInterview) { h.setAttribute("tabindex", "-1"); h.focus({ preventScroll: true }); } }
 }
 $$(".tab, .btab").forEach((t) => t.addEventListener("click", () => go(t.dataset.view)));
@@ -638,8 +667,8 @@ async function renderPlan() {
   $("#plan-body-wrap").hidden = !plan; $("#plan-actions").hidden = !plan; $("#plan-empty").hidden = !!plan;
   if (!plan) {
     $("#plan-h1").textContent = "Your plan"; $("#plan-lead").textContent = "";
-    $("#plan-empty").innerHTML = emptyState("Your plan appears after your placement interview.", emptyCopy("plan", "no_plan") + " It takes about 15 minutes.",
-      `<button class="primary big" data-start-placement>Start</button>`);
+    $("#plan-empty").innerHTML = emptyState("Your plan appears after your placement interview.", emptyCopy("plan", "no_plan") + " The placement interview takes about 15 minutes.",
+      `<button class="primary big" data-start-placement>Start placement interview</button>`);
     return;
   }
   const todayISO = d.today || localISO();
@@ -659,7 +688,7 @@ async function renderPlan() {
   if (plan.interview_passed || d.interview_status === "past" || (until != null && until < 0)) flags.push(`Your interview date has passed. We hope it went well! <button class="textlink" data-go="intake">Set a new date</button> and we'll rebuild the plan around it.`);
   else if (plan.horizon_capped || (plan.horizon_capped === undefined && until != null && until > plan.days_left + 1)) flags.push(`Plans cover up to ${plan.days_left} days at a time. We'll extend it as you get closer to ${esc(fmtDate(d.intake.interview_date))}.`);
   if (plan.compressed) flags.push("Time is tight, so the plan keeps the highest-priority work: your weakest topics first.");
-  $("#plan-summary").innerHTML = `<h2 class="section-title">Why this plan</h2><h3>${esc(mapLevels(sm.headline))}</h3><p>${esc(mapLevels(sm.why))}</p>
+  $("#plan-summary").innerHTML = `<h2 class="section-title">Why this plan</h2><h3>${esc(plainWords(sm.headline))}</h3><p>${coachHTML(sm.why)}</p>
     <div class="stat-row mt-4"><div class="stat"><b>${plan.hours_planned}h</b><span>of practice on the calendar${plan.review_hours ? `, plus about ${plan.review_hours}h of review` : ""} (${plan.hours_available}h available)</span></div>
       <div class="stat"><b>${plan.drills}</b><span>short practices ${tip("drill")}</span></div><div class="stat"><b>${plan.mocks}</b><span>mock interviews ${tip("mock interview")}</span></div></div>
     ${flags.map((f) => `<div class="flag">${f}</div>`).join("")}`;
@@ -784,8 +813,16 @@ function addMsg(kind, text, who) {
   const el = document.createElement("div");
   el.className = `msg ${kind}`;
   el.innerHTML = `<div class="who">${esc(who || (kind === "me" ? "You" : "Interviewer"))}</div>${esc(kind === "ai" ? mapLevels(text) : text)}`;
-  $("#chat").appendChild(el); el.scrollIntoView({ block: "end" });
+  $("#chat").appendChild(el); chatToEnd();
   return el;
+}
+// Scroll only the chat box, never the page: scrolling the page pushed the session bar under the sticky header (QA D-04).
+function chatToEnd() { const c = $("#chat"); c.scrollTop = c.scrollHeight; }
+// Bring an element fully into the chat box; if it is taller than the box, show its top.
+function chatShow(el) {
+  const c = $("#chat"), cr = c.getBoundingClientRect(), er = el.getBoundingClientRect();
+  const bottom = c.scrollTop + er.bottom - cr.bottom + 4, top = c.scrollTop + er.top - cr.top - 8;
+  c.scrollTop = Math.min(Math.max(bottom, c.scrollTop), top);
 }
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 function addQuestion(q) {
@@ -797,10 +834,11 @@ function addQuestion(q) {
     ${q.subskill_name ? `<span class="small muted">${esc(q.subskill_name)}</span>` : ""}
     <span class="timer" aria-label="Time on this question">0:00 / ${mmss(q.target_seconds || 60)}</span></div>
     <div class="qcard-title">${esc(q.title)}</div><div class="qcard-text">${esc(q.text)}</div>`;
-  $("#chat").appendChild(el); el.scrollIntoView({ block: "end" });
+  $("#chat").appendChild(el); chatToEnd();
   clearAnswerBox();
   startTimer(el.querySelector(".timer"), q.target_seconds || 60);
   setHint();
+  return el;
 }
 function setHint(over = false) {
   const q = S.session?.question;
@@ -822,7 +860,7 @@ function stopTimer() { clearInterval(S.timer); }
 function thinking() {
   const el = document.createElement("div"); el.className = "msg ai thinking"; el.setAttribute("role", "status");
   el.innerHTML = `<span class="dots" aria-hidden="true"><span></span><span></span><span></span></span> Checking your numbers…`;
-  $("#chat").appendChild(el); el.scrollIntoView({ block: "end" });
+  $("#chat").appendChild(el); chatToEnd();
   el._t = setTimeout(() => el.insertAdjacentHTML("beforeend", " <span>Still working, thanks for waiting.</span>"), 8000);
   return el;
 }
@@ -865,10 +903,11 @@ async function submitAnswer(override) {
     const rate = err.status === 429 || /too (fast|many|quick)|slow down|rate/i.test(err.message);
     const el = document.createElement("div"); el.className = "msg ai err"; el.setAttribute("role", "alert");
     el.innerHTML = `<div class="who">IB Ready</div>${rate ? "Easy, that was fast! Give it a second and press Submit again."
+      : err.offline ? `${esc(OFFLINE_MSG)} ${draft ? "Your answer is still in the box." : ""}`
       : `We couldn't grade that one. ${draft ? "Your answer is still in the box." : ""} <span class="small muted">(${esc(err.message)})</span>`}
       ${rate ? "" : ` <button class="secondary small-btn" type="button">Try again</button>`}`;
     el.querySelector("button")?.addEventListener("click", () => { el.remove(); submitAnswer(override); });
-    $("#chat").appendChild(el); el.scrollIntoView({ block: "end" });
+    $("#chat").appendChild(el); chatToEnd();
   } finally { S.busy = false; $("#send-btn").disabled = false; $("#idk-btn").disabled = false; if (!isMobile()) $("#answer").focus(); }
 }
 
@@ -894,7 +933,10 @@ async function handleTurn(r) {
     await finishSession(true);
     return;
   }
-  if (r.next_question) { stopTimer(); addQuestion(r.next_question); speak(`${r.interviewer} ${r.next_question.text}`, S.session.persona); }
+  if (r.next_question) {
+    stopTimer(); const qEl = addQuestion(r.next_question);
+    setTimeout(() => chatShow(qEl), 50);  // QA D-02: the whole new question in view, never under the composer
+    speak(`${r.interviewer} ${r.next_question.text}`, S.session.persona); }
   else { setHint(); speak(r.interviewer, S.session.persona); }
 }
 
@@ -931,7 +973,8 @@ function renderDiag(r) {
       ${diag ? "" : `<button class="secondary small-btn mt-2" type="button">See feedback ▴</button>`}`;
     el.querySelector("button")?.addEventListener("click", openSheet);
     $("#chat").appendChild(el);
-    setTimeout(() => el.scrollIntoView({ block: "end" }), 0);
+    // when a new question follows, handleTurn scrolls to it instead (QA D-02: never hide it under the composer)
+    if (!r.next_question) setTimeout(chatToEnd, 0);
   }
 }
 // answer length: computed by the app from the model answer, coaching only (it never changes the grade)
@@ -1006,8 +1049,8 @@ function normDebrief(d = {}) {
     encouragement: d.encouragement || "",
   };
 }
-function focusHTML(f) {
-  return `<div class="focus"><b class="nm">${esc(f.name || f.misconception_id)}</b>${f.why ? `<p><span class="k">Why it matters:</span> ${esc(mapLevels(f.why))}</p>` : ""}${f.try_this ? `<p><span class="k">Try this:</span> ${esc(mapLevels(f.try_this))}</p>` : ""}</div>`;
+function focusHTML(f, seen) {
+  return `<div class="focus"><b class="nm">${esc(f.name || f.misconception_id)}</b>${f.why ? `<p><span class="k">Why it matters:</span> ${coachHTML(f.why, seen)}</p>` : ""}${f.try_this ? `<p><span class="k">Try this:</span> ${coachHTML(f.try_this, seen)}</p>` : ""}</div>`;
 }
 function renderResults(r) {
   const mode = r.session?.mode;
@@ -1045,24 +1088,31 @@ function renderResults(r) {
         `<div class="placement-row c-${s.key}"><span class="nm">${esc(skillName(s.key))} ${tip(s.key)}</span>${levelMeter(s.level, null, { label: LEVEL_NAMES[s.level] })}
          <span class="lvname">${esc(LEVEL_SHORT[s.level] || LEVEL_SHORT[0])} ${maxL !== minL && s.level === maxL ? '<span class="chip strong">Strongest</span>' : maxL !== minL && s.level === minL ? '<span class="chip start">Start here</span>' : ""}</span></div>`).join("");
     }
-    $("#res-notes").innerHTML = `<div class="notes"><h2 class="section-title">Your coach's notes</h2>${d.headline ? `<p class="headline">${esc(mapLevels(d.headline))}</p>` : ""}
-      ${d.went_well.length ? `<h3>What went well</h3><ul>${d.went_well.map((s) => `<li>${esc(mapLevels(s))}</li>`).join("")}</ul>` : ""}
-      ${d.work_on.length ? `<h3>Where to start</h3>${d.work_on.slice(0, 2).map(focusHTML).join("")}` : ""}</div>`;
-    $("#res-next").innerHTML = next ? `<span class="eyebrow">Your first step</span>${d.next_step ? `<p class="nstep">${esc(mapLevels(d.next_step))}</p>` : ""}
+    const seen = new Set();
+    $("#res-notes").innerHTML = `<div class="notes"><h2 class="section-title">Your coach's notes</h2>${d.headline ? `<p class="headline">${coachHTML(d.headline, seen)}</p>` : ""}
+      ${d.went_well.length ? `<h3>What went well</h3><ul>${d.went_well.map((s) => `<li>${coachHTML(s, seen)}</li>`).join("")}</ul>` : ""}
+      ${d.work_on.length ? `<h3>Where to start</h3>${d.work_on.slice(0, 2).map((f) => focusHTML(f, seen)).join("")}` : ""}</div>`;
+    $("#res-next").innerHTML = next ? `<span class="eyebrow">Your first step</span>
       <p class="task-line">${esc(taskTitle(next))}</p><p class="small muted mt-0">${esc(taskSub(next))}</p>
+      ${r.next_why ? `<p class="nstep">${coachHTML(r.next_why)}</p>` : ""}
       <button class="primary big" data-task="${next.id}">Start</button>
       <button class="textlink" data-go="plan">See my plan</button>`
-      : `<span class="eyebrow">Your next step</span><p class="nstep">${esc(d.next_step || "Head home to see what's next.")}</p><button class="primary big" data-go="home">Continue</button>`;
+      : `<span class="eyebrow">Your next step</span><p class="nstep">${coachHTML(d.next_step || "Head home to see what's next.")}</p><button class="primary big" data-go="home">Continue</button>`;
     
   } else {
-    $("#res-kind").textContent = `${(MODE_LABEL[mode] || "Session").replace("Topic practice", "Practice")} complete · ${n} question${n === 1 ? "" : "s"}`;
+    // questions = finished questions (done_q); answers = every graded reply, including second attempts and follow-ups
+    const nq = r.questions_done ?? n;
+    $("#res-kind").textContent = `${(MODE_LABEL[mode] || "Session").replace("Topic practice", "Practice")} complete · ${nq} question${nq === 1 ? "" : "s"}` +
+      (n > nq ? ` · ${n} answers` : "");
     $("#res-notes").parentElement.hidden = false;
-    $("#res-title").textContent = n >= 3 ? "Good work. Here's what changed." : n ? "Session complete. Here's what changed." : "Session ended";
     const touched = (r.touched_skills && r.touched_skills.length ? r.touched_skills : [...new Set(turns.map((t) => t.skill))]).filter(Boolean);
     $("#res-sub").textContent = n < 3
       ? "Short session, so this is a light read. A few more answers next time will sharpen your picture."
       : `You practiced ${touched.map((k) => skillName(k)).join(", ")}${mins ? ` for ${mins} minute${mins === 1 ? "" : "s"}` : ""}.`;
     const ups = r.level_ups || [];
+    // "Good work" only when something actually went up (a milestone, or earned confidence on a topic)
+    const improved = ups.length > 0 || touched.some((k) => Math.round(100 * (r.mastery_end?.[k]?.p ?? 0)) > Math.round(100 * (r.mastery_start?.[k]?.p ?? 0)));
+    $("#res-title").textContent = !n ? "Session ended" : improved ? "Good work. Here's what changed." : "Session complete. Here's what to work on next.";
     $("#res-levelups").innerHTML = ups.map((u, i) => `<div class="levelup" style="animation-delay:${0.2 + i * 0.15}s">⬆ ${esc(skillName(u.skill, u.name))}: ${esc(lvlLabel(u.from))} → ${esc(lvlLabel(u.to))}<div class="small" style="font-weight:500">${esc(levelUpLine(skillName(u.skill, u.name), u.to))}</div></div>`).join("");
     const row = (k) => {
       const a = r.mastery_start?.[k]?.p, b = r.mastery_end?.[k]?.p;
@@ -1080,15 +1130,18 @@ function renderResults(r) {
     $("#res-changes").innerHTML = `<h2 class="section-title">What changed ${tip("confidence")}</h2>` + (touched.length ? touched.map(row).join("") : `<p class="muted mt-0">No answers were graded, so nothing changed.</p>`) +
       (others.length ? `<details class="more-focus"><summary>Show all topics</summary>${others.map(row).join("")}</details>` : "");
     const dipped = touched.some((k) => (r.mastery_end?.[k]?.p ?? 0) < (r.mastery_start?.[k]?.p ?? 0));
-    $("#res-notes").innerHTML = `<div class="notes"><h2 class="section-title">Your coach's notes</h2>${d.headline ? `<p class="headline">${esc(mapLevels(d.headline))}</p>` : ""}
-      ${d.went_well.length ? `<h3>What went well</h3><ul>${d.went_well.map((s) => `<li>${esc(mapLevels(s))}</li>`).join("")}</ul>` : ""}
-      <h3>One thing to work on ${tip("mistake pattern")}</h3>${d.work_on.length ? focusHTML(d.work_on[0]) : `<p class="mt-0">No mistake patterns this session. That's a clean run.</p>`}
-      ${d.work_on.length > 1 ? `<details class="more-focus"><summary>${d.work_on.length - 1} more thing${d.work_on.length > 2 ? "s" : ""} to work on</summary>${d.work_on.slice(1).map(focusHTML).join("")}</details>` : ""}
+    const seen = new Set();
+    $("#res-notes").innerHTML = `<div class="notes"><h2 class="section-title">Your coach's notes</h2>${d.headline ? `<p class="headline">${coachHTML(d.headline, seen)}</p>` : ""}
+      ${d.went_well.length ? `<h3>What went well</h3><ul>${d.went_well.map((s) => `<li>${coachHTML(s, seen)}</li>`).join("")}</ul>` : ""}
+      <h3>One thing to work on ${tip("mistake pattern")}</h3>${d.work_on.length ? focusHTML(d.work_on[0], seen) : `<p class="mt-0">No mistake patterns this session. That's a clean run.</p>`}
+      ${d.work_on.length > 1 ? `<details class="more-focus"><summary>${d.work_on.length - 1} more thing${d.work_on.length > 2 ? "s" : ""} to work on</summary>${d.work_on.slice(1).map((f) => focusHTML(f, seen)).join("")}</details>` : ""}
       ${deliveryHTML(r.debrief?.delivery)}</div>`;
-    $("#res-next").innerHTML = `<span class="eyebrow">Your next step</span>${d.next_step ? `<p class="nstep">${esc(mapLevels(d.next_step))}</p>` : ""}
+    $("#res-next").innerHTML = `<span class="eyebrow">Your next step</span>
       ${next ? `<p class="task-line">${esc(taskTitle(next))}</p><p class="small muted mt-0">${esc(taskSub(next))}</p>
+        ${r.next_why ? `<p class="nstep">${coachHTML(r.next_why)}</p>` : ""}
         <button class="primary big" data-task="${next.id}">Start</button>`
-      : `<p class="task-line">Full mock interview</p><button class="primary big" id="res-mock">Start</button>`}
+      : `<p class="task-line">Full mock interview</p><p class="nstep">${p ? "You've finished every task on your plan. " : ""}Mixed questions, like the real interview, keep everything fresh.</p>
+        <button class="primary big" id="res-mock">Start</button>`}
       <button class="textlink" data-go="home">Back to Home</button>
       ${p ? `<p class="small muted mt-0">Plan: ${p.done} of ${p.total} tasks done${r.debrief?.plan_event?.startsWith?.("ticked") ? " (this session counted ✓)" : ""}</p>` : ""}`;
     $("#res-mock")?.addEventListener("click", () => startSession("mock", persona()));
@@ -1180,7 +1233,7 @@ async function renderHow(sec) {
     return;
   }
   const prices = S.meta?.prices;
-  if (prices) $("#price-line").textContent = `Every step of your latest session: what the director decided, what each agent did, what the calculator checked, what the safety guard blocked, and what it cost (${S.meta.model || "the model"} pricing per 1M tokens: ${Object.entries(prices).map(([k, v]) => `${k} $${v}`).join(" · ")}).`;
+  if (prices) $("#price-line").textContent = `Every step of your latest session: what the director decided, what each agent did, what the calculator checked, what the safety guard blocked, and what it cost (${S.meta.model || "the model"} price per million tokens: ${Object.entries(prices).map(([k, v]) => `${k.replace(/_/g, " ")} $${Number(v).toFixed(2)}`).join(" · ")}).`;
   const sid = S.session?.id || S.lastReport?.session?.id;
   try {
     if (sid) {

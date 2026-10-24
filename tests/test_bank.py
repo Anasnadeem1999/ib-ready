@@ -290,3 +290,21 @@ def test_model_answer_covers_its_own_key_points(tid):
     for kp in t.key_points:
         terms = _terms(kp)
         assert len(terms & answer) / len(terms) >= 0.5, f"{tid}: model answer misses key point '{kp}'"
+
+
+# ---------------------------------------------------------------- UX QA round 2, D-08: no "why banking" twice
+def test_why_team_question_reads_well_for_generalists():
+    t = bank.TEMPLATES["b_why_group"]
+    assert t.title == "Why this team"
+    assert t.text({"group": "investment banking", "generalist": True}) == "Why banking, and what kind of team interests you?"
+    assert t.text({"group": "Healthcare"}) == "Why do you want to work in Healthcare?"
+
+
+def test_why_ib_and_why_team_are_never_asked_in_one_session():
+    from ticktie import mastery
+    for first, twin in (("b_why_ib", "b_why_group"), ("b_why_group", "b_why_ib")):
+        for seed in range(30):
+            rng = random.Random(seed)
+            for lvl in (1, 2):
+                t = mastery.pick_targeted("generalist", "fit", lvl, None, [first], {}, rng)
+                assert t.id != twin

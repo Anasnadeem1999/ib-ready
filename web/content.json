@@ -3,7 +3,7 @@
  "tagline": "Your IB interview coach",
  "primer": {
   "title": "What are IB technical interviews?",
-  "body": "Investment banks advise companies on big money decisions: buying another company, selling one, or raising money from investors. Before hiring you as an analyst, bankers check that you understand the basics of how companies are measured and valued. That's the \"technical\" part of the interview. Expect four families of questions: accounting (how a change ripples through the three financial statements), valuation (what a company is worth and why), deals (mergers and leveraged buyouts), and you (your story and why banking). Early conversations, such as coffee chats and first rounds, stick to the basics. Final rounds (\"Superdays\") go deeper. Nobody expects you to know everything. They want clear thinking, out loud, and honesty when you're unsure. That's exactly what you'll practise in IB Ready."
+  "body": "Investment banks advise companies on big money decisions: buying another company, selling one, or raising money from investors. Before hiring you as an analyst, bankers check that you understand the basics of how companies are measured and valued. That's the \"technical\" part of the interview. Expect four families of questions: accounting (how a change ripples through the three financial statements), valuation (what a company is worth and why), deals (mergers and leveraged buyouts), and you (your story and why banking). Early conversations, such as coffee chats and first rounds, stick to the basics. Final rounds (\"Superdays\") go deeper. Nobody expects you to know everything. They want clear thinking, out loud, and honesty when you're unsure. That's exactly what you'll practice in IB Ready."
  },
  "glossary": [
   {
@@ -279,6 +279,10 @@
    "definition": "One hundredth of a percent: 100bp = 1%."
   },
   {
+   "term": "mm",
+   "definition": "Bankers' shorthand for million. $500mm means $500 million."
+  },
+  {
    "term": "M&A",
    "definition": "Mergers and acquisitions: one company buying or combining with another."
   },
@@ -323,12 +327,20 @@
    "definition": "The money the sponsor puts in itself."
   },
   {
+   "term": "Paper LBO",
+   "definition": "A quick leveraged-buyout calculation done in your head or on paper, with round numbers and no spreadsheet."
+  },
+  {
    "term": "MOIC (multiple of invested capital)",
    "definition": "Money out divided by money in, for example 2.0x."
   },
   {
    "term": "IRR (internal rate of return)",
    "definition": "The annual compounded return on an investment."
+  },
+  {
+   "term": "Returns math",
+   "definition": "Working out what an investor earns on a deal, usually as MOIC (money back divided by money in) and IRR (the yearly return)."
   },
   {
    "term": "Leverage ratio",
@@ -403,29 +415,29 @@
    "definition": "New loans to a company during bankruptcy."
   },
   {
-   "term": "Misconception",
-   "definition": "A specific, named wrong idea behind a wrong answer."
+   "term": "Mistake pattern",
+   "definition": "A specific, named wrong idea behind a wrong answer, like \"forgets the tax effect\"."
   },
   {
-   "term": "Mastery",
-   "definition": "How consistently you've shown a skill recently, from 0 to 100."
+   "term": "Confidence",
+   "definition": "How sure we are that you can answer a topic correctly, based on your recent answers."
   },
   {
-   "term": "Level",
-   "definition": "The recruiting stage you're ready for in a topic: Getting started, Coffee-chat ready, First-round ready or Superday ready. See 'How levels work'."
+   "term": "Milestone",
+   "definition": "The recruiting stage you're ready for in a topic: Getting started, Coffee-chat ready, First-round ready or Superday ready. See 'How milestones work'."
   },
   {
    "term": "Sub-skill",
    "definition": "One narrow topic inside a skill, for example 'Working capital' inside Accounting."
   },
   {
-   "term": "Drill / mock",
-   "definition": "A short targeted practice set / a full simulated interview."
+   "term": "Practice session / mock interview",
+   "definition": "A short practice set on one topic / a full practice interview across mixed topics."
   }
  ],
  "levels": {
-  "title": "How levels work",
-  "intro": "Every topic has three levels, named after the stage of recruiting you're ready for. Everyone starts at Getting started.",
+  "title": "How milestones work",
+  "intro": "Every topic moves through three milestones after Getting started, each named after the stage of recruiting you're ready for: Coffee-chat ready, First-round ready and Superday ready.",
   "order": [
    "Basic",
    "Intermediate",
@@ -454,9 +466,9 @@
    "stage": "Superdays (final rounds)",
    "explanation": "You can handle the deeper questions technical interviewers push on in a Superday: purchase accounting, rate shocks, deferred taxes and edge cases."
   },
-  "how_you_level_up": "You reach a level once you've shown it on at least two questions (75%+ mastery). IB Ready starts every topic at Coffee-chat ready questions and only moves you up when you're ready."
+  "how_you_level_up": "You reach a milestone once you've shown it on at least two questions (about 3 in 4 right). IB Ready starts every topic at Coffee-chat ready questions and only moves you up when you're ready."
  },
- "misconception_explainer": "A misconception is the specific wrong idea behind a wrong number, like \"forgot that interest is tax-deductible\". Fix the idea once and every question that uses it gets easier.",
+ "misconception_explainer": "A mistake pattern is the specific wrong idea behind a wrong number, like \"forgot that interest is tax-deductible\". Fix the idea once and every question that uses it gets easier.",
  "empty_states": {
   "dashboard": {
    "not_placed": "Let's find your starting point. A 15-minute placement interview shows where you already are and where to focus. There's no pass or fail, just a map.",
@@ -464,12 +476,12 @@
    "nothing_due_today": "You're caught up for today. If you have ten spare minutes, one short mock keeps things fresh."
   },
   "plan": {
-   "no_plan": "Your plan appears here after the placement interview. It counts back from your interview date and fits the hours you said you have, so you only practise what moves the needle.",
+   "no_plan": "It counts back from your interview date and fits the hours you have, so you only practice what moves the needle.",
    "date_passed": "Your interview date has passed. We hope it went well! Set a new date and we'll rebuild the plan around it."
   },
   "progress": {
-   "no_skills": "Your skills map fills in as you answer questions. Each topic climbs from Getting started to Coffee-chat ready, First-round ready and Superday ready. Red sub-skills are where your next drills go.",
-   "no_misconceptions": "No misconceptions spotted yet. When a wrong answer matches a known mistake, it shows up here with your own words as evidence, so you can see it, fix it and beat it twice.",
+   "no_skills": "Your skills map fills in as you answer questions. Each topic climbs from Getting started to Coffee-chat ready, First-round ready and Superday ready. Red sub-skills are where your next practice goes.",
+   "no_misconceptions": "No mistake patterns spotted yet. When a wrong answer matches a known mistake, it shows up here with your own words as evidence, so you can see it, fix it and beat it twice.",
    "before_first_answer": "Answer the way you would out loud: the direction (up or down), the number, and why. Each line item gets checked here."
   }
  },
@@ -493,13 +505,13 @@
   "level_up": [
    "Level up: {skill} is now {level}. You've shown it twice in a row. It's yours.",
    "New level reached: {skill} is {level}.",
-   "Misconception beaten: \"{misconception}\" is cleared. Two correct in a row.",
+   "Mistake pattern beaten: \"{misconception}\" is cleared. Two correct in a row.",
    "Placed. Here's your starting map: green is solid, red is where your plan begins."
   ],
   "keep_going": [
    "Hard sessions are where most of the learning happens. Your plan has already adjusted.",
    "Three questions today still counts. A short session tomorrow beats a long one next week.",
-   "You found gaps today that you didn't know about. That's the point of practising in IB Ready, not in the interview.",
+   "You found gaps today that you didn't know about. That's the point of practicing in IB Ready, not in the interview.",
    "Day {streak} in a row. Small and steady is how this gets easy.",
    "Your interview is tomorrow. Do a light coffee-chat-level warm-up, then rest. You've done the work."
   ]
