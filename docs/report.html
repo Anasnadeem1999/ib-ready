@@ -94,7 +94,7 @@
 
 <!-- =========================================================== 2 -->
 <h2><span class="no">2</span>Motivation</h2>
-<p class="lede">Thousands of students prepare for banking interviews every year. Their practice is plentiful, but the diagnosis is missing.</p>
+<p class="lede">Every banking recruit has to pass spoken technical interviews. Practice material is plentiful; diagnosis of their own mistakes is missing.</p>
 <h3>Who has the problem</h3>
 <p>Everyone recruiting for investment banking, MBA or undergraduate, must pass "technicals": accounting, valuation, M&amp;A and LBO questions asked
 out loud, from coffee chats to first rounds to Superdays. At Yale SOM, banking has taken about 10&ndash;14% of each graduating class (10.1% for the Class
@@ -146,7 +146,8 @@ pasting into a chatbot. The held-out set was written after the code was frozen.<
 <tr><td><b>Fit answers: IB Ready</b></td><td>10</td><td><b>100%</b></td><td>100%</td><td>100%</td><td><b>0%</b></td><td>$0.00013</td></tr><tr><td>Fit answers: plain gpt-6-luna</td><td>10</td><td>80%</td><td>100%</td><td>100%</td><td>67%</td><td>$0.00010</td></tr>
 <tr><td><b>Group specifics: IB Ready</b></td><td>8</td><td><b>100%</b></td><td>100%</td><td>100%</td><td><b>0%</b></td><td>$0.00021</td></tr><tr><td>Group specifics: plain gpt-6-luna</td><td>8</td><td>100%</td><td>100%</td><td>83%</td><td>0%</td><td>$0.00009</td></tr></table>
 <p><small>Across three recorded runs the plain model's false-alarm rate on the held-out and development sets ranged 20%&ndash;47%
-(<code>evals/results/history.md</code>). Caveats: I wrote the sets, so they may be cleaner than real speech; early runs exposed grading bugs (sign convention,
+(<code>evals/results/history.md</code>). Caveats: I wrote the sets, so they may be cleaner than real speech; the fit and group-specifics sets are small
+(3 and 2 correct answers), so their false-alarm rates are indicative only; early runs exposed grading bugs (sign convention,
 arithmetic slips, hedged answers, over-tight rounding), each fixed with a test before the held-out set was used.</small></p>
 
 <!-- =========================================================== 4 -->
@@ -282,8 +283,9 @@ Prices are gpt-6-luna list prices per 1M tokens: $0.10 input, $0.01 cached input
   <div class="kpi"><b>$0.053</b><span>per active user per month</span></div>
 </div>
 <h3>One typical run</h3>
-<p>The recorded practice session above (26 model calls, 12 graded answers). Per graded answer: <b>9,215 input tokens
-(7,823 of them cached) and 296 output tokens</b>. The placement is cheaper ($0.0036 in total) because
+<p>The recorded practice session above is one typical run: 12 graded answers and 26 model calls, using
+<b>110,578 input tokens (93,873 of them cached) and 3,556 output tokens,
+for $0.0044</b>. Per graded answer that is 9,215 input (7,823 cached) and 296 output tokens. The placement is cheaper ($0.0036 in total) because
 code, not the interviewer, writes its short acknowledgements. The real pilot users' sessions cost $0.00029 per graded answer
 (44 calls), in line with the demo.</p>
 <table class="num"><tr><th>Agent (practice session)</th><th>Calls</th><th>Avg input</th><th>Avg cached</th><th>Avg output</th><th>Avg cost / call</th></tr><tr><td>Specialist diagnostician</td><td>12</td><td>6,705</td><td>6,047</td><td>224</td><td>$0.00024</td></tr><tr><td>Interviewer</td><td>13</td><td>2,009</td><td>1,496</td><td>44</td><td>$0.00009</td></tr><tr><td>Coach</td><td>1</td><td>3,995</td><td>1,861</td><td>296</td><td>$0.00038</td></tr></table>

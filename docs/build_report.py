@@ -621,7 +621,7 @@ def build() -> str:
 
 <!-- =========================================================== 2 -->
 <h2><span class="no">2</span>Motivation</h2>
-<p class="lede">Thousands of students prepare for banking interviews every year. Their practice is plentiful, but the diagnosis is missing.</p>
+<p class="lede">Every banking recruit has to pass spoken technical interviews. Practice material is plentiful; diagnosis of their own mistakes is missing.</p>
 <h3>Who has the problem</h3>
 <p>Everyone recruiting for investment banking, MBA or undergraduate, must pass "technicals": accounting, valuation, M&amp;A and LBO questions asked
 out loud, from coffee chats to first rounds to Superdays. At Yale SOM, banking has taken about 10&ndash;14% of each graduating class (10.1% for the Class
@@ -673,7 +673,8 @@ pasting into a chatbot. The held-out set was written after the code was frozen.<
 {eval_row(f"Fit answers: {NAME}", beh.get('ibready', {}), True)}{eval_row("Fit answers: plain gpt-6-luna", beh.get('baseline', {}))}
 {eval_row(f"Group specifics: {NAME}", ind.get('ibready', {}), True)}{eval_row("Group specifics: plain gpt-6-luna", ind.get('baseline', {}))}</table>
 <p><small>Across three recorded runs the plain model's false-alarm rate on the held-out and development sets ranged {pct(fa_lo)}&ndash;{pct(fa_hi)}
-(<code>evals/results/history.md</code>). Caveats: I wrote the sets, so they may be cleaner than real speech; early runs exposed grading bugs (sign convention,
+(<code>evals/results/history.md</code>). Caveats: I wrote the sets, so they may be cleaner than real speech; the fit and group-specifics sets are small
+({beh.get('ibready', {}).get('n_correct_answers', '?')} and {ind.get('ibready', {}).get('n_correct_answers', '?')} correct answers), so their false-alarm rates are indicative only; early runs exposed grading bugs (sign convention,
 arithmetic slips, hedged answers, over-tight rounding), each fixed with a test before the held-out set was used.</small></p>
 
 <!-- =========================================================== 4 -->
@@ -733,8 +734,9 @@ Prices are gpt-6-luna list prices per 1M tokens: ${PRICE['input']:.2f} input, ${
   <div class="kpi"><b>{usd(user_month, 3)}</b><span>per active user per month</span></div>
 </div>
 <h3>One typical run</h3>
-<p>The recorded practice session above ({prac['calls']} model calls, {prac['graded']} graded answers). Per graded answer: <b>{pa['input_tokens']:,.0f} input tokens
-({pa['cached_tokens']:,.0f} of them cached) and {pa['output_tokens']:,.0f} output tokens</b>. The placement is cheaper ({usd(placement_cost, 4)} in total) because
+<p>The recorded practice session above is one typical run: {prac['graded']} graded answers and {prac['calls']} model calls, using
+<b>{prac['total']['input_tokens']:,} input tokens ({prac['total']['cached_tokens']:,} of them cached) and {prac['total']['output_tokens']:,} output tokens,
+for {usd(prac['total']['cost_usd'], 4)}</b>. Per graded answer that is {pa['input_tokens']:,.0f} input ({pa['cached_tokens']:,.0f} cached) and {pa['output_tokens']:,.0f} output tokens. The placement is cheaper ({usd(placement_cost, 4)} in total) because
 code, not the interviewer, writes its short acknowledgements. The real pilot users' sessions cost {usd(pil['per_answer']['cost_usd'], 5)} per graded answer
 ({pil['calls']} calls), in line with the demo.</p>
 <table class="num"><tr><th>Agent (practice session)</th><th>Calls</th><th>Avg input</th><th>Avg cached</th><th>Avg output</th><th>Avg cost / call</th></tr>{agent_rows}</table>

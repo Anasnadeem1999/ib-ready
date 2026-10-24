@@ -28,3 +28,5 @@ data/*.db-shm
 
 # eval run databases (the token logs llm_calls.jsonl stay as evidence)
 evals/results/_*/*.db*
+docs/_video_data/
+docs/_video/
