@@ -1,7 +1,7 @@
-"""Diagnosis accuracy: Tick & Tie vs a cheaper Tick & Tie vs plain gpt-6-luna ("ChatGPT").
+"""Diagnosis accuracy: IB Ready vs a cheaper IB Ready vs plain gpt-6-luna ("ChatGPT").
 
     python -m evals.run_eval            # all three systems
-    python -m evals.run_eval --only ticktie
+    python -m evals.run_eval --only ibready
 
     python -m evals.run_eval --set holdout
     python -m evals.run_eval --set behavioral   # fit answers: fairness (verdict match, unfair flags)
@@ -27,9 +27,9 @@ from typing import Literal
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 
-from ticktie import agents, bank, guard, llm
-from ticktie.engine import _adjudicate
-from ticktie.misconceptions import LIBRARY
+from ibready import agents, bank, guard, llm
+from ibready.engine import _adjudicate
+from ibready.misconceptions import LIBRARY
 
 HERE = Path(__file__).parent
 OUT = HERE / "results"
@@ -69,7 +69,7 @@ def baseline_agent() -> Agent:
 
 
 # ---------------------------------------------------------------- runners
-async def run_ticktie(item: dict, q: bank.Question, lite: bool, agents_cache: dict) -> dict:
+async def run_ibready(item: dict, q: bank.Question, lite: bool, agents_cache: dict) -> dict:
     key = agents.specialist_for(q)
     ag = agents_cache.setdefault((key, lite), lite_specialist(key) if lite else agents.specialist(key))
     deps = agents.DiagDeps(question=q)
@@ -152,7 +152,7 @@ async def main(only: list[str], args_set: str = "labeled") -> None:
                     if system == "baseline":
                         r = await run_baseline(item, q, base)
                     else:
-                        r = await run_ticktie(item, q, system == "ticktie_lite", cache)
+                        r = await run_ibready(item, q, system == "ibready_lite", cache)
                     break
                 except Exception as e:  # transient gateway errors: retry, then record the failure
                     if attempt == 2:
@@ -163,7 +163,7 @@ async def main(only: list[str], args_set: str = "labeled") -> None:
         return {"id": item["id"], "t": item["t"], "expect": item["expect"], **extra, **r}
 
     # The lite variant drops the domain playbook; for fit and industry the playbook IS the grading logic.
-    systems = only or (["ticktie", "ticktie_lite", "baseline"] if args_set in ("labeled", "holdout") else ["ticktie", "baseline"])
+    systems = only or (["ibready", "ibready_lite", "baseline"] if args_set in ("labeled", "holdout") else ["ibready", "baseline"])
     for system in systems:
         t0 = time.time()
         rows = await asyncio.gather(*(one(system, it) for it in data))

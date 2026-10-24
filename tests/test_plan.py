@@ -2,7 +2,7 @@
 
 import datetime as dt
 
-from ticktie import bank, mastery, plan
+from ibready import bank, mastery, plan
 
 
 def _intake(days=21, hours=6, group="tmt"):
@@ -118,7 +118,7 @@ def test_mark_done_prefers_the_task_id():
 
 # ---------------------------------------------------------------- .env discovery
 def test_empty_repo_env_does_not_mask_parent_key(tmp_path, monkeypatch):
-    from ticktie import config
+    from ibready import config
     (tmp_path / "repo").mkdir()
     (tmp_path / "repo" / ".env").write_text("PORTKEY_API_KEY=\n", encoding="utf-8")
     (tmp_path / ".env").write_text("PORTKEY_API_KEY=parent-key\n", encoding="utf-8")
@@ -129,7 +129,7 @@ def test_empty_repo_env_does_not_mask_parent_key(tmp_path, monkeypatch):
 
 
 def test_requirements_are_pinned():
-    from ticktie import config
+    from ibready import config
     lines = [l.strip() for l in (config.REPO_ROOT / "requirements.txt").read_text().splitlines()
              if l.strip() and not l.startswith("#")]
     assert lines and all("==" in l for l in lines)

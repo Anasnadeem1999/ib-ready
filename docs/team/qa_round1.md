@@ -1,6 +1,6 @@
 # QA round 1: exploratory test of app-v2 (branch v2)
 
-Tested 2026-10-24 on a local server (port 8205) with its own data folder. The live pilot (port 8000, `tick-and-tie`) was not touched.
+Tested 2026-10-24 on a local server (port 8205) with its own data folder. The live pilot (port 8000, `ib-ready`) was not touched.
 Method: three personas driven end to end through the UI with Playwright (sign in, intake, placement, results, every tab), then edge cases through the UI and the API. Answers were built from the answer key in sqlite (`bank.from_state`). Model spend: about $0.014 across 61 graded answers.
 Screenshots and scripts are in `C:/Users/ANAS/AppData/Local/Temp/claude/C--Users-ANAS-Desktop-Prob-and-Stat/a0cf80a0-8ce1-4782-89ed-7d7490e63cc7/scratchpad/qa1/` (screenshots in `shots/`, shortened to `SHOTS/` below).
 

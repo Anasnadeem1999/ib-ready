@@ -294,8 +294,8 @@ def club(prof: dict = Depends(current_profile)) -> dict:
 # ---------------------------------------------------------------- owner export (pilot evidence)
 @app.get("/api/admin/export")
 def admin_export(x_admin_token: str | None = Header(default=None)) -> dict:
-    """Pilot data for the report. Disabled unless TICKTIE_ADMIN_TOKEN is set on the server."""
-    expected = os.environ.get("TICKTIE_ADMIN_TOKEN")
+    """Pilot data for the report. Disabled unless IBREADY_ADMIN_TOKEN is set on the server."""
+    expected = os.environ.get("IBREADY_ADMIN_TOKEN")
     if not expected or not x_admin_token or not hmac.compare_digest(expected.encode(), x_admin_token.encode()):
         raise HTTPException(404, "Not found")
     return {**db.export_all(), "costs": _costs(), "club": _club()}

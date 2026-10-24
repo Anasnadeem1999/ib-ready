@@ -31,8 +31,8 @@ load_env(ENV_FILES)
 APP_NAME = os.environ.get("APP_NAME", "IB Ready")
 APP_TAGLINE = os.environ.get("APP_TAGLINE", "Practice IB interviews. Learn why. Get a plan.")
 
-DATA_DIR = Path(os.environ.get("TICKTIE_DATA_DIR", REPO_ROOT / "data"))
-DB_PATH = DATA_DIR / "ticktie.db"
+DATA_DIR = Path(os.environ.get("IBREADY_DATA_DIR", REPO_ROOT / "data"))
+DB_PATH = DATA_DIR / "ibready.db"
 LOG_PATH = DATA_DIR / "llm_calls.jsonl"
 
 # ---------------------------------------------------------------- model
@@ -66,12 +66,12 @@ MAX_ANSWER_CHARS = 2000          # longer answers are cut before any model sees 
 MAX_FOLLOWUPS_PER_QUESTION = 2   # stop rule: at most two probes per question
 MAX_ATTEMPTS_PER_QUESTION = 2    # after two wrong attempts the solution is shown
 REQUEST_LIMIT_PER_AGENT = 4      # model requests per agent run (stops tool loops)
-SESSION_TOKEN_BUDGET = int(os.environ.get("TICKTIE_SESSION_TOKENS", 120_000))
-DAILY_PROFILE_TOKEN_BUDGET = int(os.environ.get("TICKTIE_DAILY_PROFILE_TOKENS", 600_000))
-DAILY_GLOBAL_TOKEN_BUDGET = int(os.environ.get("TICKTIE_DAILY_GLOBAL_TOKENS", 5_000_000))
+SESSION_TOKEN_BUDGET = int(os.environ.get("IBREADY_SESSION_TOKENS", 120_000))
+DAILY_PROFILE_TOKEN_BUDGET = int(os.environ.get("IBREADY_DAILY_PROFILE_TOKENS", 600_000))
+DAILY_GLOBAL_TOKEN_BUDGET = int(os.environ.get("IBREADY_DAILY_GLOBAL_TOKENS", 5_000_000))
 MIN_SECONDS_BETWEEN_TURNS = 1.0  # basic rate limit per session
 MAX_TURNS_PER_SESSION = 80
-SIGNIN_PER_IP_PER_MINUTE = int(os.environ.get("TICKTIE_SIGNIN_PER_MIN", 20))     # sign-in attempts per client IP
-SIGNUPS_PER_IP_PER_HOUR = int(os.environ.get("TICKTIE_SIGNUPS_PER_HOUR", 30))    # new profiles per client IP
+SIGNIN_PER_IP_PER_MINUTE = int(os.environ.get("IBREADY_SIGNIN_PER_MIN", 20))     # sign-in attempts per client IP
+SIGNUPS_PER_IP_PER_HOUR = int(os.environ.get("IBREADY_SIGNUPS_PER_HOUR", 30))    # new profiles per client IP
 # (generous on purpose: a class on campus Wi-Fi can share one public IP)
-LLM_TIMEOUT_SECONDS = float(os.environ.get("TICKTIE_LLM_TIMEOUT", 45))  # per model request; the SDK default is 600 s
+LLM_TIMEOUT_SECONDS = float(os.environ.get("IBREADY_LLM_TIMEOUT", 45))  # per model request; the SDK default is 600 s

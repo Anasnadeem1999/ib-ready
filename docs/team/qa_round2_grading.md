@@ -1,6 +1,6 @@
 # QA round 2: grading accuracy and content correctness (QA engineer B)
 
-Branch `v2`, folder `app-v2`, run 2026-10-24. No app code edited. The live grader path matched `evals/run_eval.run_ticktie`: specialist agent, then `engine._adjudicate`. Isolated data dir (`qa2b_data` in the session scratchpad). Total API spend was about **$0.035**: $0.0075 for the 40 answers, about $0.023 for the three eval sets and about $0.0035 for the six sessions.
+Branch `v2`, folder `app-v2`, run 2026-10-24. No app code edited. The live grader path matched `evals/run_eval.run_ibready`: specialist agent, then `engine._adjudicate`. Isolated data dir (`qa2b_data` in the session scratchpad). Total API spend was about **$0.035**: $0.0075 for the 40 answers, about $0.023 for the three eval sets and about $0.0035 for the six sessions.
 
 ## Headline
 
@@ -12,7 +12,7 @@ Branch `v2`, folder `app-v2`, run 2026-10-24. No app code edited. The live grade
 | Exact misconception named (wrong answers with a known misconception) | **15/17 = 88%** (the 2 misses are the false passes) |
 | Fit answers: unfair or harsh verdicts | **0/6** (all 4 good answers were `correct`; both weak answers were flagged fairly) |
 | Basic group questions (FIG, TMT, HC, energy, RX, M&A) | **6/6** verdicts right |
-| Existing eval sets (ticktie) | holdout 100% · behavioral 100% (fair 100%, unfair flags 0%) · industry 100% |
+| Existing eval sets (ibready) | holdout 100% · behavioral 100% (fair 100%, unfair flags 0%) · industry 100% |
 
 The existing sets are small (30, 10 and 8 items) and close to the training distribution. The fresh set shows the real failure modes, all in how the code decides the verdict around the model (`_adjudicate` and label tolerances), not in what the model reads.
 
@@ -127,12 +127,12 @@ What worked well: numbers spoken in words ("eight hundred twenty million", "twen
 
 | Set | System | Verdict acc. | Caught | Named | False alarms | Fair verdict / unfair flags | $/answer |
 |---|---|---|---|---|---|---|---|
-| holdout (30) | ticktie | 100% | 100% | 100% | 0% | – | $0.00024 |
-| | ticktie_lite | 100% | 100% | 100% | 0% | – | $0.00024 |
+| holdout (30) | ibready | 100% | 100% | 100% | 0% | – | $0.00024 |
+| | ibready_lite | 100% | 100% | 100% | 0% | – | $0.00024 |
 | | baseline (plain model) | 83% | 93% | 93% | 27% | – | $0.00011 |
-| behavioral (10) | ticktie | 100% | 100% | 100% | 0% | 100% / 0% | $0.00018 |
+| behavioral (10) | ibready | 100% | 100% | 100% | 0% | 100% / 0% | $0.00018 |
 | | baseline | 70% | 100% | 100% | 100% | 50% / 30% | $0.00010 |
-| industry (8) | ticktie | 100% | 100% | 100% | 0% | – | $0.00024 |
+| industry (8) | ibready | 100% | 100% | 100% | 0% | – | $0.00024 |
 | | baseline | 100% | 100% | 83% | 0% | – | $0.00009 |
 
 No item errored. The headline story still holds: IB Ready beats the plain model mainly on false alarms and fit fairness. But a perfect score on 48 in-distribution items overstates real accuracy; the 40 fresh answers give **90%** (G-12).
@@ -151,4 +151,4 @@ No item errored. The headline story still holds: IB Ready beats the plain model 
 Across 10 interviewer messages, **no answer-key number leaked before a reveal** (output filter plus checks) and no message called a wrong answer right. Every message was 1–2 sentences, warm and specific. The tone problems all come from the grading layer underneath: G-02 makes the coach invent an error, and G-01 means a wrong claim is never recorded. The coach's `went_well` can come back empty or slightly off on partly right answers (G-05).
 
 ## Reproduce
-Scripts are in the session scratchpad: `qa2b_answers.py` (40 answers through `agents.specialist` + `engine._adjudicate`) and `qa2b_sessions.py` (six sessions through `engine.start_session/answer/end_session`, with `state["current"]` pinned to the chosen question). Run both with `TICKTIE_DATA_DIR` set to a scratch dir.
+Scripts are in the session scratchpad: `qa2b_answers.py` (40 answers through `agents.specialist` + `engine._adjudicate`) and `qa2b_sessions.py` (six sessions through `engine.start_session/answer/end_session`, with `state["current"]` pinned to the chosen question). Run both with `IBREADY_DATA_DIR` set to a scratch dir.

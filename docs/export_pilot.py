@@ -1,8 +1,8 @@
 """Export the pilot (real users) to docs/pilot_summary.json for the report, without anyone's answer text.
 
-    python docs/export_pilot.py [path/to/ticktie.db ...]
+    python docs/export_pilot.py path/to/pilot.db [more.db ...]
 
-Default source: the v1 pilot database next to this worktree (../tick-and-tie/data/ticktie.db), opened read-only.
+Pass the pilot databases to read (each is opened read-only), e.g. the hosted app's data/ibready.db.
 Profiles are mapped to people with PEOPLE below (one person may have signed up twice); test profiles are dropped.
 What is kept: per-answer skill, verdict, misconception ids, seconds and word count; per-call token counts; survey
 rows (quotes only with the consent box ticked). No answer or question text leaves the database.
@@ -16,7 +16,6 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DB = ROOT.parent / "tick-and-tie" / "data" / "ticktie.db"
 OUT = ROOT / "docs" / "pilot_summary.json"
 
 # profile name -> pilot person (first names only; both agreed to be named)
@@ -62,7 +61,9 @@ def export(paths: list[Path]) -> dict:
 
 
 if __name__ == "__main__":
-    srcs = [Path(a) for a in sys.argv[1:]] or [DEFAULT_DB]
+    srcs = [Path(a) for a in sys.argv[1:]]
+    if not srcs:
+        raise SystemExit(__doc__)
     data = export([p for p in srcs if p.exists()])
     OUT.write_text(json.dumps(data, indent=1), encoding="utf-8")
     n = sum(len(p["answers"]) for p in data["people"].values())

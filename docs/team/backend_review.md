@@ -1,7 +1,7 @@
 # Back-end review and spec (app-v2, branch `v2`)
 
 Author: back-end / architecture reviewer. Date: Sat Oct 24 2026. Deadline: Mon Oct 26, 6 PM.
-Scope: `ticktie/engine.py, mastery.py, plan.py, db.py, server.py, llm.py, config.py`, `run.py`, `render.yaml`, README.
+Scope: `ibready/engine.py, mastery.py, plan.py, db.py, server.py, llm.py, config.py`, `run.py`, `render.yaml`, README.
 This is a spec. No app code was changed. Every bug marked **(verified)** was reproduced offline with a stubbed LLM
 (no API spend; script at `scratchpad/be_probe/probe.py` and `probe2.py`). The 114 existing tests still pass.
 
@@ -34,7 +34,7 @@ P2 = after the deadline or only if trivial.
 | 17 | P1 | `db.conn` / `db.init` (db.py:75-93) | Every DB call opens and commits its own connection in the default rollback-journal mode with `synchronous=FULL`. **(measured)** One graded mock turn = **26 connections, ~97 ms** with a stubbed LLM, all on the event-loop thread (the `answer`/`end`/`rebuild` handlers are `async def`). Sync handlers (`dashboard`, `signin`, `start`) run in the thread pool at the same time, so "database is locked" is possible under a pilot burst. | In `init()`: `c.execute("PRAGMA journal_mode=WAL")` (persistent). In `conn()`: `sqlite3.connect(config.DB_PATH, timeout=10)` then `c.execute("PRAGMA synchronous=NORMAL")` and `c.execute("PRAGMA busy_timeout=10000")`. Move `DATA_DIR.mkdir` into `init()`. Add `data/*.db-wal` and `data/*.db-shm` to `.gitignore`. |
 | 18 | P1 | `db.init` SCHEMA (db.py:69-71) | Missing indexes for hot queries: `tokens_since` (runs twice per turn, joins all events from the last day, no index on `ts`), every per-profile `sessions` lookup, and `login_failures`. | Add: `CREATE INDEX IF NOT EXISTS ix_events_kind_ts ON events(kind, ts);` `CREATE INDEX IF NOT EXISTS ix_sessions_profile ON sessions(profile_id);` `CREATE INDEX IF NOT EXISTS ix_login_failures ON login_failures(name, ts);` `CREATE INDEX IF NOT EXISTS ix_auth_tokens_profile ON auth_tokens(profile_id);` All are `IF NOT EXISTS`, so they are safe on existing DBs. |
 | 19 | P1 | `README.md` | Out of date for the fresh-clone test: says 64 tests (now 114), promises port 8000 (run.py picks the first free port from 8000), and PowerShell `activate` can fail under the default execution policy. | See section 4.2 for the exact replacement steps. |
-| 20 | P1 | branding | "Tick & Tie" is hard-coded in 8 places. | `APP_NAME` spec in section 3.2. |
+| 20 | P1 | branding | "IB Ready" is hard-coded in 8 places. | `APP_NAME` spec in section 3.2. |
 | 21 | P2 | `engine._answer` step 5 (engine.py:399-402) | Misconception hits are recorded on **every** non-redirect attempt, but BKT updates once per resolved question. A question answered wrong twice with the same trap counts 2 hits (inflates `active`, selection weight `min(hits,3)` and the club numbers). | Keep `state["current"]["mids"]` (union over attempts); call `record_misconception(..., True, ...)` once per mid when the question resolves (`if resolved`). |
 | 22 | P2 | `engine._answer` what-if (engine.py:404-425, 444-452) | What-ifs are not counted toward `done_q` (correct, intended), but they **are** separate BKT evidence for the same template (skill + `lvl:` + `sub:` keys). One template can give 2 updates, so "interview-ready" (n >= 3) can come from 2 templates. Also, with 10 questions and up to 6 turns each, a mock can hit `MAX_TURNS_PER_SESSION=60` before the goal. | Decision for the team: keep what-ifs as evidence (document it in the report) **or** apply the what-if update only to `sub:` keys. Raise `MAX_TURNS_PER_SESSION` to 80, or stop offering what-ifs when `turns > 45`. |
 | 23 | P2 | `mastery.current_level` (mastery.py:55-62), diagnostic floor (engine.py:660-662) | Levels only ratchet up. The diagnostic floors `lvl:` keys at 0.8 with `n_inc=2`, so re-taking the diagnostic and placing **lower** has no effect: old `lvl:` keys lift the level right back. If `first_level(skill) > 1` and the first answer is wrong, the skill is placed at `first_level - 1`, a level that was never tested. Fit can only place at 0-2 (never Advanced) because both fit questions use one level. | Document "levels are achievements" in the report. If re-placement should lower levels: in the diagnostic `end_session`, for `L > placed` do `db.set_key(pid, f"lvl:{sk}:{L}", min(get_key, 0.5), n_inc=0)`. Fit: after a pass, set `d["level"] = min(d["level"] + 1, 3)`. |
@@ -107,7 +107,7 @@ Error shape: `HTTPException` returns `{"detail": ...}` and the catch-all returns
 
 ## 2. Performance
 
-Measured offline (stubbed LLM, local SSD, Python 3.13): **26 SQLite connections and ~97 ms of synchronous work per graded mock turn**, all on the event-loop thread. Import of `ticktie.server` takes **~2.0 s** (pydantic-ai, plus `bank.py` building and asserting all templates), which is fine for Render. Real latency is dominated by 2 LLM calls per turn (specialist + interviewer). The DB matters for **concurrency**, not single-user speed: while one turn does its 97 ms of blocking DB work, every other user's request waits.
+Measured offline (stubbed LLM, local SSD, Python 3.13): **26 SQLite connections and ~97 ms of synchronous work per graded mock turn**, all on the event-loop thread. Import of `ibready.server` takes **~2.0 s** (pydantic-ai, plus `bank.py` building and asserting all templates), which is fine for Render. Real latency is dominated by 2 LLM calls per turn (specialist + interviewer). The DB matters for **concurrency**, not single-user speed: while one turn does its 97 ms of blocking DB work, every other user's request waits.
 
 Specific fixes, in order of value per minute:
 1. **WAL + `synchronous=NORMAL` + `busy_timeout`** (#17). This cuts the fsync cost of the ~12 commits per turn and removes "database is locked" between the threadpool and the event loop.
@@ -131,13 +131,13 @@ Mostly yes: `bank` (questions + calculators), `mastery` (pure selection/BKT), `p
 **Minimal refactors that lower risk before Monday (no file moves):**
 1. Move the 3 SQL blocks into `db.py` functions: `db.activity_timestamps(pid)`, `db.diag_done(pid)`, `db.cost_summary()`, `db.export_all()`. This is mechanical and testable.
 2. In `engine.py`, extract `_apply_resolution(pid, sid, q, final_verdict, mids) -> (p_old, p_new)` (today's lines 404-419) and `_finalize_session(pid, sid, s, state) -> plan_event` (lines 654-676). These are the functions fixes #1-#3 touch; isolating them keeps the diffs small and reviewable.
-3. Add `ticktie/clock.py` (about 10 lines: `user_today(offset_min)`, `now()`) and pass `today` into `plan.py`.
+3. Add `ibready/clock.py` (about 10 lines: `user_today(offset_min)`, `now()`) and pass `today` into `plan.py`.
 4. Defer the split of `engine.py` into `engine/turns.py`, `engine/grading.py`, `views.py` until after the deadline.
 
 ### 3.2 `APP_NAME`: rename the product in one place
 **config.py** (after the `.env` loading so it can be overridden from `.env` or Render):
 ```python
-APP_NAME = os.environ.get("APP_NAME", "Tick & Tie")
+APP_NAME = os.environ.get("APP_NAME", "IB Ready")
 APP_TAGLINE = os.environ.get("APP_TAGLINE", "IB technicals, diagnosed")
 ```
 **server.py**
@@ -147,30 +147,30 @@ APP_TAGLINE = os.environ.get("APP_TAGLINE", "IB technicals, diagnosed")
 
 **run.py** (import after `uvicorn` so `.env` is loaded by config):
 ```python
-from ticktie.config import APP_NAME
+from ibready.config import APP_NAME
 print(f"\n  {APP_NAME} is running at {url}\n  (Ctrl+C to stop)\n")
 ```
 Also change the module docstring to "Start the app: python run.py".
 
 **agents.py `_prompt`:** `.replace("{canary}", CANARY).replace("{app_name}", config.APP_NAME)` (import `config`). Use `.replace`, **not** `str.format`: the prompts contain literal braces/JSON.
 
-**Prompts:** replace the literal "Tick & Tie" with `{app_name}` in `coach.md:1`, `diagnostician_base.md:1`, `interviewer.md:1`, `planner.md:1`. The name sits at the top of the system prompt, so renaming changes the cached prefix once. That is harmless.
+**Prompts:** replace the literal "IB Ready" with `{app_name}` in `coach.md:1`, `diagnostician_base.md:1`, `interviewer.md:1`, `planner.md:1`. The name sits at the top of the system prompt, so renaming changes the cached prefix once. That is harmless.
 
 **web/index.html:** keep the current text as the no-JS fallback, and add hooks:
 ```html
-<title data-app-title>Tick &amp; Tie · IB interview coach</title>
-<div class="brand-name" data-app-name>Tick &amp; Tie</div><div class="brand-sub" data-app-tagline>IB technicals, diagnosed</div>
+<title data-app-title>IB Ready · IB interview coach</title>
+<div class="brand-name" data-app-name>IB Ready</div><div class="brand-sub" data-app-tagline>IB technicals, diagnosed</div>
 ```
 **web/app.js** `init()`, right after `S.meta = await api("/api/meta")`:
 ```js
-const APP = S.meta.app?.name || "Tick & Tie";
+const APP = S.meta.app?.name || "IB Ready";
 document.title = `${APP} · IB interview coach`;
 $$("[data-app-name]").forEach((e) => (e.textContent = APP));
 $$("[data-app-tagline]").forEach((e) => (e.textContent = S.meta.app?.tagline || e.textContent));
 ```
-Replace the literal `"Tick & Tie"` speaker labels at app.js:342 and :348 with `S.meta.app.name`.
+Replace the literal `"IB Ready"` speaker labels at app.js:342 and :348 with `S.meta.app.name`.
 
-**Leave unchanged on purpose:** the localStorage keys `tt_*` (renaming would sign everyone out), the package name `ticktie`, `TICKTIE_*` env vars, the DB file name, and the Render service `name:` (it is in the URL). Optionally add `APP_NAME` to `render.yaml` envVars.
+**Leave unchanged on purpose:** the localStorage keys `tt_*` (renaming would sign everyone out), the package name `ibready`, `IBREADY_*` env vars, the DB file name, and the Render service `name:` (it is in the URL). Optionally add `APP_NAME` to `render.yaml` envVars.
 
 **Test:** `test_app_name_flows_everywhere` (section 5).
 
@@ -183,16 +183,16 @@ Replace the literal `"Tick & Tie"` speaker labels at app.js:342 and :348 with `S
 |---|---|---|
 | `runtime: python`, `PYTHON_VERSION=3.12.7` | ok (local is 3.13.15; nothing 3.13-specific is used) | Verify the pinned requirements install on 3.12 (#7) |
 | `buildCommand: pip install -r requirements.txt` | ok once pinned | none |
-| `startCommand: uvicorn ticktie.server:app --host 0.0.0.0 --port $PORT` | ok | Add `--workers 1` (required by `_INFLIGHT`/`_ENDING`) and `--proxy-headers` |
+| `startCommand: uvicorn ibready.server:app --host 0.0.0.0 --port $PORT` | ok | Add `--workers 1` (required by `_INFLIGHT`/`_ENDING`) and `--proxy-headers` |
 | `healthCheckPath: /api/health` | ok, but it never touches the DB or disk | Optional: `/api/health` runs `SELECT 1` via `db.conn()` and returns 503 on failure, so a missing or unwritable disk fails the deploy instead of the first sign-in |
-| `disk` at `/var/data` + `TICKTIE_DATA_DIR=/var/data` | ok (Starter plan supports disks; a disk means no zero-downtime deploys, which is fine) | none |
+| `disk` at `/var/data` + `IBREADY_DATA_DIR=/var/data` | ok (Starter plan supports disks; a disk means no zero-downtime deploys, which is fine) | none |
 | `PORTKEY_API_KEY sync:false` | ok | Paste the key in the dashboard |
-| `TICKTIE_ADMIN_TOKEN generateValue` | ok | Copy it from the dashboard before running the export |
+| `IBREADY_ADMIN_TOKEN generateValue` | ok | Copy it from the dashboard before running the export |
 | **branch** | **v1 would deploy** | #6: `branch: v2` or merge |
 | `APP_NAME` | n/a | Optional env var |
 
 ### 4.2 Fresh clone in under 10 minutes (README replacement for "Run it locally")
-1. `git clone https://github.com/Anasnadeem1999/tick-and-tie.git && cd tick-and-tie` (plus `git checkout v2` if it is not merged).
+1. `git clone https://github.com/Anasnadeem1999/ib-ready.git && cd ib-ready` (plus `git checkout v2` if it is not merged).
 2. The key: put `PORTKEY_API_KEY=...` in a `.env` **in this folder or the folder above it**. If you have one above, you don't need one here (after fix #8, an empty one here also does no harm).
 3. Windows (no activation needed, avoids PowerShell execution-policy errors):
    `python -m venv .venv` -> `.venv\Scripts\python -m pip install -r requirements.txt` -> `.venv\Scripts\python run.py`
@@ -205,18 +205,18 @@ Measured install footprint is small (pure-Python wheels); 3-5 minutes is realist
 The server starts, `/api/meta.key_present=false`, and the UI shows `#key-warning`. Sign-in, intake, dashboard and starting a session all work. The first answer returns **503** "No API key found. Put PORTKEY_API_KEY in a .env file in this folder or the folder above it". Ending a session currently 503s if it has graded turns (coach). After fix #1 it ends with the computed fallback debrief.
 
 ### 4.4 Windows/Mac paths
-Paths are `pathlib` throughout, and files are read and written with `encoding="utf-8"`. `TICKTIE_DATA_DIR` accepts forward slashes on Windows. Two caveats: (a) the repo lives under `Desktop`, which is often OneDrive-synced, and SQLite + OneDrive sync can produce lock or "database is locked" errors. Recommend `TICKTIE_DATA_DIR` outside synced folders for demos. (b) `zoneinfo` needs `tzdata` on Windows, which is why #10 uses UTC offsets.
+Paths are `pathlib` throughout, and files are read and written with `encoding="utf-8"`. `IBREADY_DATA_DIR` accepts forward slashes on Windows. Two caveats: (a) the repo lives under `Desktop`, which is often OneDrive-synced, and SQLite + OneDrive sync can produce lock or "database is locked" errors. Recommend `IBREADY_DATA_DIR` outside synced folders for demos. (b) `zoneinfo` needs `tzdata` on Windows, which is why #10 uses UTC offsets.
 
 ---
 
 ## 5. Tests to add
 
 ### 5.1 Offline LLM stub (`tests/conftest.py`)
-`engine` calls `llm.run(...)` through the module attribute, so monkeypatching `ticktie.llm.run` intercepts every model call. Agents are built with `llm.model()` (which raises without a key), so give them pydantic-ai's `TestModel` and clear the `lru_cache`s.
+`engine` calls `llm.run(...)` through the module attribute, so monkeypatching `ibready.llm.run` intercepts every model call. Agents are built with `llm.model()` (which raises without a key), so give them pydantic-ai's `TestModel` and clear the `lru_cache`s.
 ```python
 import pytest
 from pydantic_ai.models.test import TestModel
-from ticktie import agents, config, db, engine, llm
+from ibready import agents, config, db, engine, llm
 
 class _Res:
     def __init__(self, out): self.output = out
@@ -266,7 +266,7 @@ def fake_llm(monkeypatch, tmp_db):
 @pytest.fixture
 def client(fake_llm):
     from fastapi.testclient import TestClient
-    from ticktie.server import app
+    from ibready.server import app
     with TestClient(app) as c:  # runs the startup hook -> db.init() on the tmp DB
         r = c.post("/api/signin", json={"name": "Tester", "password": "secret123"})
         c.headers["X-Auth-Token"] = r.json()["token"]
@@ -309,7 +309,7 @@ def client(fake_llm):
 | `test_cannot_touch_another_users_session` | User B gets 404 on `POST /api/session/{A_sid}/answer`, `/end`, `GET /events`, and `POST /feedback {"session_id": A_sid}` |
 | `test_admin_export_hidden_without_token` | No env -> 404; env set + wrong token -> 404; non-ASCII token -> 404 (not 500); right token -> 200 with keys `feedback, sessions, turns, events` |
 | `test_no_key_gives_503_not_500` | `fake_llm` not applied; `monkeypatch.setattr(config, "PORTKEY_API_KEY", None)` and `OPENAI_API_KEY=None`, `llm._model=None`, caches cleared -> `/answer` returns 503 with "No API key" in the `error` field; `/end` returns 200 (after #1) |
-| `test_meta_exposes_app_name` / `test_app_name_flows_everywhere` | `monkeypatch.setattr(config, "APP_NAME", "Foo")`, then `/api/meta["app"]["name"] == "Foo"`, `agents._prompt("coach.md")` contains "Foo" and not "Tick & Tie", and `"{app_name}"` does not appear in any rendered prompt |
+| `test_meta_exposes_app_name` / `test_app_name_flows_everywhere` | `monkeypatch.setattr(config, "APP_NAME", "Foo")`, then `/api/meta["app"]["name"] == "Foo"`, `agents._prompt("coach.md")` contains "Foo" and not "IB Ready", and `"{app_name}"` does not appear in any rendered prompt |
 | `test_resume_session_endpoint` (#14) | Start a session, `GET /api/session/{sid}` returns the same `question.title`; `GET /api/session/open` returns that id; after `/end` it returns `null` |
 
 ---

@@ -7,22 +7,22 @@ services:
     branch: main
     buildCommand: pip install -r requirements.txt
     # One worker on purpose: in-flight turn and end-of-session guards live in process memory.
-    startCommand: uvicorn ticktie.server:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers
+    startCommand: uvicorn ibready.server:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers
     healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.7
       - key: PORTKEY_API_KEY
         sync: false          # paste the key in the Render dashboard; never in git
-      - key: TICKTIE_ADMIN_TOKEN
+      - key: IBREADY_ADMIN_TOKEN
         generateValue: true
-      - key: TICKTIE_DATA_DIR
+      - key: IBREADY_DATA_DIR
         value: /var/data
       - key: APP_NAME
         value: IB Ready
       - key: FORWARDED_ALLOW_IPS   # trust Render's proxy, so per-IP sign-in limits see the real client IP
         value: "*"
     disk:
-      name: ticktie-data
+      name: ibready-data
       mountPath: /var/data
       sizeGB: 1

@@ -2,7 +2,7 @@
 
 import pytest
 
-from ticktie import config, db
+from ibready import config, db
 
 
 @pytest.fixture(autouse=True)

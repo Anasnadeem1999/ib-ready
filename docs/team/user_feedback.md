@@ -10,7 +10,7 @@ Source: Anas using the v1 instance at http://127.0.0.1:8000. Every item must be 
 | U-04 | Bar | Anas needs 100/100. Every rubric row must be defensible with evidence. | — | Me (final review) |
 
 Earlier feedback, already in progress:
-- **Name:** "Tick & Tie" was unclear, so the app is now **IB Ready**.
+- **Name:** "IB Ready" was unclear, so the app is now **IB Ready**.
 - **"Finance Club" tab:** confusing, so it moves to "How it works → For finance clubs".
 - **Text alignment:** paragraphs were misaligned.
 - **Audience:** the app must make sense to a university student who doesn't know banking.

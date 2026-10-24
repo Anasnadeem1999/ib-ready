@@ -5,7 +5,7 @@ import asyncio
 import pytest
 
 import mcp_server as srv
-from ticktie import bank
+from ibready import bank
 
 
 def test_question_hides_the_answer_and_check_is_exact():

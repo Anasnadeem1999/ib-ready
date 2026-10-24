@@ -21,7 +21,7 @@ Scripts and raw outputs are in the session scratchpad (`ml_live*.py`, `ml_evalse
 | 11 | P1 | Diagnostician: write `rationale` to the candidate ("you"), and never contradict the tool. | `prompts/diagnostician_base.md` | Live: for a `re_ffo` arithmetic slip, the rationale told the candidate "the stated calculation is internally consistent". |
 | 12 | P1 | Add behavioral (10) and industry (8) eval sets, plus the small runner change. | `evals/` | No fit or industry items exist today. Dry run: behavioral 8/10 now → 10/10 after P0 #1–2; industry 8/8. |
 | 13 | P1 | Planner prompt: stress-aware, cites only JSON facts, handles `compressed` and all-at-target. | `prompts/planner.md` | Minor tone gap; keeps the plan honest. |
-| 14 | P1 | Rename "Tick & Tie" → `{app_name}` in every prompt. `_prompt()` replaces `{app_name}`. | `agents._prompt`, `diagnostician_base.md` | Coordinator decision. |
+| 14 | P1 | Rename "IB Ready" → `{app_name}` in every prompt. `_prompt()` replaces `{app_name}`. | `agents._prompt`, `diagnostician_base.md` | Coordinator decision. |
 | 15 | P2 | Enforce coach length in code: trim lists to schema limits; if > 170 words, retry once. | `engine.end_session` | Live: 156–173 words against a 150 target. |
 | 16 | P2 | Coach summary: add `kind`, `stage` and "got it after a nudge" per question. | `engine.end_session` | Lets the coach treat fit and technicals differently and match urgency to the stage. |
 | 17 | P2 | Budget gaps: the planner has no budget check, and there is no per-call output cap. | `engine.build_plan`, `llm.SETTINGS` | Low risk at these prices. Listed in section 3.4. |
@@ -233,7 +233,7 @@ if any("expect_verdict" in r for r in rows):
     out["unfair_flags"] = sum(bool(set(r["mids"]) & set(r.get("forbid_mids", []))) for r in rows) / n
 ```
    Copy `expect_verdict` and `forbid_mids` into each row in `one()`. Keep the `INCOMPLETE` expectation (already supported). For `pred_correct` on behavioral, treat `incomplete` as "not correct" (already the case).
-4. Default `systems` for these sets: `["ticktie", "baseline"]`. The lite variant is meaningless for fit, since the playbook *is* the fairness logic.
+4. Default `systems` for these sets: `["ibready", "baseline"]`. The lite variant is meaningless for fit, since the playbook *is* the fairness logic.
 
 Dry run with a scratch runner (same logic, $0.0042):
 - Behavioral: **8/10 with current prompts and rules → 10/10 with the proposed playbook and rule.** The two fixes are items 3 and 6.
@@ -333,7 +333,7 @@ Recommendations:
 
 ---
 
-## 7. Improved prompt texts (full, ready to drop into `ticktie/prompts/`)
+## 7. Improved prompt texts (full, ready to drop into `ibready/prompts/`)
 
 ### 7.1 `coach.md`
 ```markdown
@@ -543,6 +543,6 @@ Rules:
 ```
 
 ### 7.5 `diagnostician_base.md`: targeted edits (not a rewrite)
-- Line 1: "Tick & Tie" → "{app_name}".
+- Line 1: "IB Ready" → "{app_name}".
 - Step 4, replace: "Write `rationale` in at most 45 words, to the candidate in the second person ("you"): first what they got right, then the main thing that went wrong and why. If the tool marked a number wrong, never describe the calculation as correct or consistent; name the step where it went off, without giving answer-key numbers they didn't say."
 - Under "Conceptual questions", add: "For behavioral (fit) questions, the playbook's fairness rules take precedence over this section."

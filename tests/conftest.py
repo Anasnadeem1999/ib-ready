@@ -8,7 +8,7 @@ built on pydantic-ai's TestModel so no API key or network is needed.
 import pytest
 from pydantic_ai.models.test import TestModel
 
-from ticktie import agents, config, db, engine, llm
+from ibready import agents, config, db, engine, llm
 
 
 class _Res:
@@ -95,7 +95,7 @@ def fake_llm(tmp_db, monkeypatch):
     engine._INFLIGHT.clear()
     engine._ENDING.clear()
     engine._INFLIGHT_PROFILES.clear()
-    from ticktie import server
+    from ibready import server
     server._RATE.clear()
     yield f
     _clear_agent_caches()
@@ -111,7 +111,7 @@ def pid(fake_llm):
 def client(fake_llm):
     from fastapi.testclient import TestClient
 
-    from ticktie.server import app
+    from ibready.server import app
 
     with TestClient(app) as c:  # runs the lifespan hook -> db.init() on the temp database
         r = c.post("/api/signin", json={"name": "Api Tester", "password": "secret123"})

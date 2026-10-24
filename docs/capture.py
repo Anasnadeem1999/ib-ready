@@ -28,8 +28,8 @@ PORT = 8240
 URL = f"http://127.0.0.1:{PORT}"
 
 sys.path.insert(0, str(ROOT))
-os.environ["TICKTIE_DATA_DIR"] = str(DATA)
-from ticktie import bank, engine  # noqa: E402
+os.environ["IBREADY_DATA_DIR"] = str(DATA)
+from ibready import bank, engine  # noqa: E402
 
 PAD = (" To be thorough, I'd also say this depends on a lot of factors, and in an interview I'd want to walk "
        "through each statement carefully and then double-check how everything links together before moving on, "
@@ -37,7 +37,7 @@ PAD = (" To be thorough, I'd also say this depends on a lot of factors, and in a
 
 
 def current() -> tuple[bank.Question, dict]:
-    c = sqlite3.connect(DATA / "ticktie.db")
+    c = sqlite3.connect(DATA / "ibready.db")
     st = json.loads(c.execute("SELECT state FROM sessions ORDER BY started DESC LIMIT 1").fetchone()[0])
     c.close()
     q = bank.from_state(st["current"])
@@ -61,7 +61,7 @@ def main() -> None:
     SHOTS.mkdir(parents=True, exist_ok=True)
     for f in SHOTS.glob("*.png"):
         f.unlink()
-    env = {**os.environ, "PORT": str(PORT), "TICKTIE_DATA_DIR": str(DATA)}
+    env = {**os.environ, "PORT": str(PORT), "IBREADY_DATA_DIR": str(DATA)}
     srv = subprocess.Popen([sys.executable, "run.py", "--no-browser"], cwd=ROOT, env=env)
     log: list[dict] = []
     try:

@@ -16,8 +16,8 @@ import base64
 import json
 import random
 
-from ticktie import bank
-from ticktie.misconceptions import LIBRARY
+from ibready import bank
+from ibready.misconceptions import LIBRARY
 
 try:
     from fastmcp import FastMCP

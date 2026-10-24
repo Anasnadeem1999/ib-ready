@@ -1,6 +1,6 @@
 # QA round 2: functional flows, API and data integrity (QA engineer A)
 
-Tested Sat Oct 24 2026 on branch `v2`. First pass on a server started at 01:43 ET; every open finding below was then **re-checked on HEAD `062ee2b`** (server restarted on port 8211 at 12:07 ET with its own data folder). Port 8000/8200 and `tick-and-tie` were not touched. No app code was edited.
+Tested Sat Oct 24 2026 on branch `v2`. First pass on a server started at 01:43 ET; every open finding below was then **re-checked on HEAD `062ee2b`** (server restarted on port 8211 at 12:07 ET with its own data folder). Port 8000/8200 and `ib-ready` were not touched. No app code was edited.
 Method: Python `requests` against the API (answers built from the answer key in sqlite via `bank.from_state`, ≥1.3 s apart), sqlite checks of the stored state/plan, and Playwright spot checks (New York and Anchorage time zones). Model spend: **$0.077** across about 260 graded answers.
 Scripts and JSON results: `C:/Users/ANAS/AppData/Local/Temp/claude/C--Users-ANAS-Desktop-Prob-and-Stat/a0cf80a0-8ce1-4782-89ed-7d7490e63cc7/scratchpad/qa2a/` (`journey.py`, `lifecycle.py`, `plans.py`, `auth.py`, `practice.py`, `carry.py`, `reverify*.py`; screenshots in `shots/`).
 

@@ -1,7 +1,7 @@
 {
  "run_at": "2026-10-24 12:33",
  "systems": {
-  "ticktie": {
+  "ibready": {
    "summary": {
     "n": 30,
     "n_correct_answers": 15,
@@ -675,7 +675,7 @@
     }
    ]
   },
-  "ticktie_lite": {
+  "ibready_lite": {
    "summary": {
     "n": 30,
     "n_correct_answers": 15,

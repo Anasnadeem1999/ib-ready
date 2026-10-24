@@ -4,8 +4,8 @@ import random
 
 import pytest
 
-from ticktie import bank
-from ticktie.misconceptions import LIBRARY
+from ibready import bank
+from ibready.misconceptions import LIBRARY
 
 
 def q(tid, **params):
@@ -301,7 +301,7 @@ def test_why_team_question_reads_well_for_generalists():
 
 
 def test_why_ib_and_why_team_are_never_asked_in_one_session():
-    from ticktie import mastery
+    from ibready import mastery
     for first, twin in (("b_why_ib", "b_why_group"), ("b_why_group", "b_why_ib")):
         for seed in range(30):
             rng = random.Random(seed)

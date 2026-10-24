@@ -1,6 +1,6 @@
 ---
 name: add-ib-question
-description: Add a new IB interview question template to IB Ready (ticktie/bank.py) with its calculator,
+description: Add a new IB interview question template to IB Ready (ibready/bank.py) with its calculator,
   misconception fingerprints and tests. Use when asked to add, extend or fix a technical question.
 ---
 
@@ -8,11 +8,11 @@ description: Add a new IB interview question template to IB Ready (ticktie/bank.
 
 ## Steps
 1. **Pick the slot.** Choose the topic (`SKILLS` key), level (1 Coffee-chat, 2 First-round, 3 Superday) and
-   sub-skill (`SUBSKILLS`). Add the id to `META` in `ticktie/bank.py`.
+   sub-skill (`SUBSKILLS`). Add the id to `META` in `ibready/bank.py`.
 2. **Write the `Template`.** It needs `gen` (random but realistic inputs), `solve` (the calculator: returns every
    label's true value), `labels` (what a full answer must state, with units and `required`), `explain` (the
    worked solution, built only from `solve`'s numbers), `key_points`, and `target_seconds`.
-3. **Add the traps.** For each misconception in `ticktie/misconceptions.py` that this question can catch, a
+3. **Add the traps.** For each misconception in `ibready/misconceptions.py` that this question can catch, a
    function returning the *wrong* numbers that mistake produces. If the mistake is new, add it to the library
    first (`id`, `skill`, `name`, `tell`, `fix`).
 4. **Test it** in `tests/test_bank.py`: the true answer passes `check_numbers`, each trap is matched to its id,

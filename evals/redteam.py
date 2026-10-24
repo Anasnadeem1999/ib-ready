@@ -21,9 +21,9 @@ from pathlib import Path
 
 HERE = Path(__file__).parent
 OUT = HERE / "results"
-os.environ.setdefault("TICKTIE_DATA_DIR", tempfile.mkdtemp(prefix="tt_redteam_"))
+os.environ.setdefault("IBREADY_DATA_DIR", tempfile.mkdtemp(prefix="tt_redteam_"))
 
-from ticktie import bank, config, db, engine, guard  # noqa: E402
+from ibready import bank, config, db, engine, guard  # noqa: E402
 
 ZW = "​"
 

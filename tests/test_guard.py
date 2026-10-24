@@ -1,8 +1,8 @@
-"""Offline tests for the safety filters in ticktie/guard.py (no model calls)."""
+"""Offline tests for the safety filters in ibready/guard.py (no model calls)."""
 
 import pytest
 
-from ticktie import agents, guard
+from ibready import agents, guard
 
 LOCK_FLAGS = {"grade manipulation", "instruction override", "score tampering", "role hijack",
               "answer/prompt extraction", "system/developer prompt reference", "fake message tags"}
@@ -125,7 +125,8 @@ def test_prompts_carry_canary_and_app_name(name):
     text = agents._prompt(name)
     assert guard.CANARY in text
     assert "{app_name}" not in text and "{canary}" not in text
-    assert "Tick & Tie" not in text
+    assert agents.APP_NAME in text  # the name comes from config.APP_NAME ...
+    assert agents.APP_NAME not in (agents.PROMPTS / name).read_text(encoding="utf-8")  # ... never hard-coded in the file
 
 
 def test_interviewer_prompt_puts_persona_and_stage_last_and_falls_back():
@@ -181,7 +182,7 @@ def test_rounding_is_close_not_a_mistake_in_coach_and_interviewer():
 
 
 def test_timeouts_and_gateway_errors_are_retried_but_bad_requests_are_not():
-    from ticktie import llm
+    from ibready import llm
 
     class ModelTimeoutError(Exception):
         pass

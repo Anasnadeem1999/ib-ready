@@ -6,7 +6,7 @@
 
 **Author:** Anas Nadeem (Yale SOM, MGT 409 AI Foundations for Managers, Fall 2026)
 
-IB Ready (code name and package: `ticktie`, "Tick & Tie") runs mock investment banking interviews: accounting, EV, DCF, M&A, LBOs, group specifics and fit. **Code checks every number you say.** For each question, deterministic calculators compute the right answer *and* the exact wrong answer each common misconception produces, so a mistake is matched to its cause, not guessed at by the model. Each question uses new numbers, so you can't memorise answers. A short placement interview sets your level per skill, the app builds a dated action plan up to your interview, a weakness map steers every drill at your weakest spot, and every technical answer is checked for length so you learn to answer concisely. You can type or speak your answers.
+IB Ready (Python package: `ibready`) runs mock investment banking interviews: accounting, EV, DCF, M&A, LBOs, group specifics and fit. **Code checks every number you say.** For each question, deterministic calculators compute the right answer *and* the exact wrong answer each common misconception produces, so a mistake is matched to its cause, not guessed at by the model. Each question uses new numbers, so you can't memorize answers. A short placement interview sets your level per skill, the app builds a dated action plan up to your interview, a weakness map steers every drill at your weakest spot, and every technical answer is checked for length so you learn to answer concisely. You can type or speak your answers.
 
 ## Run it locally (about 5 minutes)
 
@@ -35,18 +35,18 @@ You need Python 3.10+ (3.12 recommended) and an API key.
    Your browser opens on the **first free port from 8000** (8000, 8001, ...); the terminal prints the exact link. Options: `--no-browser`, or set `PORT=8123`.
 5. Pick a name and password (it creates a private profile), fill in your group and interview date, take the **placement interview**, and answer as you would out loud. The 🎤 **Speak** button works in Chrome and Edge.
 
-No database setup is needed: a SQLite file is created in `data/` on first run (set `TICKTIE_DATA_DIR` to put it elsewhere; avoid OneDrive-synced folders). Without a key the app still starts and shows a warning; grading needs the key. The product name lives in one place: `APP_NAME` in `ticktie/config.py` (or the `APP_NAME` environment variable).
+No database setup is needed: a SQLite file is created in `data/` on first run (set `IBREADY_DATA_DIR` to put it elsewhere; avoid OneDrive-synced folders). Without a key the app still starts and shows a warning; grading needs the key. The product name lives in one place: `APP_NAME` in `ibready/config.py` (or the `APP_NAME` environment variable).
 
 ## How it works
 
 | Piece | What it does |
 |---|---|
-| **Director** (`ticktie/engine.py`, plain code) | The boss. It picks every question from the weakness map, makes the final grading call from the calculator checks, enforces attempts, budgets and caps, and decides what the interviewer does next. |
+| **Director** (`ibready/engine.py`, plain code) | The boss. It picks every question from the weakness map, makes the final grading call from the calculator checks, enforces attempts, budgets and caps, and decides what the interviewer does next. |
 | **Specialist diagnosticians** (Accounting, Valuation, Deals, Markets) | gpt-6-luna agents with long domain playbooks, which are cached. They read the answer, pull out every number, and call the `check_numbers` tool. |
-| **`check_numbers` tool → calculators** (`ticktie/bank.py`) | Compares each number with the answer key and with every misconception's wrong-number fingerprint. It also spots pure arithmetic slips. |
+| **`check_numbers` tool → calculators** (`ibready/bank.py`) | Compares each number with the answer key and with every misconception's wrong-number fingerprint. It also spots pure arithmetic slips. |
 | **Interviewer** | A gpt-6-luna agent that voices the next line (nudge, "why?" probe, what-if follow-up, or reveal) in an Associate or VP persona. Its output is filtered before it is shown. |
 | **Coach** | Writes the end-of-session debrief from the app's own grading data. |
-| **Guard** (`ticktie/guard.py`) | Input filter for injection, hidden characters and length; output filter for answer leaks, invented numbers and prompt leaks. Also budgets and rate limits. |
+| **Guard** (`ibready/guard.py`) | Input filter for injection, hidden characters and length; output filter for answer leaks, invented numbers and prompt leaks. Also budgets and rate limits. |
 
 All agents run on **gpt-6-luna** through the course Portkey gateway. Every call checks which model actually answered, because the gateway silently swaps unknown model names.
 
@@ -77,7 +77,7 @@ The repo also has a coding-agent playbook for adding questions, in `.codex/skill
 ```
 run.py                 start the app
 mcp_server.py          the same calculators as an MCP server (optional)
-ticktie/               backend (FastAPI + PydanticAI)
+ibready/               backend (FastAPI + PydanticAI)
   bank.py              question templates, calculators, misconception fingerprints
   misconceptions.py    the misconception library (names + teaching notes)
   agents.py            specialist, interviewer and coach agents

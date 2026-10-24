@@ -8,7 +8,7 @@ import webbrowser
 
 import uvicorn
 
-from ticktie.config import APP_NAME  # also loads .env (repo folder, then the folder above)
+from ibready.config import APP_NAME  # also loads .env (repo folder, then the folder above)
 
 
 def free_port(start: int = 8000) -> int:
@@ -25,4 +25,4 @@ if __name__ == "__main__":
     print(f"\n  {APP_NAME} is running at {url}\n  (Ctrl+C to stop)\n")
     if "--no-browser" not in sys.argv:
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
-    uvicorn.run("ticktie.server:app", host="127.0.0.1", port=port, log_level="warning")
+    uvicorn.run("ibready.server:app", host="127.0.0.1", port=port, log_level="warning")

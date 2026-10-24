@@ -5,8 +5,8 @@ import datetime as dt
 
 import pytest
 
-from ticktie import config, db, engine, llm
-from ticktie import plan as planmod
+from ibready import config, db, engine, llm
+from ibready import plan as planmod
 
 
 def run(coro):
@@ -278,16 +278,16 @@ def test_cannot_touch_another_users_session(client):
 
 
 def test_admin_export_hidden_without_token(client, monkeypatch):
-    monkeypatch.delenv("TICKTIE_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("IBREADY_ADMIN_TOKEN", raising=False)
     assert client.get("/api/admin/export", headers={"X-Admin-Token": "x"}).status_code == 404
-    monkeypatch.setenv("TICKTIE_ADMIN_TOKEN", "s3cret")
+    monkeypatch.setenv("IBREADY_ADMIN_TOKEN", "s3cret")
     assert client.get("/api/admin/export", headers={"X-Admin-Token": "wrong"}).status_code == 404
     assert client.get("/api/admin/export", headers={"X-Admin-Token": "s3cret"}).json().keys() >= {
         "feedback", "sessions", "turns", "events", "costs", "club"}
 
 
 def test_no_key_gives_503_and_session_still_ends(client, monkeypatch):
-    from ticktie import agents
+    from ibready import agents
     monkeypatch.setattr(config, "PORTKEY_API_KEY", None)
     monkeypatch.setattr(config, "OPENAI_API_KEY", None)
     monkeypatch.setattr(llm, "_model", None)
@@ -514,7 +514,7 @@ def test_drill_trace_admits_when_it_leaves_the_exact_target(pid):
 # ---------------------------------------------------------------- answer length (concise coaching)
 def test_length_check_targets_and_exemptions():
     import random
-    from ticktie import bank
+    from ibready import bank
     num = bank.instantiate("acc_da", random.Random(1))
     target = engine.length_check(num, "x")["target"]
     assert target >= engine.CONCISE_MIN_WORDS
@@ -528,7 +528,7 @@ def test_length_check_targets_and_exemptions():
 
 def test_every_model_answer_fits_its_own_target():
     import random
-    from ticktie import bank
+    from ibready import bank
     for tid in bank.TEMPLATES:
         for seed in range(3):
             q = bank.instantiate(tid, random.Random(seed))

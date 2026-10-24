@@ -2,10 +2,10 @@
 
 import random
 
-from ticktie import bank, engine, guard, mastery
-from ticktie.agents import Diagnosis, StatedValue
-from ticktie.engine import _adjudicate
-from ticktie.misconceptions import LIBRARY
+from ibready import bank, engine, guard, mastery
+from ibready.agents import Diagnosis, StatedValue
+from ibready.engine import _adjudicate
+from ibready.misconceptions import LIBRARY
 
 
 def test_selection_is_strict_about_group_skill_and_level():

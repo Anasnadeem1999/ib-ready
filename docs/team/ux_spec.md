@@ -19,7 +19,7 @@ That came to 29 graded answers, about $0.007. The 45 screenshots are in
 |---|-----|------|--------------------|---------------|--------|
 | 1 | **P0** | Welcome | The 4 "how it works" cards are broken. Text wraps one word per line, the cards nest inside each other, and the numbers come out as 1/2, 3/4, 5/6, 7/8. This is the first thing a grader sees (S01, desktop and mobile). Cause: `.steps div` also matches the inner `<div>`. | Change the selector to `.steps > div` (§4.6 CSS-1) | 5 min |
 | 2 | **P0** | Dashboard | The empty "Today's plan" text wraps one word per line, because the `li` inherits the 3-column task grid (S03 dashboard). The empty trace list in Agents & cost has the same bug. | Add an `.empty` class (CSS-2) | 5 min |
-| 3 | **P0** | Name | "Tick & Tie" means nothing to a student, and the subtitle "IB technicals, diagnosed" is jargon. | Rename to **IB Ready** (user decision, §5) | 20 min |
+| 3 | **P0** | Name | "IB Ready" means nothing to a student, and the subtitle "IB technicals, diagnosed" is jargon. | Rename to **IB Ready** (user decision, §5) | 20 min |
 | 4 | **P0** | Nav | There are 6 tabs. Two of them ("Agents & cost", "Finance Club") are not for students. "Interview" silently sends you back to the Dashboard when no session is running, which is a dead end. On mobile the tabs wrap onto 2 lines and the last two are pushed off-screen. | New nav: **Home · My plan · Practice · Progress**. Agents & cost and Finance Club move into **How it works** (§1) | 1 h |
 | 5 | **P0** | Results / debrief | It feels harsh and noisy. Headlines say "exposed a clear gap". Seven skill rows show "30% → 17% ▼" in red, but the 30% "before" is a made-up starting value nobody earned. The survey takes as much space as the debrief. The coach's `next_session` sentence is never shown. Token cost appears in the footer. | Restructure into "What went well / One thing to work on / Your next step". Show only the skills this session touched. Hide the made-up starting value. Collapse the survey. Change the coach tone (§2.8, §2.8a) | 2 h |
 | 6 | **P0** | Jargon | Coverage/product groups, Superday, Associate/VP/MD, mastery, misconception, sub-skill, EV/DCF/WACC/LBO, "line item" and "Live diagnosis" are never explained. | Add a `?` tooltip glossary (§2.12) and student-facing renames (§1.3) | 1.5 h |
@@ -66,7 +66,7 @@ The route is `#how-it-works`. It has three anchored sections:
 
 | Current | New | Reason |
 |---|---|---|
-| Tick & Tie | IB Ready | §5 |
+| IB Ready | IB Ready | §5 |
 | IB technicals, diagnosed | Practice IB interviews. Learn why. Get a plan. | Plain language |
 | Dashboard | Home | Familiar |
 | Interview (tab) | Practice | Covers drills and mocks |
@@ -325,7 +325,7 @@ lead  You practiced Fit & behavioral for 14 minutes.
 - If fewer than 3 answers were given: *"Short session, so this is a light read. A few more answers next time will sharpen your picture."*
 
 ### 2.8a Coach prompt change (owner: prompt/agent engineer; listed here because it decides how the debrief feels)
-Add to `ticktie/prompts/coach.md` under Rules:
+Add to `ibready/prompts/coach.md` under Rules:
 > - Tone: a warm, honest mentor talking to a stressed student. Start with what went well. Describe gaps as the next thing to practice ("work on…", "next, practice…"). Never use "exposed", "failed", "poor", "weak" or "gap" in the headline.
 > - The headline names one real strength and one next focus, in under 25 words.
 > - Never soften a factual error into "correct". Honesty about what was wrong is required.
@@ -538,7 +538,7 @@ These are what the spec relies on:
 - **Subtitle:** *Investment banking interview practice*.
 - **Tagline** (welcome lead-in, README, slides): ***Practice IB interviews. Learn why. Get a plan.***
 - **Page `<title>`:** `IB Ready · Investment banking interview practice`.
-- **System speaker label in chat** (currently "Tick & Tie"): **IB Ready**.
+- **System speaker label in chat** (currently "IB Ready"): **IB Ready**.
 - **Welcome first line** (an optional eyebrow above the H1): *Get IB ready, even if you're new to finance.*
 - **Why it works:** "IB" plus "Ready" says what it is for and how you will feel, and a student needs no explanation. It avoids the Superday AI, BIWS, WSO and Wall Street Prep names. I have not run a trademark or domain check; do a quick web search before the demo.
 
@@ -546,12 +546,12 @@ Other ideas I considered (for the record only): IB Prep Coach (*Practice IB inte
 
 **Where to rename** (owner: front-end):
 - `web/index.html` (`<title>`, `.brand-name`, `.brand-sub`)
-- `web/app.js` (the "Tick & Tie" speaker label in `handleTurn`)
-- `ticktie/prompts/coach.md` line 1
+- `web/app.js` (the "IB Ready" speaker label in `handleTurn`)
+- `ibready/prompts/coach.md` line 1
 - the README and slides
 - `AGENTS.md`: update its title. Its rule "UI: black + pink" contradicts the pastel direction the user asked for, so change it to "UI: pastel light theme (tokens in docs/team/ux_spec.md §4.1)". Otherwise coding agents may "fix" the palette back.
 
-Internal package names (`ticktie/`, `TICKTIE_DATA_DIR`, `tt_` localStorage keys) can stay, so nothing breaks.
+Internal package names (`ibready/`, `IBREADY_DATA_DIR`, `tt_` localStorage keys) can stay, so nothing breaks.
 
 ---
 

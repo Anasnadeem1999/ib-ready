@@ -5,7 +5,7 @@
 Data sources (all in this repo):
   evals/results/*_eval.json, redteam.json   grading evals and red-team results (latest run)
   evals/results/history.md                  every eval run so far (the baseline varies run to run)
-  docs/_demo_data/ticktie.db                the recorded demo journey (real agents), made by docs/capture.py
+  docs/_demo_data/ibready.db                the recorded demo journey (real agents), made by docs/capture.py
   docs/demo_run.json                        that journey's answers and interviewer replies
   docs/pilot_summary.json                   real pilot users, exported by docs/export_pilot.py (no answer text)
   docs/pilot_notes.json                     the pilot user's own account of how they prep today
@@ -32,8 +32,8 @@ SHOTS = DOCS / "screenshots"
 RES = ROOT / "evals" / "results"
 sys.path.insert(0, str(ROOT))
 
-from ticktie import bank, config, engine  # noqa: E402
-from ticktie.misconceptions import LIBRARY  # noqa: E402
+from ibready import bank, config, engine  # noqa: E402
+from ibready.misconceptions import LIBRARY  # noqa: E402
 
 REPO_URL = "https://github.com/Anasnadeem1999/ib-ready"
 PAGES_URL = "https://anasnadeem1999.github.io/ib-ready"
@@ -299,12 +299,12 @@ def build() -> str:
     hold, lab, beh, ind = (load_eval(n) for n in ("holdout", "labeled", "behavioral", "industry"))
     red = load_json(RES / "redteam.json")
     fa_lo, fa_hi = baseline_false_alarm_range()
-    tt, ttl, base = hold.get("ticktie", {}), hold.get("ticktie_lite", {}), hold.get("baseline", {})
-    ltt, lbase = lab.get("ticktie", {}), lab.get("baseline", {})
+    tt, ttl, base = hold.get("ibready", {}), hold.get("ibready_lite", {}), hold.get("baseline", {})
+    ltt, lbase = lab.get("ibready", {}), lab.get("baseline", {})
     n_tests = test_count()
 
     # ---------- the recorded demo journey (v2, real agents)
-    demo_db = DOCS / "_demo_data" / "ticktie.db"
+    demo_db = DOCS / "_demo_data" / "ibready.db"
     d_sessions = db_rows(demo_db, "SELECT * FROM sessions")
     d_turns = db_rows(demo_db, "SELECT * FROM turns")
     d_events = db_rows(demo_db, "SELECT * FROM events")
@@ -535,7 +535,7 @@ its grading accuracy.</p>
 <tr><td>Interviewer seniority and coverage group</td><td>No</td><td>Yes</td><td>If asked</td><td>Partly</td><td><b>Associate, VP, Director or MD; 13 groups, {n_group} group-specific questions</b></td></tr>
 <tr><td>Published grading accuracy</td><td>n/a</td><td>No</td><td>No</td><td>No</td><td><b>Yes (below)</b></td></tr>
 <tr><td>Cost</td><td>$99&ndash;$197</td><td>$100&ndash;$300/hr</td><td>$0&ndash;$20/mo</td><td>$12&ndash;$15/mo</td><td><b>about {usd(user_month, 2)} of AI per user per month</b></td></tr></table>
-<p><b>The key idea.</b> In banking, to "tick and tie" is to check every number against its source (the code package keeps that name, <code>ticktie</code>).
+<p><b>The key idea.</b> In banking, to "tick and tie" is to check every number against its source (the code package keeps that name, <code>ibready</code>).
 {esc(NAME)} does that to the candidate's answer. For each question a calculator computes the right number for every line item <i>and</i> the exact wrong number
 each known misconception would produce. If you say net income falls $10 when the right answer is $7.50, that $10 is precisely what "ignores the tax
 effect" predicts, so the diagnosis is certain, not a guess. The language model's job is narrower and safer: read what you said, pull out your numbers,
@@ -549,8 +549,8 @@ candidate gets by pasting into a chatbot). The <b>held-out set</b> was written a
 <table class="num"><tr><th>Set and system</th><th>Answers</th><th>Verdict accuracy</th><th>Wrong caught</th><th>Exact misconception named</th><th>False alarms on correct</th><th>Cost / answer</th></tr>
 {eval_row(f"Held-out: {NAME}", tt, True)}{eval_row(f"Held-out: {NAME} Lite", ttl)}{eval_row("Held-out: plain gpt-6-luna", base)}
 {eval_row(f"Development: {NAME}", ltt, True)}{eval_row("Development: plain gpt-6-luna", lbase)}
-{eval_row(f"Fit answers: {NAME}", beh.get('ticktie', {}), True)}{eval_row("Fit answers: plain gpt-6-luna", beh.get('baseline', {}))}
-{eval_row(f"Group specifics: {NAME}", ind.get('ticktie', {}), True)}{eval_row("Group specifics: plain gpt-6-luna", ind.get('baseline', {}))}</table>
+{eval_row(f"Fit answers: {NAME}", beh.get('ibready', {}), True)}{eval_row("Fit answers: plain gpt-6-luna", beh.get('baseline', {}))}
+{eval_row(f"Group specifics: {NAME}", ind.get('ibready', {}), True)}{eval_row("Group specifics: plain gpt-6-luna", ind.get('baseline', {}))}</table>
 <div class="callout"><b>Why this matters:</b> the plain model catches most mistakes, but across every recorded run it told candidates that
 <b>{pct(fa_lo)}&ndash;{pct(fa_hi)} of their correct answers were wrong</b>, usually by "re-checking" the arithmetic and getting it wrong itself. A false
 alarm is worse than no feedback, because it teaches the wrong thing. {esc(NAME)} had <b>{pct(tt.get('false_alarms_on_correct', 0))}</b>, because the model

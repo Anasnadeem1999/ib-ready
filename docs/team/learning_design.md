@@ -1,7 +1,7 @@
 # Learning design spec: content, calibration, beginner layer, coach voice, name
 
 Owner: learning design (content). Status: review/spec only. No app code was changed.
-Method: every numeric template in `ticktie/bank.py` was instantiated with seeds 1-3 and read line by line, then each one was run 400 times to measure two things: (a) how often a misconception's wrong number falls inside the grading tolerance, which means a wrong answer gets marked correct, and (b) how often two misconceptions predict the same number, which makes the diagnosis ambiguous. The audit scripts are in the session scratchpad; the results are copied below.
+Method: every numeric template in `ibready/bank.py` was instantiated with seeds 1-3 and read line by line, then each one was run 400 times to measure two things: (a) how often a misconception's wrong number falls inside the grading tolerance, which means a wrong answer gets marked correct, and (b) how often two misconceptions predict the same number, which makes the diagnosis ambiguous. The audit scripts are in the session scratchpad; the results are copied below.
 
 ---
 
@@ -471,7 +471,7 @@ New sub-skill in `SUBSKILLS`: `"fit.understanding_banking": ("fit", "Understandi
 - Tabs: **Home · My plan · Practice · Skills** (was Dashboard · My plan · Interview · Skills map).
 - "Agents & cost" becomes **"Under the hood"**, moved to a footer link (keep it available for graders and the report).
 - "Finance Club" becomes **"For clubs"**, moved to the footer, with the subtitle: "Anonymous, combined results across all members, so a finance club can plan workshops around the most common mistakes. No names or answers are shown."
-- Brand: **IB Ready** (was "Tick & Tie"). Subtitle: was "IB technicals, diagnosed", now **"Your IB interview coach"**. Page title: "IB Ready · IB interview coach".
+- Brand: **IB Ready** (was "IB Ready"). Subtitle: was "IB technicals, diagnosed", now **"Your IB interview coach"**. Page title: "IB Ready · IB interview coach".
 - Hero headline: **"Practise IB interviews. Learn why, not just what."** Lead: "An AI interviewer that checks every number you say, explains the idea behind each mistake, and builds a day-by-day plan to your interview, starting from coffee-chat basics."
 - Text alignment (reported issue): left-align all paragraph text (no centred or justified body copy), cap line length at about 65 characters (`max-width: 65ch`), and keep one consistent left edge per card. Use centring only for single-line headings and buttons.
 
@@ -489,7 +489,7 @@ New sub-skill in `SUBSKILLS`: `"fit.understanding_banking": ("fit", "Understandi
 7. **Short.** Debrief ≤ 170 words. Nudges ≤ 25 words. No exclamation-mark stacks, no emojis, no "Amazing!!!".
 8. **Avoid:** "Don't worry", "Easy!", "Simply…", "Obviously…", "Unfortunately you failed", "Great answer" (when it wasn't), any made-up statistic about other candidates.
 
-### 5.2 Paste-ready `ticktie/prompts/coach.md` replacement
+### 5.2 Paste-ready `ibready/prompts/coach.md` replacement
 ```markdown
 You are the coach of IB Ready. After a practice interview you write the candidate's debrief. Most candidates are university students in the middle of recruiting: busy, often anxious, sometimes new to finance.
 
@@ -574,4 +574,4 @@ Replace "Sound like a person in a Superday, not a chatbot." with: "Sound like a 
 
 ## 6. Name
 
-Decided by the user: **IB Ready**. Use it in every user-facing string (`<title>`, brand name, `coach.md`, `interviewer.md` "the interviewer voice of IB Ready", README, report and slides). The internal package name `ticktie` can stay.
+Decided by the user: **IB Ready**. Use it in every user-facing string (`<title>`, brand name, `coach.md`, `interviewer.md` "the interviewer voice of IB Ready", README, report and slides). The internal package name `ibready` can stay.
