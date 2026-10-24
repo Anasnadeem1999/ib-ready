@@ -25,3 +25,6 @@ docs/_demo_data/
 evals/results/_flow/
 data/*.db-wal
 data/*.db-shm
+
+# eval run databases (the token logs llm_calls.jsonl stay as evidence)
+evals/results/_*/*.db*

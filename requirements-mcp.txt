@@ -1,0 +1,3 @@
+# Optional: only for mcp_server.py (the web app does not need it)
+-r requirements.txt
+fastmcp==4.1.3

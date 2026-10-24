@@ -57,9 +57,24 @@ python -m evals.redteam                    # 14 attacks through the full app (us
 ```
 Results are in `evals/results/`.
 
+## Use it from any AI agent (MCP server, optional)
+
+`mcp_server.py` exposes the calculators and the mistake library as an MCP server, so Claude Code, Codex, Cursor or Claude Desktop can run IB Ready drills. The tools are `list_topics`, `get_practice_question`, `check_answer` and `explain_mistake`. It also exposes the resource `ibready://mistakes` and the prompt `mock_interview`. It makes no model calls and costs $0, and the answer key stays on the server unless the caller asks for a reveal.
+
+```bash
+.venv\Scripts\python -m pip install -r requirements-mcp.txt     # Mac/Linux: .venv/bin/python ...
+```
+Add it to your agent's MCP config (e.g. `.mcp.json`), using absolute paths:
+```json
+{"mcpServers": {"ib-ready": {"command": "<repo>/.venv/Scripts/python", "args": ["<repo>/mcp_server.py"]}}}
+```
+
+The repo also has a coding-agent playbook for adding questions, in `.codex/skills/add-ib-question/SKILL.md`, and house rules for coding agents, in `AGENTS.md`.
+
 ## Repo map
 ```
 run.py                 start the app
+mcp_server.py          the same calculators as an MCP server (optional)
 ticktie/               backend (FastAPI + PydanticAI)
   bank.py              question templates, calculators, misconception fingerprints
   misconceptions.py    the misconception library (names + teaching notes)
