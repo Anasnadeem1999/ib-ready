@@ -178,3 +178,17 @@ def test_rounding_is_close_not_a_mistake_in_coach_and_interviewer():
     assert "`rounding`" in coach and "never as a mistake" in coach
     assert "rounding_note" in inter and "Never call it a mistake" in inter
     assert "concept_to_revisit" in inter
+
+
+def test_timeouts_and_gateway_errors_are_retried_but_bad_requests_are_not():
+    from ticktie import llm
+
+    class ModelTimeoutError(Exception):
+        pass
+
+    class Err(Exception):
+        def __init__(self, code):
+            self.status_code = code
+
+    assert llm._transient(ModelTimeoutError()) and llm._transient(Err(503)) and llm._transient(Err(429))
+    assert not llm._transient(Err(400)) and not llm._transient(ValueError())

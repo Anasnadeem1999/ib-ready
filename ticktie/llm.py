@@ -34,7 +34,7 @@ def _transient(exc: BaseException) -> bool:
     name = type(exc).__name__
     code = getattr(exc, "status_code", None)
     return name in ("ModelConnectionError", "APIConnectionError", "APITimeoutError", "TimeoutError",
-                    "ModelRequestTimeout") or code in (408, 429, 500, 502, 503, 504)
+                    "ModelRequestTimeout", "ModelTimeoutError") or code in (408, 429, 500, 502, 503, 504)
 
 
 def is_content_filter(exc: BaseException) -> bool:
