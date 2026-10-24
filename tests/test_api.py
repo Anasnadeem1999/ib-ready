@@ -598,3 +598,17 @@ def test_report_counts_questions_not_answers(pid):
     rep = run(engine.end_session(sid))
     assert rep["questions_done"] == db.session(sid)["state"]["done_q"] == 2
     assert len([t for t in rep["turns"] if t["verdict"]]) >= rep["questions_done"]
+
+
+def test_budgets_count_cached_tokens_at_their_price():
+    assert engine.budget_tokens(10_000, 9_000, 200) == 1_000 + 900 + 200
+    assert engine.shorten("Where does a deferred tax liability come from, for example when", 50) == "Where does a deferred tax liability come from…"
+    assert engine.shorten("short", 50) == "short"
+
+
+def test_coach_still_runs_when_the_session_budget_is_spent(pid, fake_llm, monkeypatch):
+    sid = engine.start_session(pid, "drill", "associate", None)["id"]
+    answer_until(sid, 2)
+    monkeypatch.setattr(config, "SESSION_TOKEN_BUDGET", 1)
+    rep = run(engine.end_session(sid))
+    assert not any("Coach skipped" in e["summary"] for e in rep["events"])

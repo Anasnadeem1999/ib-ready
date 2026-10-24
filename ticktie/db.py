@@ -428,7 +428,8 @@ def session_usage(sid: str) -> dict:
 
 
 def tokens_since(since: float, pid: str | None = None) -> int:
-    q = """SELECT COALESCE(SUM(e.input_tokens + e.output_tokens),0) t FROM events e
+    # cached input counts at a tenth, as it is priced (engine.budget_tokens)
+    q = """SELECT COALESCE(SUM(e.input_tokens - e.cached_tokens + e.cached_tokens / 10.0 + e.output_tokens),0) t FROM events e
            JOIN sessions s ON s.id=e.session_id WHERE e.kind='llm' AND e.ts>=?"""
     args: list = [since]
     if pid:

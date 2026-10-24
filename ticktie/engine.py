@@ -186,9 +186,15 @@ def _current(state: dict) -> bank.Question:
     return q
 
 
-def _budget_check(sid: str, pid: str, state: dict) -> None:
+def budget_tokens(input_tokens: int, cached_tokens: int, output_tokens: int) -> float:
+    """Tokens as budgets count them: cached input at a tenth, as it is priced (Lecture 11), so the
+    caps track cost and a long cached playbook doesn't use up a normal session."""
+    return (input_tokens - cached_tokens) + cached_tokens / 10 + output_tokens
+
+
+def _budget_check(sid: str, pid: str, state: dict, debrief: bool = False) -> None:
     use = db.session_usage(sid)
-    if use["input_tokens"] + use["output_tokens"] >= config.SESSION_TOKEN_BUDGET:
+    if not debrief and budget_tokens(use["input_tokens"], use["cached_tokens"], use["output_tokens"]) >= config.SESSION_TOKEN_BUDGET:
         raise BudgetExceeded(f"Session token budget reached ({config.SESSION_TOKEN_BUDGET:,} tokens). "
                              f"End the session to get your debrief.")
     day = time.time() - 86400
@@ -1026,7 +1032,7 @@ async def _end_session(s: dict, tz: int | None) -> dict:
     summary = {
         "mode": s["mode"],
         "stage": state.get("stage"),
-        "questions": [{"title": t["question"][:80], "skill": bank.SKILLS.get(t["skill"], t["skill"]), "kind": t["kind"],
+        "questions": [{"title": shorten(t["question"], 90), "skill": bank.SKILLS.get(t["skill"], t["skill"]), "kind": t["kind"],
                        "verdict": t["verdict"], "error_type": t["error_type"],
                        "line_items_right": [c["name"] for c in ((t["diagnosis"] or {}).get("checks") or [])
                                             if c.get("status") == "correct"],
@@ -1046,7 +1052,7 @@ async def _end_session(s: dict, tz: int | None) -> dict:
         allowed += [float(q["seconds"]) for q in summary["questions"] if q["seconds"]] + [float(len(summary["questions"]))]
         allowed += _numbers_in_text(json.dumps(summary))
         try:
-            _budget_check(sid, pid, {**state, "last_turn": 0, "turns": 0})
+            _budget_check(sid, pid, {**state, "last_turn": 0, "turns": 0}, debrief=True)  # one capped call; daily caps still apply
             note = ""
             for _attempt in range(2):  # one retry when the output filter blocks the draft
                 result, rec = await llm.run(agents.coach(), "Coach", json.dumps(summary, indent=1) + note, session_id=sid)
@@ -1077,6 +1083,15 @@ async def _end_session(s: dict, tz: int | None) -> dict:
     db.end_session(sid, debrief)
     db.add_event(sid, "Director", "end", "Session ended.", {})
     return _report(sid, tz)
+
+
+def shorten(text: str, n: int) -> str:
+    """Cut at a word boundary with an ellipsis, never mid-word."""
+    text = " ".join((text or "").split())
+    if len(text) <= n:
+        return text
+    cut = text[:n].rsplit(" ", 1)[0].rstrip(",;:.")
+    return cut + "…"
 
 
 def _length_fields(ln: dict | None) -> dict:
@@ -1121,9 +1136,9 @@ def _fallback_debrief(summary: dict, plan: dict | None = None) -> dict:
     for q in right:
         if q["skill"] not in seen:
             seen.add(q["skill"])
-            went_well.append(f"{q['skill']}: you got \"{q['title'][:60]}\" right.")
+            went_well.append(f"{q['skill']}: you got \"{shorten(q['title'], 60)}\" right.")
     if not went_well and partly:
-        went_well.append(f"{partly[0]['skill']}: you were partly there on \"{partly[0]['title'][:60]}\".")
+        went_well.append(f"{partly[0]['skill']}: you were partly there on \"{shorten(partly[0]['title'], 60)}\".")
     counts: dict[str, int] = {}
     for q in qs:
         for m in q["misconceptions"]:
