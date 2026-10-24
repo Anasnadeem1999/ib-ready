@@ -181,6 +181,11 @@ class PlanSummary(BaseModel):
     why: str = Field(description="Two sentences on why the plan is shaped this way (weakest areas first).")
     first_step: str = Field(description="One sentence: the very first thing to do today.")
 
+    @field_validator("headline", "why", "first_step")
+    @classmethod
+    def _house_style(cls, v: str) -> str:
+        return plain_dashes(v)
+
 
 @lru_cache(maxsize=None)
 def planner() -> Agent:
