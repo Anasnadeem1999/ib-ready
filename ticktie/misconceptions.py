@@ -101,8 +101,10 @@ _ALL = [
     Misconception(
         "EV_FINANCING_MOVES_EV", "ev", "Thinks financing changes enterprise value",
         "Raising debt and holding the cash increases EV.",
-        "Raising debt and holding the cash adds debt and cash in equal amounts, so EV "
-        "and equity value are unchanged. Only changes to the operating business move EV.",
+        "Raising money and holding it as cash doesn't change the operating business, so EV "
+        "is unchanged: new debt adds debt and cash in equal amounts (equity value also "
+        "unchanged); new shares add equity value and cash in equal amounts. Only changes "
+        "to the operating business move EV.",
     ),
     Misconception(
         "EV_MULTIPLE_MISMATCH", "ev", "Mismatches numerator and denominator in multiples",
@@ -435,6 +437,24 @@ _ALL = [
         "Divides combined net income by the old share count.",
         "In a stock deal the buyer issues new shares (purchase price / share price). Pro forma EPS divides combined net "
         "income by the old plus new shares.",
+    ),
+    Misconception(
+        "EV_EQUITY_ISSUE_NO_CHANGE", "ev", "Thinks issuing shares leaves equity value unchanged",
+        "Says equity value stays the same after the company sells new shares.",
+        "New shares sold at the market price add to equity value: more shares at the same price, so equity value "
+        "rises by the cash raised. EV is unchanged because that cash offsets the higher equity value.",
+    ),
+    Misconception(
+        "HC_RNPV_WEIGHTS_COSTS", "industry", "Probability-weights costs that are spent either way",
+        "rNPV = probability x (approved value - trial costs).",
+        "Only the cash that depends on approval gets weighted by the probability. Trial costs are spent whether or not "
+        "the drug is approved, so subtract them in full: rNPV = probability x approved value - committed costs.",
+    ),
+    Misconception(
+        "MA_ACCRETION_SIGN", "ma", "Calls a dilutive deal accretive (or the reverse)",
+        "The size of the EPS change is right but the direction is backwards.",
+        "Compare pro forma EPS with the buyer's standalone EPS: higher means accretive, lower means dilutive. Say the "
+        "direction first, then the size.",
     ),
     Misconception(
         "MA_PREMIUM_ON_OFFER", "ma", "Measures the premium against the offer price",

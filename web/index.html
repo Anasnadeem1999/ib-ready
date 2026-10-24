@@ -107,19 +107,12 @@
     <section id="view-home" class="view w-default" hidden aria-labelledby="home-h1">
       <div class="page-head">
         <div><h1 id="home-h1">Welcome</h1><p class="lead-sm" id="home-sub"></p></div>
-        <button class="ghost" id="edit-intake">Edit my goals</button>
       </div>
-      <div id="resume-banner" class="banner" hidden></div>
       <div id="firstrun" hidden></div>
       <div class="home-grid" id="home-main">
         <div class="card card--hero area-next" id="upnext"></div>
-        <div class="stat-cards area-stats">
-          <div class="card stat-card"><h2 class="section-title">Your level</h2><div id="lvl-body"></div></div>
-          <div class="card stat-card"><h2 class="section-title">Plan progress <span id="plan-status"></span></h2><div id="plan-body"></div></div>
-          <div class="card stat-card"><h2 class="section-title">Your streak</h2><div id="streak-body"></div></div>
-        </div>
-        <div class="card area-today"><h2 class="section-title">Today's tasks <a class="textlink" href="#plan">Full plan →</a></h2><ul class="task-list" id="today"></ul></div>
-        <div class="card area-skills"><h2 class="section-title">Your skills <a class="textlink" href="#progress">See all progress →</a></h2><ul class="skill-list" id="home-skills"></ul></div>
+        <div class="card area-journey" id="home-journey"></div>
+        <div class="card area-skills"><h2 class="section-title">Your topics <a class="textlink" href="#progress">See details →</a></h2><ul class="skill-list" id="home-skills"></ul></div>
       </div>
     </section>
 
@@ -127,7 +120,7 @@
     <section id="view-plan" class="view w-default" hidden aria-labelledby="plan-h1">
       <div class="page-head">
         <div><h1 id="plan-h1">Your plan</h1><p class="lead-sm" id="plan-lead"></p></div>
-        <div class="row-gap-2" id="plan-actions"><button class="ghost" id="plan-rebuild">Update my plan</button><span data-tipkey="update plan"></span></div>
+        <div class="row-gap-2" id="plan-actions"><button class="textlink" id="plan-rebuild">Update my plan</button><span data-tipkey="update plan"></span></div>
       </div>
       <div id="plan-body-wrap">
         <div class="card card--hero" id="plan-today"></div>
@@ -141,24 +134,28 @@
     </section>
 
     <!-- ================= PRACTICE: launcher ================= -->
-    <section id="view-practice" class="view w-default" hidden aria-labelledby="practice-h1">
-      <div class="page-head"><div><h1 id="practice-h1">Practice</h1><p class="lead-sm">Pick how you want to practice. Each session takes 15–30 minutes and updates your plan and progress.</p></div></div>
-      <div class="launcher">
-        <div class="card launch-tile card--hero" id="lt-plan"></div>
-        <div class="card launch-tile">
-          <h2 class="section-title">Mock interview <span data-tipkey="mock interview"></span></h2>
-          <p class="small muted">A full practice interview across mixed topics, like the real thing.</p>
-          <label class="field"><span>Interviewer <span data-tipkey="interviewer"></span></span><select id="q-persona"></select></label>
-          <button class="secondary mt-auto" id="q-mock">Start mock interview</button>
+    <section id="view-practice" class="view w-narrow" hidden aria-labelledby="practice-h1">
+      <div class="page-head"><div><h1 id="practice-h1">Practice</h1><p class="lead-sm">An AI interviewer asks you questions, one at a time. Answer by typing or speaking. Each session takes 15–30 minutes.</p></div></div>
+      <div class="card card--hero launch-main" id="lt-plan"></div>
+      <details class="card disclosure mt-4" id="lt-more">
+        <summary>Practice something else</summary>
+        <div class="more-grid">
+          <div class="launch-tile">
+            <h2 class="section-title">A full mock interview <span data-tipkey="mock interview"></span></h2>
+            <p class="small muted">Mixed questions, like a real interview.</p>
+            <label class="field"><span>Who interviews you <span data-tipkey="interviewer"></span></span><select id="q-persona"></select></label>
+            <button class="secondary" id="q-mock">Start</button>
+          </div>
+          <div class="launch-tile">
+            <h2 class="section-title">One topic <span data-tipkey="drill"></span></h2>
+            <p class="small muted">Short practice on a single topic.</p>
+            <div class="row2 tight"><label class="field"><span>Topic</span><select id="q-skill"></select></label>
+              <label class="field"><span>Milestone <span data-tipkey="level"></span></span><select id="q-level"></select></label></div>
+            <button class="secondary" id="q-practice">Start</button>
+          </div>
         </div>
-        <div class="card launch-tile">
-          <h2 class="section-title">Pick a topic <span data-tipkey="drill"></span></h2>
-          <p class="small muted">Short practice on one topic at the level you choose.</p>
-          <div class="row2 tight"><label class="field"><span>Topic</span><select id="q-skill"></select></label>
-            <label class="field"><span>Level <span data-tipkey="level"></span></span><select id="q-level"></select></label></div>
-          <button class="secondary mt-auto" id="q-practice">Start topic practice</button>
-        </div>
-      </div>
+        <p class="small mt-4" id="lt-retake" hidden><button class="textlink" data-start-placement>Redo the placement interview</button></p>
+      </details>
     </section>
 
     <!-- ================= INTERVIEW ================= -->
@@ -168,25 +165,27 @@
           <div class="session-bar" id="session-bar">
             <span class="pill mode-pill" id="sb-mode">Session</span>
             <div class="progress"><span class="lbl" id="sb-label">—</span><div class="pbar"><i id="sb-fill"></i></div></div>
-            <button class="ghost icon-btn sb-more" id="sb-more" aria-expanded="false" aria-controls="sb-tools" aria-label="More options">⋯</button>
-            <div class="sb-tools" id="sb-tools">
-              <label class="toggle"><input type="checkbox" id="tts-toggle" /> 🔊 Read aloud</label>
-              <span class="toggle-wrap"><label class="toggle"><input type="checkbox" id="handsfree-toggle" /> 🎙 Hands-free</label><span data-tipkey="hands-free"></span></span>
-              <button class="ghost" id="end-btn">End session</button>
+            <button class="ghost" id="end-btn">End</button>
+            <div class="menu-wrap">
+              <button class="ghost icon-btn sb-more" id="sb-more" aria-expanded="false" aria-controls="sb-tools" aria-label="Voice options">Voice ▾</button>
+              <div class="sb-tools" id="sb-tools" hidden>
+                <label class="toggle"><input type="checkbox" id="tts-toggle" /> Read questions aloud</label>
+                <span class="toggle-wrap"><label class="toggle"><input type="checkbox" id="handsfree-toggle" /> Hands-free mode</label><span data-tipkey="hands-free"></span></span>
+              </div>
             </div>
           </div>
           <div class="chat" id="chat" aria-live="polite"></div>
           <form class="composer" id="composer">
             <label for="answer" class="sr-only">Your answer</label>
-            <textarea id="answer" rows="2" placeholder="Answer as you would out loud: what changes, by how much, and why. Press Enter to send (Shift+Enter for a new line)."></textarea>
+            <textarea id="answer" rows="2" autocomplete="off" autocorrect="off" autocapitalize="sentences" placeholder="Type your answer the way you would say it out loud. Press Enter to send."></textarea>
             <div class="composer-row">
               <span class="hint" id="attempt-hint"></span>
               <div class="composer-actions">
+                <button type="button" class="textlink idk" id="idk-btn" hidden>I don't know this one</button>
                 <button type="button" class="ghost sheet-btn" id="sheet-btn" hidden>See feedback ▴</button>
-                <button type="button" class="ghost" id="idk-btn" hidden>I don't know this one</button>
                 <button type="button" class="ghost mic" id="mic-btn" title="Answer out loud (Chrome or Edge)">
                   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
-                  <span id="mic-label">🎤 Speak</span></button>
+                  <span id="mic-label">Speak</span></button>
                 <button type="submit" class="primary" id="send-btn">Submit answer</button>
               </div>
             </div>
@@ -251,7 +250,8 @@
     <!-- ================= PROGRESS ================= -->
     <section id="view-progress" class="view w-default" hidden aria-labelledby="progress-h1">
       <div class="page-head"><div><h1 id="progress-h1">Your progress</h1>
-        <p class="lead-sm">Each topic has three levels: Basic, Intermediate and Advanced <span data-tipkey="level"></span>. You reach a level when you answer at least 2 questions at that level with 75%+ confidence <span data-tipkey="confidence"></span>. Topics marked "Start here" are where your drills begin.</p></div></div>
+        <p class="lead-sm">Each topic moves through the same milestones, from getting started to Superday ready <span data-tipkey="level"></span>. You reach a milestone by answering at least 2 questions at that stage well.</p></div></div>
+      <div class="card mb-4" id="progress-journey"></div>
       <div id="progress-empty" hidden></div>
       <div class="two-col" id="progress-main">
         <div>
@@ -259,7 +259,7 @@
           <div class="skills-grid" id="skills-full"></div>
         </div>
         <div class="card"><h2 class="section-title">Mistake patterns <span data-tipkey="mistake pattern"></span></h2>
-          <p class="small muted mt-0">Mistakes you've made more than once, with your own words, so you can see the pattern. Fix one twice in a row and it's marked Fixed ✓.</p>
+          <p class="small muted mt-0">The wrong ideas behind your mistakes, with your own words, so you can spot the pattern. Fix one twice in a row and it's marked Fixed ✓.</p>
           <div class="mis-list" id="mis-list"></div></div>
       </div>
     </section>

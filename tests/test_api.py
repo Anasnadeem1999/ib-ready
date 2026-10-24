@@ -151,11 +151,11 @@ def test_empty_diagnostic_is_not_marked_done(pid):
 def test_partial_diagnostic_places_and_builds_plan(pid):
     sid = engine.start_session(pid, "diagnostic", "associate", None)["id"]
     answer(sid)
-    answer(sid)  # two right accounting answers: climbed to at least Intermediate
+    answer(sid)  # two right accounting answers: climbed at least one level
     rep = run(engine.end_session(sid))
     placed = db.get_profile_json(pid, "placement")
     assert placed["accounting"] >= 1
-    assert set(placed) >= {"ev", "dcf", "ma", "lbo", "fit"}  # the rest placed at Foundations
+    assert set(placed) >= {"ev", "dcf", "ma", "lbo", "fit"}  # the rest placed at level 0 (Getting started)
     d = engine.dashboard(pid)
     assert d["diagnostic_done"] and d["plan"] is not None and "ev" in d["placement_partial"]
     assert rep["is_placement"] and rep["placement_partial"]
@@ -335,3 +335,55 @@ def test_costs_and_club_signed_in(client):
     assert client.get("/api/costs").status_code == 200
     c = client.get("/api/club").json()
     assert c["too_few_members"] and c["misconceptions"] == []
+
+
+# ---------------------------------------------------------------- QA round 2 grading, through the full turn
+def _set_question(sid, tid, params):
+    st = db.session(sid)["state"]
+    q = engine.bank.build(engine.bank.TEMPLATES[tid], params)
+    st["current"] = {**q.to_state(), "whatif": False}
+    st["attempts"], st["followups"], st["phase"], st["first_verdict"] = 0, 0, "answer", None
+    db.save_state(sid, st)
+
+
+def test_wrong_claim_with_right_numbers_nudges_and_hits_the_map(pid, fake_llm):
+    sid = engine.start_session(pid, "drill", "associate", "dcf")["id"]
+    _set_question(sid, "dcf_unlever_beta", {"t": 0.2, "de": 0.5, "bL": 1.68})
+    fake_llm.mids = ["DCF_BETA_DIRECTION"]
+    fake_llm.fail = {"Interviewer"}  # the safe fallback must name the concept, with no numbers
+    r = answer(sid)
+    assert (r["verdict"], r["error_type"], r["action"]) == ("incomplete", "conceptual", "nudge")
+    assert "DCF_BETA_DIRECTION" in {m["mid"] for m in db.misconceptions(pid) if m["hits"]}
+    lib = engine.LIBRARY["DCF_BETA_DIRECTION"].name.lower()
+    assert lib in r["interviewer"].lower() and not any(ch.isdigit() for ch in r["interviewer"])
+
+
+def test_near_miss_turn_shows_a_neutral_rounding_note(pid, fake_llm):
+    sid = engine.start_session(pid, "drill", "associate", "dcf")["id"]
+    _set_question(sid, "mkt_rates_wacc", {"we": 0.7, "w0": 0.1, "b": 0.8, "t": 0.4, "g": 0.03, "bp": 100.0})
+    fake_llm.offsets = {"wacc_new": -0.09}
+    fake_llm.unmatched_error = "arithmetic"
+    fake_llm.mids = ["GEN_ARITHMETIC"]
+    r = answer(sid)
+    assert (r["verdict"], r["error_type"], r["action"]) == ("incomplete", "rounding", "nudge")
+    assert r["note"].startswith("Close. Check your rounding") and r["misconceptions"] == []
+    assert "GEN_ARITHMETIC" not in {m["mid"] for m in db.misconceptions(pid) if m["hits"]}
+
+
+def test_wrong_optional_line_item_is_a_nudge_not_a_fail(pid, fake_llm):
+    sid = engine.start_session(pid, "drill", "associate", "accounting")["id"]
+    _set_question(sid, "acc_asset_sale", {"B": 60.0, "P": 100.0, "t": 0.25})
+    fake_llm.offsets = {"ppe": -190.0}
+    r = answer(sid)
+    assert r["verdict"] == "incomplete" and r["action"] == "nudge"
+    assert [c["status"] for c in r["checks"] if c["name"].lower().startswith("change in pp")] == ["wrong"]
+
+
+def test_openers_are_plain_language(pid):
+    for mode, focus in (("drill", "ma"), ("practice", "ma"), ("diagnostic", None), ("mock", None)):
+        o = engine.start_session(pid, mode, "associate", focus)["opener"]
+        assert "Targeted drill" not in o and "drill" not in o.lower() and "practis" not in o.lower()
+        assert o.count(":") <= 1, o
+    assert engine.start_session(pid, "practice", "associate", "ma", 1)["opener"].startswith(
+        "Practice: M&A, coffee-chat level questions.")
+    assert engine.start_session(pid, "diagnostic", "associate", None)["opener"].startswith("This is a quick check, not a test.")

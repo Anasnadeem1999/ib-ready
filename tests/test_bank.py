@@ -220,3 +220,52 @@ def test_offer_premium():
     assert v["premium"] == pytest.approx(20) and v["purchase_equity"] == pytest.approx(600)
     c = {x.label: x for x in bank.check_numbers(q("ma_premium", P0=25.0, Offer=30.0, Q=20.0), {"premium": 16.67})}["premium"]
     assert c.status == "wrong" and "MA_PREMIUM_ON_OFFER" in c.matches
+
+
+def _as_said(label, x):
+    """The truth the way a person rounds it out loud (QA G-02)."""
+    if label.unit == "%":
+        return round(x, 1)
+    if label.unit == "$":
+        return float(round(x)) if abs(x) >= 20 else round(x, 2)
+    return round(x, 2)   # $/sh to the cent; multiples and share counts to 2dp
+
+
+@pytest.mark.parametrize("tid", NUMERIC_IDS)
+def test_interview_rounding_is_accepted(tid):
+    t = bank.TEMPLATES[tid]
+    for seed in range(300):
+        qq = bank.build(t, t.gen(random.Random(seed)))
+        said = {l.key: _as_said(l, qq.values[l.key]) for l in qq.labels}
+        bad = [(c.label, c.stated, c.expected) for c in bank.check_numbers(qq, said) if c.status != "correct"]
+        assert not bad, f"{tid} seed {seed}: rounded answer marked wrong {bad}"
+
+
+def test_whole_percent_dilution_and_one_decimal_wacc_pass():
+    # QA N11 / N18: "about ten percent dilutive", "WACC about 8.9%"
+    qq = q("ma_stock", Pa=40.0, Sa=100.0, PEa=10.0, Mt=1200.0, prem=0.5, PEt=15.0, r=0.04, rd=0.06, t=0.25)
+    truth = qq.values["accretion"]
+    c = {x.label: x for x in bank.check_numbers(qq, {"accretion": float(round(truth))})}
+    assert c["accretion"].status == "correct", truth
+    qw = q("mkt_rates_wacc", we=0.6, w0=0.08, b=1.0, t=0.2, g=0.02, bp=100.0)   # truth 8.94
+    assert bank.check_numbers(qw, {"wacc_new": 8.9})[0].status == "correct"
+
+
+def test_equity_issue_mistake_has_its_own_teaching_note():
+    qq = q("ev_equity_issue", X=200.0)
+    c = {x.label: x for x in bank.check_numbers(qq, {"equity_value": 0.0, "ev": 0.0})}
+    assert c["equity_value"].matches == ["EV_EQUITY_ISSUE_NO_CHANGE"] and c["ev"].status == "correct"
+    assert "rises by the cash raised" in LIBRARY["EV_EQUITY_ISSUE_NO_CHANGE"].fix
+
+
+def test_rnpv_traps_are_named_for_what_went_wrong():
+    qq = q("hc_rnpv", V=1500.0, pr=0.3, Cd=150.0)   # truth 300
+    m = lambda x: bank.check_numbers(qq, {"rnpv": x})[0].matches
+    assert m(405.0) == ["HC_RNPV_WEIGHTS_COSTS"] and m(1350.0) == ["HC_RNPV_UNWEIGHTED"]
+    assert "before any trial costs" in qq.text
+
+
+def test_accretion_direction_flip_is_named():
+    qq = q("ma_stock", Pa=40.0, Sa=100.0, PEa=10.0, Mt=1200.0, prem=0.5, PEt=15.0, r=0.04, rd=0.06, t=0.25)
+    c = bank.check_numbers(qq, {"accretion": -qq.values["accretion"]})[0]
+    assert c.status == "wrong" and c.matches == ["MA_ACCRETION_SIGN"]

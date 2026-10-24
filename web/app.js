@@ -4,8 +4,33 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const money = (x, dp = 4) => "$" + Number(x || 0).toFixed(dp);
 const fmt = (x) => (x === null || x === undefined ? "—" : Number(x).toLocaleString(undefined, { maximumFractionDigits: 2 }));
-const LEVEL_NAMES = ["Not yet placed", "Basic", "Intermediate", "Advanced"];
-const MODE_LABEL = { diagnostic: "Placement interview", drill: "Targeted drill", mock: "Mock interview", practice: "Topic practice" };
+const LEVEL_NAMES = ["Getting started", "Coffee-chat ready", "First-round ready", "Superday ready"];
+const LEVEL_SHORT = ["Getting started", "Coffee chat", "First round", "Superday"];
+const LEVEL_MEANING = [
+  "You're learning the basics. Everyone starts here.",
+  "You can handle the simple questions bankers ask in networking coffee chats.",
+  "You can answer the standard technical questions in a first-round interview.",
+  "You can handle the harder, multi-step questions in final-round Superdays.",
+];
+const OLD_LEVEL = { Foundations: 0, Basic: 1, Intermediate: 2, Advanced: 3 };
+// Server text may still say Basic / Intermediate / Advanced: show the student-facing milestone names instead.
+function mapLevels(text) {
+  if (!text) return text;
+  return String(text).replace(/(Foundations|Basic|Intermediate|Advanced)( level| drill)?/g, (m, w, suf) =>
+    suf === " level" ? `${LEVEL_SHORT[OLD_LEVEL[w]].toLowerCase()} level` : suf === " drill" ? `${LEVEL_SHORT[OLD_LEVEL[w]]} drill` : LEVEL_NAMES[OLD_LEVEL[w]]);
+}
+function journey(level, { title = true } = {}) {
+  const L = Math.max(0, Math.min(3, level || 0));
+  const steps = LEVEL_SHORT.map((n, i) => {
+    const cls = i < L ? "done" : i === L ? "here" : i === L + 1 ? "next" : "todo";
+    const tag = i === L ? "You are here" : i === L + 1 ? "Next milestone" : "";
+    return `<li class="${cls}"${i === L ? ' aria-current="step"' : ""}><span class="jdot" aria-hidden="true">${i < L ? "✓" : ""}</span><b>${esc(n)}</b>${tag ? `<small>${tag}</small>` : ""}</li>`;
+  }).join("");
+  const next = L < 3 ? `<p class="small mt-0"><b>Next milestone: ${esc(LEVEL_NAMES[L + 1])}.</b> ${esc(LEVEL_MEANING[L + 1])}</p>` : `<p class="small mt-0"><b>Top milestone reached.</b> Keep it fresh with mock interviews.</p>`;
+  return `${title ? `<h2 class="section-title">Your journey ${tip("level")}</h2>` : ""}<ol class="journey">${steps}</ol>
+    <p class="mt-0"><b>You are here: ${esc(LEVEL_NAMES[L])}.</b> ${esc(LEVEL_MEANING[L])}</p>${next}`;
+}
+const MODE_LABEL = { diagnostic: "Placement interview", drill: "Practice session", mock: "Mock interview", practice: "Topic practice" };
 const MODE_TIP = { diagnostic: "placement interview", drill: "drill", mock: "mock interview", practice: "drill" };
 const pick = (arr) => (Array.isArray(arr) && arr.length ? arr[Math.floor(Math.random() * arr.length)] : "");
 const isMobile = () => window.matchMedia("(max-width: 900px)").matches;
@@ -36,12 +61,12 @@ const VERDICT = {
 // ------------------------------------------------------------------ content (web/content.json, with built-in fallbacks)
 const FALLBACK = {
   primer: "**What are IB technical interviews?**\n\nInvestment banks advise companies on big money decisions: buying another company, selling one, or raising money from investors. Before hiring you as an analyst, bankers check that you understand the basics of how companies are measured and valued. That's the \"technical\" part of the interview.\n\nExpect four families of questions:\n- **Accounting**: how a change ripples through the three financial statements\n- **Valuation**: what a company is worth and why\n- **Deals**: mergers and leveraged buyouts\n- **You**: your story and why banking\n\nEarly conversations, such as coffee chats and first rounds, stick to the basics. Final rounds (\"Superdays\") go deeper. Nobody expects you to know everything. They want clear thinking, out loud, and honesty when you're unsure.",
-  levels: "**How levels work**\n\nEvery topic has three levels. You'll see each one in a real recruiting season.\n- **Basic: coffee chats and first rounds.** The questions every candidate is expected to answer cleanly in about a minute.\n- **Intermediate: Superdays.** Two or three steps, or a well-known trap: working capital, diluted shares, accretion/dilution, a paper LBO.\n- **Advanced: specialist and stretch questions.** Purchase accounting, rate shocks, deferred taxes. Useful for very technical groups.\n\nYou reach a level once you've shown it on at least two questions (75%+ confidence). We always start you at Basic and only move up when you're ready.",
+  levels: null,
   misconception_explainer: "**What's a mistake pattern?** It's the specific wrong idea behind a wrong number, like \"forgot that interest is tax-deductible\". Fix the idea once and every question that uses it gets easier.",
   empty_states: {
     dashboard: "Let's find your starting point. A 15-minute placement interview shows where you already are and where to focus. There's no pass or fail, just a map.",
     plan: "Your plan appears here after the placement interview. It counts back from your interview date and fits the hours you said you have, so you only practice what moves the needle.",
-    progress: "Your progress fills in as you answer questions. Each topic shows Basic → Intermediate → Advanced, and the sub-skills that need work are where your next drills go.",
+    progress: "Your progress fills in as you answer questions. Each topic moves from Getting started to Superday ready, and the sub-skills that need work are where your next drills go.",
   },
   encouragement: {
     nudge: ["Small and steady is how this gets easy.", "One short session today beats a long one next week."],
@@ -57,7 +82,7 @@ function emptyCopy(k, sub) {
   if (v && typeof v === "object") { const x = v[sub] || Object.values(v).find((y) => typeof y === "string" && y.length > 60); if (x) return x; }
   return FALLBACK.empty_states[k];
 }
-const lvlLabel = (x) => (!x || x === "Foundations" ? "Not yet placed" : x);
+const lvlLabel = (x) => mapLevels(x || "Foundations");
 function levelUpLine(skill, level) {
   const opts = (S.content?.encouragement?.level_up || []).filter((t) => t.includes("{skill}"));
   const t = pick(opts);
@@ -69,11 +94,13 @@ function misHTML(short) {
   return `${short ? "" : "<h3>What's a mistake pattern?</h3>"}${body ? `<p>${inline(body)}</p>` : rich(m)}`;
 }
 function levelsHTML(x) {
-  if (!x || typeof x !== "object" || Array.isArray(x) || !(x.Basic || x.basic)) return rich(x);
-  const lv = ["Basic", "Intermediate", "Advanced"].map((n) => [n, x[n] || x[n.toLowerCase()]]).filter(([, v]) => v);
-  return `<h3>${esc(x.title || "How levels work")}</h3>${x.intro ? `<p>${inline(x.intro)}</p>` : ""}<ul>${lv.map(([n, v]) =>
-    `<li><b>${esc(n)}${v.stage ? `: ${esc(v.stage.toLowerCase())}` : ""}.</b> ${inline(v.explanation || v.body || (typeof v === "string" ? v : ""))}</li>`).join("")}</ul>
-    ${x.how_you_level_up ? `<p>${inline(x.how_you_level_up)}</p>` : ""}`;
+  const lv = x && typeof x === "object" && !Array.isArray(x) ? x : {};
+  const rows = [lv.getting_started, lv.Basic, lv.Intermediate, lv.Advanced].map((v, i) => ({
+    label: v?.label || LEVEL_NAMES[i], stage: v?.stage || "", text: v?.explanation || v?.meaning || LEVEL_MEANING[i] }));
+  const how = typeof lv.how_you_level_up === "string" ? mapLevels(lv.how_you_level_up) : "You reach a milestone once you've shown it on at least two questions. Everyone starts at the beginning and moves up only when ready.";
+  return `<h3>How milestones work</h3><p>${inline(mapLevels(lv.intro) || "Every topic moves through four milestones, named after the stage of recruiting you're ready for.")}</p>
+    <ol class="journey static">${rows.map((r, i) => `<li class="${i ? "todo" : "here"}"><span class="jdot" aria-hidden="true"></span><b>${esc(LEVEL_SHORT[i])}</b></li>`).join("")}</ol>
+    <ul>${rows.map((r) => `<li><b>${esc(r.label)}</b>${r.stage ? ` <span class="muted">(${esc(r.stage)})</span>` : ""}: ${inline(r.text)}</li>`).join("")}</ul><p>${inline(how)}</p>`;
 }
 const encourage = (k) => pick((S.content?.encouragement?.[k]?.length ? S.content.encouragement[k] : FALLBACK.encouragement[k]));
 
@@ -130,13 +157,13 @@ const TIPS = {
   superday: ["Superday", "The final round: several back-to-back interviews in one day. Coffee chats and first rounds come before it and stick to the basics."],
   interviewer: ["Associate / VP / Director / MD", "Banker seniority, junior to senior. Associates focus on technical questions; Managing Directors focus on your story and fit. Start with Associate if you're unsure."],
   "placement interview": ["Placement interview", "A 15-minute check of your current level. It's not graded; it sets your starting point."],
-  drill: ["Drill", "A short (about 20 min) set of questions on one topic at one level."],
+  drill: ["Practice session", "A short (about 20 min) set of questions on one topic, pitched at your next milestone."],
   "mock interview": ["Mock interview", "A full practice interview across mixed topics, like the real thing."],
   confidence: ["Confidence", "How sure we are that you can answer this topic correctly, based on your recent answers."],
   "mistake pattern": ["Mistake pattern", "The specific wrong idea behind an answer (e.g. \"forgets the tax effect\"). Fixing the pattern fixes many questions."],
   "sub-skill": ["Sub-skill", "A smaller piece of a topic, like \"working capital\" inside Accounting."],
   "line item": ["Line item", "One number the interviewer expects in your answer, such as net income or cash."],
-  level: ["Levels", "Basic = coffee chats and first rounds. Intermediate = Superdays. Advanced = specialist and stretch questions."],
+  level: ["Milestones", "Getting started → Coffee-chat ready (simple questions in networking chats) → First-round ready (standard technical questions) → Superday ready (harder final-round questions)."],
   "hands-free": ["Hands-free voice mode", "The interviewer reads each question aloud, then the microphone opens. Answer out loud and say \"submit\" to send. Works in Chrome and Edge."],
   "update plan": ["Update my plan", "Rebuilds the plan from your latest results. Finished tasks stay finished."],
   "plan status": ["Plan status", "Compares the tasks you've finished with the tasks scheduled up to today. Falling a little behind is normal; the plan adjusts."],
@@ -186,7 +213,7 @@ function tipData(key) {
   const aliases = { superday: "superday", drill: "drill", "mock interview": "mock", "sub-skill": "sub-skill", "mistake pattern": "misconception", confidence: "mastery" };
   const g = GLOSS.map[k] || (aliases[k] && GLOSS.map[aliases[k]]);
   if (own) return { label: own[0], def: own[1] };
-  if (g) return { label: g.term, def: g.def };
+  if (g) return { label: mapLevels(g.term), def: mapLevels(g.def) };
   return null;
 }
 function tip(key, label) {
@@ -309,7 +336,7 @@ document.addEventListener("keydown", (e) => {
   if (!$("#profile-menu").hidden) { closeMenu(); $("#profile-chip").focus(); return; }
   if (!$("#coach-mark").hidden) { endTour(); return; }
   if ($("#side-col").classList.contains("open")) { closeSheet(); return; }
-  if ($("#session-bar").classList.contains("open")) { $("#session-bar").classList.remove("open"); }
+  if (!$("#sb-tools").hidden) closeVoiceMenu();
 });
 
 function signedInUI(on) {
@@ -426,7 +453,6 @@ function fillIntake() {
   $("#intake-cancel").hidden = !S.dash || S.dash.needs_intake;
   $("#intake-h1").textContent = S.dash?.needs_intake ? "Tell us about your interviews" : "Edit my goals";
 }
-$("#edit-intake").addEventListener("click", () => openIntake(true));
 $("#intake-cancel").addEventListener("click", () => history.length > 1 ? history.back() : go("home"));
 $("#intake").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -464,13 +490,13 @@ function levelMeter(level, p, { ink = null, label = "" } = {}) {
 function taskTitle(t) {
   if (!t) return "";
   if (t.type === "mock") return t.final ? "Final mock interview" : "Mock interview";
-  return `${LEVEL_NAMES[t.level] || ""} drill · ${skillName(t.skill)}`;
+  return `${skillName(t.skill)} practice`;
 }
 function taskSub(t) {
   if (!t) return "";
   if (t.type === "mock") return `Mixed questions · about ${t.minutes} min`;
   const sub = t.subskill && S.meta?.subskills?.[t.subskill]?.name;
-  return `${sub ? sub + " · " : ""}about ${t.minutes} min`;
+  return `${sub ? sub + " · " : ""}${LEVEL_SHORT[t.level] ? LEVEL_SHORT[t.level].toLowerCase() + " level · " : ""}about ${t.minutes} min`;
 }
 function taskRow(t, withBtn) {
   return `<li class="task-row ${t.done ? "done" : ""}"><span class="tick" aria-hidden="true">${t.done ? "✓" : ""}</span>
@@ -505,71 +531,61 @@ async function renderHome() {
   const first = (S.profile?.name || "").split(" ")[0];
   $("#home-h1").textContent = `${greeting()}, ${first}`;
   const n = daysUntil(d.intake?.interview_date);
-  $("#home-sub").textContent = [showIndustry() ? d.group_name.split(" (")[0] : "Generalist",
-    d.intake?.interview_date ? `Interview ${fmtDate(d.intake.interview_date)}${n != null && n >= 0 ? ` (${n === 0 ? "today" : n === 1 ? "tomorrow" : n + " days"})` : ""}` : ""].filter(Boolean).join(" · ");
-  const rb = $("#resume-banner");
-  const partial = Array.isArray(d.placement_partial) ? d.placement_partial : [];
-  rb.innerHTML = S.session ? resumeBanner() : partial.length && d.diagnostic_done
-    ? `<span>Your placement isn't finished: ${partial.map((k) => esc(skillName(k))).join(", ")} still start${partial.length === 1 ? "s" : ""} at Basic. Finish it any time.</span><button class="secondary" data-start-placement>Finish placement</button>` : "";
-  rb.hidden = !rb.innerHTML;
+  $("#home-sub").textContent = d.intake?.interview_date && n != null && n >= 0
+    ? `Your interview is ${n === 0 ? "today" : n === 1 ? "tomorrow" : `in ${n} days (${fmtDate(d.intake.interview_date)})`}.` : "";
   const pid = S.profile?.id || S.profile?.name;
   const panelDone = localStorage.getItem(`ibr_firstrun:${pid}`) === "1";
   const fr = $("#firstrun");
   if (!d.diagnostic_done && !panelDone && !S.session) {
     fr.hidden = false; $("#home-main").hidden = true;
     fr.innerHTML = `<div class="card card--hero firstrun"><h2>Welcome, ${esc(first)}. Here's how this works.</h2>
-      <p class="mt-0 muted">${inline(emptyCopy("dashboard", "not_placed"))}</p>
-      <ol class="fr-steps"><li><b>Placement interview ${tip("placement interview")}</b><span>15 minutes: find your level in each topic.</span></li>
-        <li><b>Your plan</b><span>We schedule short drills and mock interviews until your interview date.</span></li>
-        <li><b>Practice daily</b><span>Each session updates your plan and your progress.</span></li></ol>
-      <div class="row-gap-2"><button class="primary big" data-start-placement>Start placement interview</button><button class="ghost" id="fr-notnow">Not now</button></div></div>`;
+      <p class="mt-0 muted">No finance background needed. ${inline(emptyCopy("dashboard", "not_placed"))}</p>
+      <ol class="fr-steps"><li><b>Find your starting point ${tip("placement interview")}</b><span>A 15-minute placement interview. It's not graded.</span></li>
+        <li><b>Get your plan</b><span>A short practice each day until your interview.</span></li>
+        <li><b>Practice and improve</b><span>Every session shows what you got right and what to fix.</span></li></ol>
+      <div class="row-gap-2"><button class="primary big" data-start-placement>Start</button><button class="textlink" id="fr-notnow">Not now</button></div></div>`;
     $("#fr-notnow").addEventListener("click", () => { localStorage.setItem(`ibr_firstrun:${pid}`, "1"); renderHome(); });
     return;
   }
   fr.hidden = true; $("#home-main").hidden = false;
   const p = d.progress;
-  // Up next
+  // ONE "Up next" card with ONE button
   const up = $("#upnext");
-  if (!d.diagnostic_done) {
-    up.innerHTML = `<div class="upnext"><div><span class="eyebrow">Start here</span><h2>15-minute placement interview ${tip("placement interview")}</h2>
-      <div class="sub">Find your level in each topic. It's a check, not a test.</div></div>
-      <div class="upnext-actions"><button class="primary big" data-start-placement>Start placement</button></div></div>`;
+  let title, subline, btn, extra = "";
+  if (S.session) {
+    title = esc(`Continue your ${(MODE_LABEL[S.session.mode] || "session").toLowerCase()}`);
+    subline = "You stopped partway through. Pick up where you left off.";
+    btn = `<button class="primary big" data-resume>Continue</button>`;
+  } else if (!d.diagnostic_done) {
+    title = `Placement interview ${tip("placement interview")}`;
+    subline = "15 minutes to find your starting point in each topic. It's a check, not a test.";
+    btn = `<button class="primary big" data-start-placement>Start</button>`;
   } else if (p?.next) {
-    const more = Math.max(0, (p.today || []).filter((t) => !t.done && t.id !== p.next.id).length);
-    up.innerHTML = `<div class="upnext"><div><span class="eyebrow">Up next</span><h2>${esc(taskTitle(p.next))} ${p.next.type === "mock" ? tip("mock interview") : tip("drill")}</h2>
-      <div class="sub">${esc(taskSub(p.next))}</div><div class="then">${more ? `Then: ${more} more task${more > 1 ? "s" : ""} today.` : "Small and steady is how this gets easy."}</div></div>
-      <div class="upnext-actions"><button class="primary big" data-task="${p.next.id}">Start</button></div></div>`;
+    const later = (p.today || []).filter((t) => !t.done && t.id !== p.next.id);
+    title = `${esc(taskTitle(p.next))} ${p.next.type === "mock" ? tip("mock interview") : tip("drill")}`;
+    subline = esc(taskSub(p.next));
+    btn = `<button class="primary big" data-task="${p.next.id}">Start</button>`;
+    extra = later.length ? `Later today: ${later.map((t) => esc(taskTitle(t))).join(", ")}.` : "That's everything planned for today.";
   } else {
-    up.innerHTML = `<div class="upnext"><div><span class="eyebrow">Up next</span><h2>You've finished every task in your plan</h2>
-      <div class="sub">A mock interview keeps things fresh.</div></div><div class="upnext-actions"><button class="primary big" id="up-mock">Start mock</button></div></div>`;
-    $("#up-mock").addEventListener("click", () => startSession("mock", persona()));
+    title = "You've finished your plan";
+    subline = "A full mock interview keeps you sharp.";
+    btn = `<button class="primary big" id="up-mock">Start</button>`;
   }
-  // stat cards
-  const top = d.overall_level >= 3;
-  $("#lvl-body").innerHTML = d.diagnostic_done
-    ? `<div class="big-num">${esc(d.overall_label)}</div><div class="small muted hide-m">${top ? "Top level ✓" : `Goal: ${esc(d.target_label)}`}</div>${levelMeter(d.overall_level, null, { label: d.overall_label })}`
-    : `<div class="big-num">Not placed</div><div class="small muted hide-m">After your placement interview</div>`;
-  const st = $("#plan-status");
-  const statusText = { "on track": "On track", behind: "A little behind (that's OK)", ahead: "Ahead" };
-  st.innerHTML = p ? `<span class="status ${p.status.replace(" ", "-")}">${esc(statusText[p.status] || p.status)}</span>${tip("plan status")}` : "";
-  $("#plan-body").innerHTML = p ? `<div class="ring-row"><div class="ring" style="--p:${p.pct}"><div>${p.pct}%</div></div>
-      <div class="small"><b>${p.done} of ${p.total}</b> tasks done<div class="muted hide-m">${p.due_done} of ${p.due} due so far</div></div></div>`
-    : `<p class="small muted mt-0">Your plan appears after the placement interview.</p>`;
-  $("#streak-body").innerHTML = `<div class="stat-row"><div class="stat"><b>${d.streak}</b><span>day${d.streak === 1 ? "" : "s"} in a row</span></div>
-    <div class="stat"><b>${d.sessions}</b><span>sessions</span></div><div class="stat"><b>${d.answered}</b><span>answers</span></div></div>`;
-  // today
-  const today = p ? ((p.today || []).length ? p.today : p.next ? [p.next] : []) : [];
-  $("#today").innerHTML = today.length ? today.map((t) => taskRow(t, true)).join("")
-    : `<li class="empty">${d.diagnostic_done ? emptyCopy("dashboard", "nothing_due_today") : "Take the placement interview to get your plan."}</li>`;
-  // skills (compact)
-  const startSkill = p?.next?.type === "drill" ? p.next.skill : null;
+  up.innerHTML = `<div class="upnext"><div><span class="eyebrow">Up next</span><h2>${title}</h2>
+    <div class="sub">${subline}</div>${extra ? `<div class="then">${extra}</div>` : ""}</div>
+    <div class="upnext-actions">${btn}${d.diagnostic_done && !S.session ? `<a class="textlink" href="#plan">See my plan</a>` : ""}</div></div>`;
+  $("#up-mock")?.addEventListener("click", () => startSession("mock", persona()));
+  const facts = [];
+  if (p) facts.push(`${p.done} of ${p.total} plan tasks done`);
+  if (d.streak) facts.push(`${d.streak}-day streak`);
+  if (d.answered) facts.push(`${d.answered} answers so far`);
+  $("#home-journey").innerHTML = journey(d.diagnostic_done ? d.overall_level : 0) + (facts.length ? `<p class="small muted mt-0">${facts.join(" · ")}</p>` : "");
   $("#home-skills").innerHTML = visibleSkills(d.skills).map((s) => {
-    const placed = s.level > 0 || s.n > 0;
-    const lv = !placed ? "Not yet placed" : s.level >= 3 ? "Advanced · top ✓" : (s.level ? LEVEL_NAMES[s.level] : "Getting started");
-    return `<li class="c-${s.key}"><span class="nm"><span class="dotc" aria-hidden="true"></span>${esc(skillName(s.key, s.name))} ${tip(s.key)}${s.key === startSkill ? ' <span class="chip start">Start here</span>' : ""}</span>
-      ${placed ? levelMeter(s.level, s.n ? s.p : null, { label: lv }) : "<span></span>"}<span class="lv">${esc(lv)}</span></li>`;
+    const lv = LEVEL_SHORT[s.level] || LEVEL_SHORT[0];
+    return `<li class="c-${s.key}"><span class="nm"><span class="dotc" aria-hidden="true"></span>${esc(skillName(s.key, s.name))} ${tip(s.key)}</span>
+      ${levelMeter(s.level, s.n ? s.p : null, { label: LEVEL_NAMES[s.level] || LEVEL_NAMES[0] })}<span class="lv">${esc(lv)}${s.level >= 3 ? " ✓" : ""}</span></li>`;
   }).join("");
-  if (d.diagnostic_done) maybeTour();
+  if (d.diagnostic_done && !S.session) maybeTour();
 }
 
 // ------------------------------------------------------------------ first-run coach marks (after placement)
@@ -583,7 +599,7 @@ function maybeTour() {
   TOUR.steps = [
     { sel: ["#upnext"], text: "This is always your next step. Just press Start." },
     { sel: [".tab[data-view=plan]", ".btab[data-view=plan]"], text: `Your day-by-day schedule until ${planDate}.` },
-    { sel: [".tab[data-view=progress]", ".btab[data-view=progress]"], text: "See each topic's level and the mistakes you keep repeating." },
+    { sel: [".tab[data-view=progress]", ".btab[data-view=progress]"], text: "See where each topic stands and the mistakes you keep repeating." },
   ];
   TOUR.i = 0; TOUR.active = true; setTimeout(showStep, 350);
 }
@@ -623,17 +639,17 @@ async function renderPlan() {
   if (!plan) {
     $("#plan-h1").textContent = "Your plan"; $("#plan-lead").textContent = "";
     $("#plan-empty").innerHTML = emptyState("Your plan appears after your placement interview.", emptyCopy("plan", "no_plan") + " It takes about 15 minutes.",
-      `<button class="primary big" data-start-placement>Start placement</button>`);
+      `<button class="primary big" data-start-placement>Start</button>`);
     return;
   }
   const todayISO = d.today || localISO();
-  $("#plan-h1").textContent = `Your plan to ${d.target_label || "the next level"}`;
+  $("#plan-h1").textContent = d.overall_level >= 3 ? "Your plan: stay Superday ready" : `Your plan to ${LEVEL_NAMES[Math.min(3, (d.overall_level || 0) + 1)]}`;
   $("#plan-lead").textContent = `${plan.days_left} days · ${plan.practice_days ? `${plan.practice_days} practice days · ` : ""}about ${plan.minutes_per_practice_day} min a practice day · 1 rest day a week`;
   // Today
   const todays = plan.tasks.filter((t) => t.date === todayISO);
   const next = plan.tasks.find((t) => !t.done);
   $("#plan-today").innerHTML = `<h2 class="section-title">Today · ${esc(fmtDate(todayISO))}</h2>` + (todays.length
-    ? `<ul class="task-list">${todays.map((t) => taskRow(t, true)).join("")}</ul>`
+    ? `<ul class="task-list">${todays.map((t) => taskRow(t, next && t.id === next.id)).join("")}</ul>`
     : next ? `<p class="mt-0">Nothing scheduled today. Want to get ahead?</p><ul class="task-list">${taskRow(next, true)}</ul>` : `<p class="mt-0">Every task is done. Nice work.</p>`);
   // Summary
   const sm = plan.summary || {};
@@ -643,15 +659,15 @@ async function renderPlan() {
   if (plan.interview_passed || d.interview_status === "past" || (until != null && until < 0)) flags.push(`Your interview date has passed. We hope it went well! <button class="textlink" data-go="intake">Set a new date</button> and we'll rebuild the plan around it.`);
   else if (plan.horizon_capped || (plan.horizon_capped === undefined && until != null && until > plan.days_left + 1)) flags.push(`Plans cover up to ${plan.days_left} days at a time. We'll extend it as you get closer to ${esc(fmtDate(d.intake.interview_date))}.`);
   if (plan.compressed) flags.push("Time is tight, so the plan keeps the highest-priority work: your weakest topics first.");
-  $("#plan-summary").innerHTML = `<h2 class="section-title">Why this plan</h2><h3>${esc(sm.headline)}</h3><p>${esc(sm.why)}</p>
+  $("#plan-summary").innerHTML = `<h2 class="section-title">Why this plan</h2><h3>${esc(mapLevels(sm.headline))}</h3><p>${esc(mapLevels(sm.why))}</p>
     <div class="stat-row mt-4"><div class="stat"><b>${plan.hours_planned}h</b><span>of practice on the calendar${plan.review_hours ? `, plus about ${plan.review_hours}h of review` : ""} (${plan.hours_available}h available)</span></div>
-      <div class="stat"><b>${plan.drills}</b><span>short drills ${tip("drill")}</span></div><div class="stat"><b>${plan.mocks}</b><span>mock interviews ${tip("mock interview")}</span></div></div>
+      <div class="stat"><b>${plan.drills}</b><span>short practices ${tip("drill")}</span></div><div class="stat"><b>${plan.mocks}</b><span>mock interviews ${tip("mock interview")}</span></div></div>
     ${flags.map((f) => `<div class="flag">${f}</div>`).join("")}`;
   // Ladder
   const counts = {}; plan.tasks.forEach((t) => { if (t.type === "drill") counts[t.skill] = (counts[t.skill] || 0) + 1; });
-  $("#plan-ladder").innerHTML = `<thead><tr><th>Topic</th><th>Now</th><th>Goal</th><th>Drills</th></tr></thead><tbody>` + visibleSkills(plan.skills).map((r) =>
-    `<tr class="c-${r.skill}"><td><span class="skillcell">${esc(skillName(r.skill, r.name))} ${tip(r.skill)}</span></td><td>${esc(LEVEL_NAMES[r.current] || "")}</td>
-     <td>${r.current >= 3 ? "Top level ✓" : esc(LEVEL_NAMES[r.target])}</td><td class="tnum">${counts[r.skill] ?? 0}</td></tr>
+  $("#plan-ladder").innerHTML = `<thead><tr><th>Topic</th><th>Now</th><th>Goal</th><th>Practices</th></tr></thead><tbody>` + visibleSkills(plan.skills).map((r) =>
+    `<tr class="c-${r.skill}"><td><span class="skillcell">${esc(skillName(r.skill, r.name))} ${tip(r.skill)}</span></td><td>${esc(LEVEL_SHORT[r.current] || LEVEL_SHORT[0])}</td>
+     <td>${r.current >= 3 ? "Top ✓" : esc(LEVEL_SHORT[r.target] || "")}</td><td class="tnum">${counts[r.skill] ?? 0}</td></tr>
      ${r.weak_subskills?.length ? `<tr class="subrow"><td colspan="4">↳ Focus on: ${r.weak_subskills.map((w) => esc(w.name)).join(", ")}</td></tr>` : ""}`).join("") + "</tbody>";
   // Calendar grouped by week, past days collapsed
   const byDay = {}; plan.tasks.forEach((t) => (byDay[t.date] = byDay[t.date] || []).push(t));
@@ -679,15 +695,16 @@ async function renderLauncher() {
   const p = d.progress;
   const lt = $("#lt-plan");
   if (!d.diagnostic_done) {
-    lt.innerHTML = `<span class="eyebrow">Start here</span><h3>Placement interview ${tip("placement interview")}</h3>
-      <p class="small muted">A 15-minute check to find your starting level. It's not graded.</p><button class="primary mt-auto" data-start-placement>Start placement</button>`;
+    lt.innerHTML = `<span class="eyebrow">Start here</span><h2>Placement interview ${tip("placement interview")}</h2>
+      <p class="muted mt-0">15 minutes to find your starting point. It's not graded, and "I don't know" is a fine answer.</p><button class="primary big" data-start-placement>Start</button>`;
   } else if (p?.next) {
-    lt.innerHTML = `<span class="eyebrow">Continue my plan</span><h3>${esc(taskTitle(p.next))}</h3>
-      <p class="small muted">${esc(taskSub(p.next))}</p><button class="primary mt-auto" data-task="${p.next.id}">Start</button>
-      ${d.can_retake_placement ? `<button class="textlink" data-start-placement>Retake placement interview</button>` : ""}`;
+    lt.innerHTML = `<span class="eyebrow">Next in your plan</span><h2>${esc(taskTitle(p.next))}</h2>
+      <p class="muted mt-0">${esc(taskSub(p.next))}</p><button class="primary big" data-task="${p.next.id}">Start</button>`;
   } else {
-    lt.innerHTML = `<span class="eyebrow">Continue my plan</span><h3>Plan complete</h3><p class="small muted">Every task is done. Try a mock interview to stay sharp.</p>`;
+    lt.innerHTML = `<span class="eyebrow">Your plan is done</span><h2>Full mock interview</h2><p class="muted mt-0">Mixed questions, like a real interview.</p><button class="primary big" id="lt-mock">Start</button>`;
+    $("#lt-mock").addEventListener("click", () => startSession("mock", persona()));
   }
+  $("#lt-retake").hidden = !(d.diagnostic_done && d.can_retake_placement !== false);
   const ps = $("#q-persona");
   if (!ps.options.length) ps.innerHTML = Object.entries(S.meta.personas).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
   ps.value = persona();
@@ -695,7 +712,7 @@ async function renderLauncher() {
   sk.innerHTML = Object.entries(S.meta.skills).filter(([k]) => k !== "industry" || showIndustry()).map(([k, v]) => `<option value="${k}">${esc(skillName(k, v))}</option>`).join("");
   if (cur && [...sk.options].some((o) => o.value === cur)) sk.value = cur;
   const lv = $("#q-level");
-  if (!lv.options.length) lv.innerHTML = `<option value="">My next level</option>` + [1, 2, 3].map((l) => `<option value="${l}">${LEVEL_NAMES[l]}</option>`).join("");
+  if (!lv.options.length) lv.innerHTML = `<option value="">My next milestone</option>` + [1, 2, 3].map((l) => `<option value="${l}">${LEVEL_SHORT[l]} level</option>`).join("");
 }
 $("#q-mock").addEventListener("click", () => startSession("mock", $("#q-persona").value));
 $("#q-practice").addEventListener("click", () => startSession("practice", $("#q-persona").value || persona(), $("#q-skill").value, Number($("#q-level").value) || null));
@@ -748,7 +765,9 @@ function afterShowInterview() {
   setTimeout(() => { const c = $("#chat"); c.scrollTop = c.scrollHeight; if (!isMobile()) $("#answer").focus(); }, 30);
 }
 $("#bts").addEventListener("toggle", () => localStorage.setItem("ibr_bts", $("#bts").open ? "1" : "0"));
-$("#sb-more").addEventListener("click", () => { const bar = $("#session-bar"); bar.classList.toggle("open"); $("#sb-more").setAttribute("aria-expanded", String(bar.classList.contains("open"))); });
+function closeVoiceMenu() { $("#sb-tools").hidden = true; $("#sb-more").setAttribute("aria-expanded", "false"); }
+$("#sb-more").addEventListener("click", (e) => { e.stopPropagation(); const t = $("#sb-tools"); t.hidden = !t.hidden; $("#sb-more").setAttribute("aria-expanded", String(!t.hidden)); });
+document.addEventListener("click", (e) => { if (!e.target.closest("#sb-tools, #sb-more")) closeVoiceMenu(); });
 
 function updateSessionBar(p) {
   if (!p) return;
@@ -764,9 +783,7 @@ function updateSessionBar(p) {
 function addMsg(kind, text, who) {
   const el = document.createElement("div");
   el.className = `msg ${kind}`;
-  const btn = kind === "ai" ? ` <button class="speak-btn" type="button" aria-label="Read this message aloud">🔊</button>` : "";
-  el.innerHTML = `<div class="who">${esc(who || (kind === "me" ? "You" : "Interviewer"))}${btn}</div>${esc(text)}`;
-  if (kind === "ai") el.querySelector(".speak-btn").addEventListener("click", () => speak(text, S.session?.persona, true));
+  el.innerHTML = `<div class="who">${esc(who || (kind === "me" ? "You" : "Interviewer"))}</div>${esc(kind === "ai" ? mapLevels(text) : text)}`;
   $("#chat").appendChild(el); el.scrollIntoView({ block: "end" });
   return el;
 }
@@ -776,11 +793,12 @@ function addQuestion(q) {
   const diag = S.session?.mode === "diagnostic";
   el.className = `qcard c-${q.skill}`;
   el.innerHTML = `<div class="qcard-head"><span class="pill">${esc(skillName(q.skill))}</span>${tip(q.skill)}
-    ${diag ? "" : `<span class="pill lvl-${q.difficulty}">${esc(q.level || LEVEL_NAMES[q.difficulty] || "")}</span>`}
+    ${diag ? "" : `<span class="pill lvl-${q.difficulty}">${esc(LEVEL_SHORT[q.difficulty] ? LEVEL_SHORT[q.difficulty] + " level" : mapLevels(q.level || ""))}</span>`}
     ${q.subskill_name ? `<span class="small muted">${esc(q.subskill_name)}</span>` : ""}
     <span class="timer" aria-label="Time on this question">0:00 / ${mmss(q.target_seconds || 60)}</span></div>
     <div class="qcard-title">${esc(q.title)}</div><div class="qcard-text">${esc(q.text)}</div>`;
   $("#chat").appendChild(el); el.scrollIntoView({ block: "end" });
+  clearAnswerBox();
   startTimer(el.querySelector(".timer"), q.target_seconds || 60);
   setHint();
 }
@@ -823,15 +841,19 @@ $("#answer").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.sh
 $("#composer").addEventListener("submit", (e) => { e.preventDefault(); submitAnswer(); });
 $("#idk-btn").addEventListener("click", () => submitAnswer("I don't know"));
 
+function clearAnswerBox() {
+  stopMic();                      // aborts recognition and bumps MIC.turn, so late results are ignored
+  const a = $("#answer"); a.value = ""; a.style.height = ""; updateCounter();
+}
 async function submitAnswer(override) {
   if (S.busy || !S.session) return;
-  if (MIC.on) stopMic();
   const text = (override ?? $("#answer").value).trim();
+  stopMic();
   if (!text) { $("#answer").focus(); return; }
   const seconds = S.qStart ? (Date.now() - S.qStart) / 1000 : null;
   S.busy = true; $("#send-btn").disabled = true; $("#idk-btn").disabled = true;
   const draft = override ? "" : $("#answer").value;
-  addMsg("me", text, S.profile.name); $("#answer").value = ""; $("#answer").style.height = "";
+  addMsg("me", text, S.profile.name); clearAnswerBox();
   closeSheet();
   const t = thinking();
   try {
@@ -882,7 +904,8 @@ function renderDiag(r) {
   $("#diag-empty").hidden = true; $("#diag-body").hidden = false;
   const diag = S.session?.mode === "diagnostic";
   const [title, sub0] = VERDICT[r.verdict] || [r.verdict, ""];
-  const sub = diag ? "Noted. Full explanations come in your drills." : sub0;
+  const numeric = (r.checks || []).length > 0;
+  const sub = diag ? "Noted. Full explanations come in your practice sessions." : !numeric && r.verdict === "incorrect" ? "A key idea is missing or off. Have another go." : sub0;
   $("#verdict").className = `verdict v-${r.verdict}`;
   $("#verdict").innerHTML = `<span class="dot" aria-hidden="true"></span><div>${esc(title)}${r.explain_only ? " (your explanation)" : ""}<div class="vsub">${esc(sub)}</div></div>`;
   const checks = diag ? [] : (r.checks || []);
@@ -901,7 +924,6 @@ function renderDiag(r) {
   $("#solution-label").textContent = r.answered_question?.kind === "numeric" ? "Worked solution (calculator)" : "Model answer";
   $("#solution-wrap").open = ["reveal", "note_next", "diag_next"].includes(r.action) && r.verdict !== "correct" && !diag;
   // mobile: a compact verdict chip in the chat that opens the feedback sheet
-  $("#sheet-btn").hidden = false;
   if (isMobile()) {
     const right = checks.filter((c) => c.status === "correct").length;
     const el = document.createElement("div"); el.className = `msg ai v-${r.verdict}`;
@@ -939,7 +961,7 @@ function updateMeter(u) {
 }
 
 // ------------------------------------------------------------------ end of session -> results
-$("#end-btn").addEventListener("click", () => { $("#session-bar").classList.remove("open"); if (S.session && !S.busy) finishSession(false); });
+$("#end-btn").addEventListener("click", () => { closeVoiceMenu(); if (S.session && !S.busy) finishSession(false); });
 async function finishSession(auto) {
   const answered = S.session?.progress?.answered ?? 0;
   if (!auto && answered < 3 && !confirm("End now? We'll update your skills with what you've answered so far.")) return;
@@ -967,7 +989,7 @@ function normDebrief(d = {}) {
   };
 }
 function focusHTML(f) {
-  return `<div class="focus"><b class="nm">${esc(f.name || f.misconception_id)}</b>${f.why ? `<p><span class="k">Why it matters:</span> ${esc(f.why)}</p>` : ""}${f.try_this ? `<p><span class="k">Try this:</span> ${esc(f.try_this)}</p>` : ""}</div>`;
+  return `<div class="focus"><b class="nm">${esc(f.name || f.misconception_id)}</b>${f.why ? `<p><span class="k">Why it matters:</span> ${esc(mapLevels(f.why))}</p>` : ""}${f.try_this ? `<p><span class="k">Try this:</span> ${esc(mapLevels(f.try_this))}</p>` : ""}</div>`;
 }
 function renderResults(r) {
   const mode = r.session?.mode;
@@ -994,24 +1016,25 @@ function renderResults(r) {
     } else {
       const overall = dd.overall_label || LEVEL_NAMES[Math.round(keys.reduce((a, k) => a + placed[k], 0) / keys.length)];
       const lvl = dd.overall_level ?? 1;
-      $("#res-title").textContent = `You're starting at ${overall}. ${lvl >= 2 ? "Nice foundation." : "That's a normal place to start."}`;
+      $("#res-title").textContent = ["You're getting started. That's a normal place to begin.", "You're coffee-chat ready. Nice foundation.",
+        "You're first-round ready. Strong start.", "You're Superday ready. Impressive."][Math.max(0, Math.min(3, lvl))];
       const days = daysUntil(dd.intake?.interview_date);
       $("#res-sub").textContent = `${days != null && days >= 0 ? `Your interview is in ${days} day${days === 1 ? "" : "s"}. ` : ""}Here's where you stand and what to do first.` +
-        (r.placement_partial ? " You ended early, so topics you didn't reach start at Basic." : "");
+        (r.placement_partial ? " You ended early, so topics you didn't reach are marked Getting started." : "");
       const sorted = visibleSkills(keys.map((k) => ({ key: k, level: placed[k] }))).sort((a, b) => b.level - a.level);
       const maxL = sorted[0]?.level, minL = sorted.at(-1)?.level;
-      $("#res-changes").innerHTML = `<h2 class="section-title">Your starting levels ${tip("level")}</h2>` + sorted.map((s) =>
+      $("#res-changes").innerHTML = journey(lvl) + `<h3 class="section-title mt-4">By topic</h3>` + sorted.map((s) =>
         `<div class="placement-row c-${s.key}"><span class="nm">${esc(skillName(s.key))} ${tip(s.key)}</span>${levelMeter(s.level, null, { label: LEVEL_NAMES[s.level] })}
-         <span class="lvname">${esc(LEVEL_NAMES[s.level] || "Getting started")} ${maxL !== minL && s.level === maxL ? '<span class="chip strong">Strongest</span>' : maxL !== minL && s.level === minL ? '<span class="chip start">Start here</span>' : ""}</span></div>`).join("");
+         <span class="lvname">${esc(LEVEL_SHORT[s.level] || LEVEL_SHORT[0])} ${maxL !== minL && s.level === maxL ? '<span class="chip strong">Strongest</span>' : maxL !== minL && s.level === minL ? '<span class="chip start">Start here</span>' : ""}</span></div>`).join("");
     }
-    $("#res-notes").innerHTML = `<div class="notes"><h2 class="section-title">Your coach's notes</h2>${d.headline ? `<p class="headline">${esc(d.headline)}</p>` : ""}
-      ${d.went_well.length ? `<h3>What went well</h3><ul>${d.went_well.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
+    $("#res-notes").innerHTML = `<div class="notes"><h2 class="section-title">Your coach's notes</h2>${d.headline ? `<p class="headline">${esc(mapLevels(d.headline))}</p>` : ""}
+      ${d.went_well.length ? `<h3>What went well</h3><ul>${d.went_well.map((s) => `<li>${esc(mapLevels(s))}</li>`).join("")}</ul>` : ""}
       ${d.work_on.length ? `<h3>Where to start</h3>${d.work_on.slice(0, 2).map(focusHTML).join("")}` : ""}</div>`;
-    $("#res-next").innerHTML = next ? `<span class="eyebrow">Your first step</span>${d.next_step ? `<p class="nstep">${esc(d.next_step)}</p>` : ""}
+    $("#res-next").innerHTML = next ? `<span class="eyebrow">Your first step</span>${d.next_step ? `<p class="nstep">${esc(mapLevels(d.next_step))}</p>` : ""}
       <p class="task-line">${esc(taskTitle(next))}</p><p class="small muted mt-0">${esc(taskSub(next))}</p>
-      <button class="primary big" data-task="${next.id}">${next.type === "mock" ? "Start mock interview" : "Start first drill"}</button>
-      <button class="textlink" data-go="plan">See my full plan →</button>`
-      : `<span class="eyebrow">Your next step</span><p class="nstep">${esc(d.next_step || "Head home to see what's next.")}</p><button class="primary big" data-go="home">Go to Home</button>`;
+      <button class="primary big" data-task="${next.id}">Start</button>
+      <button class="textlink" data-go="plan">See my plan</button>`
+      : `<span class="eyebrow">Your next step</span><p class="nstep">${esc(d.next_step || "Head home to see what's next.")}</p><button class="primary big" data-go="home">Continue</button>`;
     
   } else {
     $("#res-kind").textContent = `${(MODE_LABEL[mode] || "Session").replace("Topic practice", "Practice")} complete · ${n} question${n === 1 ? "" : "s"}`;
@@ -1030,7 +1053,7 @@ function renderResults(r) {
       const pa = a == null || fresh ? null : Math.round(100 * a), pb = b == null ? null : Math.round(100 * b);
       const up = ups.some((u) => u.skill === k), diff = pa != null && pb != null ? pb - pa : 0;
       const chip = up ? '<span class="chip levelup">⬆ Level up</span>' : diff > 0 ? '<span class="chip up">▲ Up</span>' : diff < 0 ? '<span class="chip dipped">Dipped this time</span>' : "";
-      return `<div class="change-row c-${k}"><span class="nm">${esc(skillName(k))} ${tip(k)} <span class="lvname">${esc(lb ? LEVEL_NAMES[lb] : "Getting started")}${la !== lb ? ` (was ${esc(la ? LEVEL_NAMES[la] : "not yet placed")})` : ""}</span></span>
+      return `<div class="change-row c-${k}"><span class="nm">${esc(skillName(k))} ${tip(k)} <span class="lvname">${esc(LEVEL_SHORT[lb] || LEVEL_SHORT[0])}${la !== lb ? ` (was ${esc(LEVEL_SHORT[la] || LEVEL_SHORT[0])})` : ""}</span></span>
         ${levelMeter(lb, pb != null ? pb / 100 : null, { label: LEVEL_NAMES[lb] })}
         <span class="nums">${pa != null && pb != null ? `<span>Confidence ${pa}% → ${pb}%</span>` : pb != null ? `<span>Confidence now ${pb}%</span>` : ""}${chip}</span>
         ${diff < 0 && !up ? `<p class="helper">Early dips are normal. One tough answer moves a new topic a lot. It recovers as you practice.</p>` : ""}</div>`;
@@ -1039,15 +1062,15 @@ function renderResults(r) {
     $("#res-changes").innerHTML = `<h2 class="section-title">What changed ${tip("confidence")}</h2>` + (touched.length ? touched.map(row).join("") : `<p class="muted mt-0">No answers were graded, so nothing changed.</p>`) +
       (others.length ? `<details class="more-focus"><summary>Show all topics</summary>${others.map(row).join("")}</details>` : "");
     const dipped = touched.some((k) => (r.mastery_end?.[k]?.p ?? 0) < (r.mastery_start?.[k]?.p ?? 0));
-    $("#res-notes").innerHTML = `<div class="notes"><h2 class="section-title">Your coach's notes</h2>${d.headline ? `<p class="headline">${esc(d.headline)}</p>` : ""}
-      ${d.went_well.length ? `<h3>What went well</h3><ul>${d.went_well.map((s) => `<li>${esc(s)}</li>`).join("")}</ul>` : ""}
+    $("#res-notes").innerHTML = `<div class="notes"><h2 class="section-title">Your coach's notes</h2>${d.headline ? `<p class="headline">${esc(mapLevels(d.headline))}</p>` : ""}
+      ${d.went_well.length ? `<h3>What went well</h3><ul>${d.went_well.map((s) => `<li>${esc(mapLevels(s))}</li>`).join("")}</ul>` : ""}
       <h3>One thing to work on ${tip("mistake pattern")}</h3>${d.work_on.length ? focusHTML(d.work_on[0]) : `<p class="mt-0">No mistake patterns this session. That's a clean run.</p>`}
       ${d.work_on.length > 1 ? `<details class="more-focus"><summary>${d.work_on.length - 1} more thing${d.work_on.length > 2 ? "s" : ""} to work on</summary>${d.work_on.slice(1).map(focusHTML).join("")}</details>` : ""}</div>`;
-    $("#res-next").innerHTML = `<span class="eyebrow">Your next step</span>${d.next_step ? `<p class="nstep">${esc(d.next_step)}</p>` : ""}
+    $("#res-next").innerHTML = `<span class="eyebrow">Your next step</span>${d.next_step ? `<p class="nstep">${esc(mapLevels(d.next_step))}</p>` : ""}
       ${next ? `<p class="task-line">${esc(taskTitle(next))}</p><p class="small muted mt-0">${esc(taskSub(next))}</p>
-        <button class="primary big" data-task="${next.id}">${next.type === "mock" ? "Start mock interview" : "Start next drill"}</button>`
-      : `<button class="primary big" id="res-mock">Start mock interview</button>`}
-      <button class="textlink" data-go="home">Back to Home →</button>
+        <button class="primary big" data-task="${next.id}">Start</button>`
+      : `<p class="task-line">Full mock interview</p><button class="primary big" id="res-mock">Start</button>`}
+      <button class="textlink" data-go="home">Back to Home</button>
       ${p ? `<p class="small muted mt-0">Plan: ${p.done} of ${p.total} tasks done${r.debrief?.plan_event?.startsWith?.("ticked") ? " (this session counted ✓)" : ""}</p>` : ""}`;
     $("#res-mock")?.addEventListener("click", () => startSession("mock", persona()));
     enc = enc || (dipped || n < 3 ? encourage("keep_going") : "");
@@ -1091,27 +1114,26 @@ function skillCard(s, d) {
     const cls = x.p < 0.5 ? "weak" : x.p >= 0.75 ? "ok" : "";
     return `<span class="subchip ${cls}" title="${Math.round(x.p * 100)}% confidence on ${x.n} answer(s)">${cls === "weak" ? "! " : cls === "ok" ? "✓ " : ""}${esc(x.name)}</span>`;
   }).join("");
-  const placed = s.level > 0 || s.n > 0;
-  const startSkill = d.progress?.next?.type === "drill" ? d.progress.next.skill : null;
+  const L = s.level || 0;
   return `<article class="card skill-card c-${s.key}">
-    <h3><span class="nm">${esc(name)} ${tip(s.key)}</span><span class="pill lvl-${placed ? s.level : 0}">${esc(placed ? (s.level ? LEVEL_NAMES[s.level] : "Getting started") : "Not yet placed")}</span></h3>
-    ${s.key === startSkill ? '<span><span class="chip start">Start here</span></span>' : ""}
-    ${placed ? levelMeter(s.level, s.n ? s.p : null, { ink: SKILL_INK[s.key], label: `${LEVEL_NAMES[s.level] || "Getting started"}${s.n ? `, ${Math.round(s.p * 100)}% confident` : ""}` }) : ""}
-    <div class="meta">${s.n ? `Confidence ${Math.round(s.p * 100)}% ${tip("confidence")} · ${s.n} answered${s.avg_seconds ? ` · ${s.avg_seconds}s avg` : ""}` : "No answers yet"}
-      ${placed ? ` · ${s.level >= 3 ? "Top level ✓" : `next: ${LEVEL_NAMES[Math.min(3, (s.level || 0) + 1)]}`}` : ""}</div>
+    <h3><span class="nm">${esc(name)} ${tip(s.key)}</span><span class="pill lvl-${L}">${esc(LEVEL_SHORT[L])}</span></h3>
+    ${levelMeter(L, s.n ? s.p : null, { ink: SKILL_INK[s.key], label: LEVEL_NAMES[L] })}
+    <p class="small mt-0">${L >= 3 ? "Top milestone reached ✓" : `<b>Next:</b> ${esc(LEVEL_NAMES[L + 1])}`}</p>
+    <div class="meta">${s.n ? `${s.n} answered · confidence ${Math.round(s.p * 100)}% ${tip("confidence")}` : "No answers yet"}</div>
     ${s.n ? sparkline(s.history, SKILL_INK[s.key]) : ""}
     ${subs ? `<div class="sub">${subs}</div>` : ""}
-    <div class="skill-detail"><button class="secondary" data-drill="${s.key}">Practice ${esc(name)}</button></div>
+    <div class="skill-detail"><button class="textlink" data-drill="${s.key}">Practice this topic →</button></div>
   </article>`;
 }
 async function renderProgress() {
   const d = await refreshDash(); if (!d || S.view !== "progress") return;
   const nothing = !d.diagnostic_done && !d.answered;
-  $("#progress-empty").hidden = !nothing; $("#progress-main").hidden = nothing;
+  $("#progress-empty").hidden = !nothing; $("#progress-main").hidden = nothing; $("#progress-journey").hidden = nothing;
   if (nothing) {
-    $("#progress-empty").innerHTML = emptyState("Nothing to show yet.", emptyCopy("progress", "no_skills"), `<button class="primary big" data-start-placement>Start placement</button>`);
+    $("#progress-empty").innerHTML = emptyState("Nothing to show yet.", emptyCopy("progress", "no_skills"), `<button class="primary big" data-start-placement>Start</button>`);
     return;
   }
+  $("#progress-journey").innerHTML = journey(d.diagnostic_done ? d.overall_level : 0).replace("Your journey", "Overall");
   $("#skills-full").innerHTML = visibleSkills(d.skills).map((s) => skillCard(s, d)).join("");
   const mis = d.misconceptions || [];
   $("#mis-list").innerHTML = mis.length ? mis.map((x) => {
@@ -1130,7 +1152,7 @@ async function renderHow(sec) {
   const groups = {};
   (GLOSS.list.length ? GLOSS.list : Object.values(TIPS).map(([t, def]) => ({ group: "", term: t, def })))
     .forEach((e) => (groups[e.group || ""] = groups[e.group || ""] || []).push(e));
-  $("#glossary-list").innerHTML = Object.entries(groups).map(([g, es]) => `${g ? `<h4>${esc(g)}</h4>` : ""}${es.map((e) => `<div><b>${esc(e.term)}:</b> ${esc(e.def)}</div>`).join("")}`).join("");
+  $("#glossary-list").innerHTML = Object.entries(groups).map(([g, es]) => `${g ? `<h4>${esc(g)}</h4>` : ""}${es.map((e) => `<div><b>${esc(mapLevels(e.term))}:</b> ${esc(mapLevels(e.def))}</div>`).join("")}`).join("");
   if (sec) { const target = $(`#sec-${sec}`); if (target) setTimeout(() => target.scrollIntoView({ block: "start" }), 30); }
   if (!S.token) {
     $("#behind-body").innerHTML = `<div class="card"><p class="mt-0 muted">Sign in and run any session to see its step-by-step trace and cost here.</p></div>`;
@@ -1200,33 +1222,42 @@ $("#handsfree-toggle").addEventListener("change", (e) => {
 });
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-const MIC = { rec: null, on: false, base: "" };
+const MIC = { rec: null, on: false, base: "", turn: 0 };
 function setupMic() {
   const b = $("#mic-btn");
   if (!SR) { b.disabled = true; b.title = "Voice input needs Chrome or Edge"; return; }
   b.addEventListener("click", () => (MIC.on ? stopMic() : startMic()));
 }
 function startMic() {
-  if (!SR || MIC.on) return;
+  if (!SR || MIC.on || !S.session) return;
   window.speechSynthesis?.cancel();
-  MIC.rec = new SR(); MIC.rec.lang = "en-US"; MIC.rec.continuous = true; MIC.rec.interimResults = true;
+  const turn = MIC.turn;                 // results from an older turn are ignored
+  const rec = new SR(); rec.lang = "en-US"; rec.continuous = true; rec.interimResults = true;
+  MIC.rec = rec;
   MIC.base = $("#answer").value.trim() ? $("#answer").value.trim() + " " : "";
-  MIC.rec.onresult = (e) => {
+  const live = () => MIC.on && MIC.rec === rec && MIC.turn === turn;
+  rec.onresult = (e) => {
+    if (!live()) return;
     let text = "";
     for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
     const said = (MIC.base + text).trim();
     if (S.handsfree && /\b(submit|send it|final answer)\.?$/i.test(said)) {
       $("#answer").value = said.replace(/\b(submit|send it|final answer)\.?$/i, "").trim();
-      stopMic(); submitAnswer(); return;
+      submitAnswer(); return;
     }
     $("#answer").value = said;
   };
-  MIC.rec.onerror = (e) => { if (e.error === "no-speech") return; toast(e.error === "not-allowed" ? "Microphone access is blocked. Allow it from the address bar." : `Voice input stopped (${e.error}).`, "info"); stopMic(); };
-  MIC.rec.onend = () => { if (MIC.on) { MIC.base = $("#answer").value.trim() + " "; try { MIC.rec.start(); } catch {} } };
-  MIC.rec.start(); MIC.on = true;
+  rec.onerror = (e) => { if (!live() || e.error === "no-speech" || e.error === "aborted") return; toast(e.error === "not-allowed" ? "Microphone access is blocked. Allow it from the address bar." : `Voice input stopped (${e.error}).`, "info"); stopMic(); };
+  rec.onend = () => { if (live()) { MIC.base = $("#answer").value.trim() ? $("#answer").value.trim() + " " : ""; try { rec.start(); } catch {} } };
+  rec.start(); MIC.on = true;
   $("#mic-btn").classList.add("rec"); $("#mic-label").textContent = S.handsfree ? "Listening… say \"submit\"" : "Listening… tap to stop";
 }
-function stopMic() { MIC.on = false; if (MIC.rec) try { MIC.rec.stop(); } catch {} $("#mic-btn").classList.remove("rec"); $("#mic-label").textContent = "🎤 Speak"; }
+function stopMic() {
+  MIC.turn++; MIC.on = false;
+  const rec = MIC.rec; MIC.rec = null;
+  if (rec) { rec.onresult = rec.onend = rec.onerror = null; try { rec.abort(); } catch {} }
+  $("#mic-btn").classList.remove("rec"); $("#mic-label").textContent = "Speak";
+}
 setupMic();
 
 init().catch((e) => toast(e.message, "error"));

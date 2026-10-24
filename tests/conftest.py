@@ -31,6 +31,9 @@ class FakeLLM:
         self.verdict = "right"
         self.fail: set[str] = set()
         self.calls: list[str] = []
+        self.mids: list[str] = []            # misconception ids the "specialist" flags
+        self.offsets: dict[str, float] = {}  # label -> amount added to the true value (for near misses)
+        self.unmatched_error = "none"
         self.coach_text = {"headline": "Solid work today.", "went_well": ["Clear structure."], "work_on": [],
                            "next_step": "Run a drill on your weakest skill.", "encouragement": "Keep going."}
 
@@ -40,10 +43,12 @@ class FakeLLM:
             raise RuntimeError("simulated gateway failure")
         if deps is not None:  # a specialist diagnostician
             q, ok = deps.question, self.verdict == "right"
-            sv = ([agents.StatedValue(label=l.key, value=(q.values[l.key] if ok else q.values[l.key] * 3 + 7777))
+            sv = ([agents.StatedValue(label=l.key, value=(q.values[l.key] + self.offsets.get(l.key, 0.0) if ok
+                                                          else q.values[l.key] * 3 + 7777))
                    for l in q.labels] if q.kind == "numeric" else [])
             return _Res(agents.Diagnosis(
                 stated_values=sv, key_points_hit=list(range(len(q.key_points))) if ok else [],
+                misconceptions=list(self.mids), unmatched_error=self.unmatched_error,
                 reasoning_quality="strong" if ok else "none", rationale="ok", evidence_quote="x")), _rec(agent_name)
         if agent_name == "Interviewer":
             return _Res(agents.InterviewerMsg(message="Good. Next one.")), _rec(agent_name)

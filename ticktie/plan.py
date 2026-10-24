@@ -1,8 +1,8 @@
 """Personal action plan: built by code from the diagnostic, the deadline and the hours available.
 
 Every number in the plan is computed here, so it's explainable and testable:
-  * target  = one level up per skill (Basic -> Intermediate -> Advanced), or Advanced practice if already there
-  * drills  = 3 per level to climb + 1 per weak sub-skill (+1 maintenance drill per week at Advanced)
+  * target  = one level up per skill (Coffee-chat ready -> First-round ready -> Superday ready), or top-level practice if already there
+  * drills  = 3 per level to climb + 1 per weak sub-skill (+1 maintenance drill per week at the top level)
   * mocks   = 1 per week + 1 final mock before the interview
   * hours   = drills x 20 min + mocks x 30 min + 15% review time
 If the hours needed exceed the hours available, the plan keeps the highest-priority work
@@ -90,10 +90,10 @@ def days_until(date_str: str | None, default_days: int = DEFAULT_HORIZON, today:
 
 def _drill_title(skill: str, level: int, sub: str | None, wanted: int) -> str:
     name = bank.SUBSKILLS.get(sub, (None, None))[1] if sub else None
-    title = f"{bank.LEVELS[level]} drill: {bank.SKILLS[skill]}" + (f", {name}" if name else "")
+    title = f"Drill: {bank.SKILLS[skill]}" + (f", {name}" if name else "") + f" (towards {bank.LEVELS[level]}"
     if level != wanted:
-        title += f" (no {bank.LEVELS[wanted]} questions yet, so the closest level)"
-    return title
+        title += f"; no {bank.LEVELS[wanted]} questions yet"
+    return title + ")"
 
 
 def build(intake: dict, levels: dict[str, int], weak_subskills: list[str], today: dt.date | None = None) -> dict:
@@ -120,7 +120,7 @@ def build(intake: dict, levels: dict[str, int], weak_subskills: list[str], today
         weak = [w for w in weak_subskills if bank.SUBSKILLS.get(w, ("",))[0] == s]
         drills = steps * DRILLS_PER_LEVEL + len(weak)
         if cur >= 3:
-            drills = max(drills, math.ceil(weeks))  # maintenance at Advanced
+            drills = max(drills, math.ceil(weeks))  # maintenance at the top level
         # group emphasis: heavier-weighted skills get an extra drill, lighter ones may drop one
         wt = weights.get(s, 1.0)
         drills = max(1 if steps or weak or cur >= 3 else 0, round(drills * wt))
@@ -190,7 +190,7 @@ def build(intake: dict, levels: dict[str, int], weak_subskills: list[str], today
             t["title"] = "Final mock interview" if t.get("final") else "Mock interview"
 
     tech = [levels.get(s, 0) for s in bank.TECHNICAL]
-    overall = int(sum(tech) / len(tech) + 0.5) if tech else 0  # nearest level (4 of 5 skills at Basic = Basic)
+    overall = int(sum(tech) / len(tech) + 0.5) if tech else 0  # nearest level (4 of 5 skills at level 1 = level 1)
     per_skill = {}
     for t in tasks:
         if t["type"] == "drill":
@@ -207,7 +207,7 @@ def build(intake: dict, levels: dict[str, int], weak_subskills: list[str], today
         "days_left": days, "hours_per_week": hours_week,
         "interview_status": status, "interview_passed": status == "past", "horizon_capped": horizon_capped,
         "final_prep": final_prep,
-        "overall_level": overall, "overall_label": bank.LEVELS.get(overall, "Foundations"),
+        "overall_level": overall, "overall_label": bank.LEVELS.get(overall, bank.LEVEL0_LABEL),
         "target_level": mastery.target_level(overall), "target_label": bank.LEVELS[mastery.target_level(overall)],
         "skills": rows,
         "drills": n_drills, "mocks": mocks, "questions": n_drills * DRILL_QUESTIONS + mocks * MOCK_QUESTIONS,

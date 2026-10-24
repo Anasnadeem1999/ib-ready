@@ -2,9 +2,10 @@
 
 import random
 
-from ticktie import bank, guard, mastery
+from ticktie import bank, engine, guard, mastery
 from ticktie.agents import Diagnosis, StatedValue
 from ticktie.engine import _adjudicate
+from ticktie.misconceptions import LIBRARY
 
 
 def test_selection_is_strict_about_group_skill_and_level():
@@ -74,7 +75,8 @@ def test_correct_numbers_thin_reasoning_gets_probed():
 
 def test_unmatched_wrong_number_is_arithmetic():
     q = bank.build(bank.TEMPLATES["dcf_tv"], {"F": 100.0, "w": 0.10, "g": 0.02})
-    verdict, etype, mids, _ = _adjudicate(q, _diag({"tv": 1305}, unmatched_error="arithmetic"), False)
+    # 1,350 vs 1,275 is far outside rounding (more than 2x the tolerance) and matches no trap
+    verdict, etype, mids, _ = _adjudicate(q, _diag({"tv": 1350}, unmatched_error="arithmetic"), False)
     assert verdict == "incorrect" and etype == "arithmetic" and mids == ["GEN_ARITHMETIC"]
 
 
@@ -165,7 +167,7 @@ def test_practice_never_repeats_a_word_question_back_to_back():
 
 
 def test_practice_reports_a_widened_level_truthfully():
-    # Group specifics for a group with no Advanced questions: the served level must be reported.
+    # Group specifics for a group with no level-3 (Superday ready) questions: the served level must be reported.
     for g in bank.GROUPS:
         if g == "generalist" or not mastery.pool(g, skill="industry"):
             continue
@@ -181,3 +183,54 @@ def test_practice_reports_a_widened_level_truthfully():
 def test_practice_industry_without_group_falls_back():
     t, served = mastery.pick_practice(None, "industry", 2, [], {}, random.Random(0))
     assert t.skill != "industry" and served is not None
+
+
+# ---------------------------------------------------------------- QA round 2 grading (G-01, G-02, G-04)
+def _q(tid, params):
+    return bank.build(bank.TEMPLATES[tid], params)
+
+
+def _right(q, **over):
+    return {l.key: over.get(l.key, q.values[l.key]) for l in q.labels}
+
+
+def test_right_numbers_plus_flagged_wrong_claim_is_not_correct():
+    # N23: "... and the hundred of proceeds also counts as revenue"
+    q = _q("acc_asset_sale", {"B": 60.0, "P": 100.0, "t": 0.25})
+    d = _diag(_right(q), "adequate", misconceptions=["ACC_PROCEEDS_AS_REVENUE"],
+              evidence_quote="the hundred of proceeds also counts as revenue")
+    assert _adjudicate(q, d, False)[:3] == ("incomplete", "conceptual", ["ACC_PROCEEDS_AS_REVENUE"])
+    # N24: "the unlevered beta is usually higher than the levered one"
+    q = _q("dcf_unlever_beta", {"t": 0.2, "de": 0.5, "bL": 1.68})
+    d = _diag(_right(q), "strong", misconceptions=["DCF_BETA_DIRECTION"],
+              evidence_quote="the unlevered beta is usually higher than the levered one")
+    assert _adjudicate(q, d, False)[:3] == ("incomplete", "conceptual", ["DCF_BETA_DIRECTION"])
+
+
+def test_flag_without_quote_or_off_topic_does_not_penalise_right_numbers():
+    q = _q("dcf_unlever_beta", {"t": 0.2, "de": 0.5, "bL": 1.68})
+    assert _adjudicate(q, _diag(_right(q), "strong", misconceptions=["DCF_BETA_DIRECTION"]), False)[0] == "correct"
+    off_topic = next(m.id for m in LIBRARY.values() if m.skill == "accounting")
+    d = _diag(_right(q), "strong", misconceptions=[off_topic], evidence_quote="something")
+    assert _adjudicate(q, d, False)[0] == "correct"
+
+
+def test_wrong_optional_number_with_right_required_numbers_is_a_nudge():
+    q = _q("acc_asset_sale", {"B": 60.0, "P": 100.0, "t": 0.25})
+    verdict, etype, mids, checks = _adjudicate(q, _diag(_right(q, ppe=-250.0)), False)
+    assert verdict == "incomplete" and etype == "incomplete" and mids == []
+    assert any(c.label == "ppe" and c.status == "wrong" for c in checks)
+
+
+def test_near_miss_is_rounding_not_an_invented_error():
+    # N18: "WACC is about ..." just outside the tolerance, and the model guessed an arithmetic cause
+    q = _q("mkt_rates_wacc", {"we": 0.7, "w0": 0.1, "b": 0.8, "t": 0.4, "g": 0.03, "bp": 100.0})
+    near = q.values["wacc_new"] - 0.09   # tolerance 0.06, so inside 2x
+    d = _diag({"wacc_new": near}, "adequate", unmatched_error="arithmetic", misconceptions=["GEN_ARITHMETIC"])
+    verdict, etype, mids, checks = _adjudicate(q, d, False)
+    assert not any(c.matches for c in checks)
+    assert (verdict, etype, mids) == ("incomplete", "rounding", [])
+    assert engine.rounding_note(q, checks).startswith("Close. Check your rounding")
+    far = q.values["wacc_new"] - 0.5  # well outside rounding: a real error (whatever its cause)
+    assert _adjudicate(q, _diag({"wacc_new": far}, unmatched_error="arithmetic"), False)[:2] in (
+        ("incorrect", "arithmetic"), ("incorrect", "conceptual"))

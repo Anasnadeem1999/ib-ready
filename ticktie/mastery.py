@@ -2,7 +2,7 @@
 
 Three layers of mastery, each a Bayesian-knowledge-tracing estimate:
 * skill               e.g. "accounting"            the headline bar
-* level within skill  e.g. "lvl:accounting:2"      decides Basic / Intermediate / Advanced
+* level within skill  e.g. "lvl:accounting:2"      decides Coffee-chat / First-round / Superday ready
 * sub-skill           e.g. "sub:accounting.noncash" what drills target
 
 The model never decides what to ask next or how well the candidate is doing,

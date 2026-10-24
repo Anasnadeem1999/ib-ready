@@ -19,7 +19,7 @@ from . import plan as planmod
 from .misconceptions import LIBRARY
 
 OPENERS = {
-    "associate": "Hi, thanks for making time. We'll keep this conversational: a few technicals, and I'll dig into "
+    "associate": "Hi, thanks for making time. We'll keep this conversational, with a few technicals, and I'll dig into "
                  "your reasoning as we go. Talk me through your thinking out loud. First one:",
     "vp": "Let's get into it. I'll move quickly and push on anything vague, so be precise. Go:",
     "director": "Thanks for coming in. I want to get a sense of who you are and how you think, and we'll cover some "
@@ -27,9 +27,21 @@ OPENERS = {
     "md": "Good to meet you. I'm less interested in rehearsed answers than in how you think and why you're here. "
           "Let's talk:",
 }
-DIAGNOSTIC_OPENER = ("This is your placement interview: about 10-20 questions across accounting, valuation, DCF, M&A, LBOs"
-                     "{group} and fit. Each skill starts at Basic and moves up as you get questions right. One attempt each, "
-                     "no notes. When it's done you'll get your level and a personal action plan.")
+DIAGNOSTIC_OPENER = ("This is a quick check, not a test. I'll ask about 10 to 20 short questions on accounting, valuation, "
+                     "DCF, M&A, LBOs{group} and fit. Each topic starts easy and only gets harder while you're getting "
+                     "them right. Answer the way you would out loud, one try each, and it's fine to say you're not sure. "
+                     "At the end you'll see where you stand and get a plan built around it.")
+
+
+def level_phrase(level: int | None) -> str:
+    """'Coffee-chat ready' -> 'coffee-chat level', for plain-language sentences."""
+    name = bank.LEVELS.get(level or 0, bank.LEVEL0_LABEL)
+    return name.removesuffix(" ready").lower() + " level"
+
+
+def _topic(skill: str, sub: str | None) -> str:
+    name = bank.SUBSKILLS.get(sub, ("", ""))[1] if sub else ""
+    return f"{bank.SKILLS[skill]} ({name})" if name else bank.SKILLS[skill]
 DIAG_ACKS = {True: ["Good.", "Right.", "Noted, good.", "OK, that works."], False: ["Noted.", "OK, let's keep going.", "Got it, moving on."]}
 
 FALLBACKS = {
@@ -112,21 +124,21 @@ def _pick(pid: str, state: dict, sid: str) -> bank.Question:
         d = state["diag"]
         skill, lvl = d["skills"][d["i"]], d["level"]
         t = mastery.pick_targeted(group, skill, lvl, None, asked, act, rng)
-        reason = f"Placement: {bank.SKILLS[skill]} at {bank.LEVELS[lvl]} level."
+        reason = f"Placement: {bank.SKILLS[skill]}, a {bank.LEVELS[lvl]} question."
     elif mode == "drill":
         tg = state["target"]
         t = mastery.pick_targeted(group, tg["skill"], tg["level"], tg["subskill"], asked, act, rng)
         sub = bank.SUBSKILLS.get(tg["subskill"], ("", ""))[1]
-        reason = f"Drill target: {bank.SKILLS[tg['skill']]}" + (f" / {sub}" if sub else "") + f" at {bank.LEVELS[tg['level']]}."
+        reason = f"Practice target: {bank.SKILLS[tg['skill']]}" + (f" / {sub}" if sub else "") + f", {bank.LEVELS[tg['level']]} questions."
     elif mode == "practice":
         focus = state.get("focus") or "accounting"
         lvl = state.get("level") or mastery.target_level(levels_for(pid).get(focus, 0))
         t, served = mastery.pick_practice(group, focus, lvl, asked, act, rng)
         if served is None:
-            reason = f"Practice: {bank.SKILLS[focus]}, {bank.LEVELS[lvl]} only."
+            reason = f"Practice: {bank.SKILLS[focus]}, {bank.LEVELS[lvl]} questions only."
         elif t.skill != focus:
             reason = (f"Practice: no {bank.SKILLS[focus]} questions for this group, "
-                      f"so {bank.SKILLS[t.skill]} at {bank.LEVELS[t.difficulty]} instead.")
+                      f"so {bank.SKILLS[t.skill]} ({bank.LEVELS[t.difficulty]}) instead.")
         else:
             reason = (f"Practice: {bank.SKILLS[focus]}. No fresh {bank.LEVELS[lvl]} question left, "
                       f"so the closest level with one ({bank.LEVELS[served]}).")
@@ -135,7 +147,7 @@ def _pick(pid: str, state: dict, sid: str) -> bank.Question:
         t = mastery.pick_mock(group, state["persona"], levels, bank.GROUP_WEIGHTS.get(group, {}), asked, act, rng,
                               state.get("focus"))
         reason = (f"Mock with the {agents.PERSONAS[state['persona']][0]}: "
-                  f"{'fit question' if t.skill == 'fit' else bank.SKILLS[t.skill]} at {bank.LEVELS[t.difficulty]}.")
+                  f"{'fit question' if t.skill == 'fit' else bank.SKILLS[t.skill]}, a {bank.LEVELS[t.difficulty]} question.")
     hits = [x for x in t.misconceptions if x in act]
     if hits:
         reason += " Re-tests: " + ", ".join(LIBRARY[h].name for h in hits) + "."
@@ -292,9 +304,12 @@ def start_session(profile_id: str, mode: str, persona: str, focus: str | None, l
             group=f", {gname.split(' (')[0]} specifics" if group and group != "generalist" else "")
     elif mode == "drill":
         tg = state["target"]
-        sub = bank.SUBSKILLS.get(tg["subskill"], ("", ""))[1]
-        out["opener"] = (f"Targeted drill: {bank.SKILLS[tg['skill']]}" + (f", {sub}" if sub else "") +
-                         f", {bank.LEVELS[tg['level']]} level, {GOALS['drill']} questions. " + OPENERS[persona])
+        out["opener"] = (f"Let's practice {_topic(tg['skill'], tg['subskill'])} together. {GOALS['drill']} quick questions "
+                         f"at {level_phrase(tg['level'])}. " + OPENERS[persona])
+    elif mode == "practice":
+        lvl = state.get("level") or mastery.target_level(state["levels_start"].get(focus, 0))
+        out["opener"] = (f"Practice: {bank.SKILLS[focus]}, {level_phrase(lvl)} questions. "
+                         "Take your time and talk me through your thinking.")
     else:
         out["opener"] = OPENERS[persona]
     out["events"] = db.events(sid)
@@ -338,7 +353,7 @@ def _advance_diagnostic(pid: str, state: dict, passed: bool, sid: str) -> None:
         placed = max(0, placed)
         d["results"][skill] = placed
         db.add_event(sid, "Director", "placement",
-                     f"Placed {bank.SKILLS[skill]} at {bank.LEVELS.get(placed, 'Foundations')}.",
+                     f"Placed {bank.SKILLS[skill]} at {bank.LEVELS.get(placed, bank.LEVEL0_LABEL)}.",
                      {"skill": skill, "level": placed})
         d["i"] += 1
         if d["i"] >= len(d["skills"]):
@@ -520,7 +535,7 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
         if state.get("complete"):
             msg = "That's the placement done. Let's look at where you stand."
     else:
-        msg = await _interviewer_message(sid, state, q, verdict, action, checks, mids, wrapped, d,
+        msg = await _interviewer_message(sid, state, q, verdict, action, checks, mids, wrapped, d, error_type=error_type,
                                          followup=nq.text if nq else None)
 
     # ---------- 7. advance the interview
@@ -570,7 +585,8 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
                     "expected": c.expected if show_detail else None,
                     "required": next(l.required for l in q.labels if l.key == c.label)} for c in checks],
         "misconceptions": [{"id": m, "name": LIBRARY[m].name, "fix": LIBRARY[m].fix} for m in mids] if show_detail else [],
-        "rationale": d.rationale if show_detail else None,
+        "rationale": (rounding_note(q, checks) if error_type == "rounding" else d.rationale) if show_detail else None,
+        "note": rounding_note(q, checks) if error_type == "rounding" else None,
         "solution": solution,
         "answered_question": {"title": q.title, "skill": q.skill, "kind": q.kind, "seconds": seconds, "target": q.target_seconds},
         "session": _public_session(sid, {**s, "state": state}),
@@ -595,24 +611,35 @@ def _adjudicate(q: bank.Question, d: agents.Diagnosis, explain_only: bool):
     if q.kind == "numeric" and not explain_only:
         stated = {v.label: v.value for v in d.stated_values if any(l.key == v.label for l in q.labels)}
         checks = bank.check_numbers(q, stated)
-        wrong = [c for c in checks if c.status == "wrong"]
-        missing_req = [c for c in checks if c.status == "missing" and
-                       next(l.required for l in q.labels if l.key == c.label)]
-        if wrong:
-            matched = sorted({m for c in wrong for m in c.matches})
-            all_slips = all(c.slip for c in wrong)
+        required = {l.key: l.required for l in q.labels}
+        wrong_req = [c for c in checks if c.status == "wrong" and required[c.label]]
+        wrong_opt = [c for c in checks if c.status == "wrong" and not required[c.label]]
+        missing_req = [c for c in checks if c.status == "missing" and required[c.label]]
+        concept_mids = [m for m in llm_mids if m not in ("GEN_MEMORISED", "GEN_ARITHMETIC")]
+        if wrong_req:
+            matched = sorted({m for c in wrong_req + wrong_opt for m in c.matches})
             if matched:
-                etype = "conceptual"
-                mids = matched + [m for m in llm_mids if m not in matched and m not in ("GEN_MEMORISED", "GEN_ARITHMETIC")]
-            elif all_slips or d.unmatched_error == "arithmetic":
+                return "incorrect", "conceptual", matched + [m for m in concept_mids if m not in matched], checks
+            if all(_near_miss(q, c) for c in wrong_req):
+                # Close to the truth and no trap explains it: interview-style rounding. Don't invent a cause.
+                return "incomplete", "rounding", [], checks
+            if all(c.slip for c in wrong_req) or d.unmatched_error == "arithmetic":
                 # Deterministic slip detector (one digit off, transposed, decimal shift) wins over the model.
-                etype, mids = "arithmetic", ["GEN_ARITHMETIC"]
-            else:
-                etype = "conceptual"
-                mids = [m for m in llm_mids if m not in ("GEN_MEMORISED", "GEN_ARITHMETIC")]
-            return "incorrect", etype, mids, checks
+                return "incorrect", "arithmetic", ["GEN_ARITHMETIC"], checks
+            return "incorrect", "conceptual", concept_mids, checks
         if missing_req:
             return "incomplete", "incomplete", [m for m in llm_mids if m != "GEN_MEMORISED"], checks
+        if wrong_opt:
+            # Every required number is right; only a supporting line item is off: nudge on that line, don't fail.
+            matched = sorted({m for c in wrong_opt for m in c.matches})
+            if matched:
+                return "incomplete", "conceptual", matched, checks
+            return "incomplete", ("rounding" if all(_near_miss(q, c) for c in wrong_opt) else "incomplete"), [], checks
+        # Right numbers, but the answer also states a wrong idea that the specialist flagged and quoted
+        # (e.g. "the unlevered beta is usually higher"): the claim is what an interviewer would catch.
+        claimed = [m for m in concept_mids if m in q.misconceptions or LIBRARY[m].skill == q.skill]
+        if claimed and d.evidence_quote.strip():
+            return "incomplete", "conceptual", claimed, checks
         if d.reasoning_quality in ("weak", "none"):
             return "correct_unexplained", "unexplained", [], checks
         return "correct", "none", [], checks
@@ -638,6 +665,20 @@ def _adjudicate(q: bank.Question, d: agents.Diagnosis, explain_only: bool):
     if cover < 0.67 or d.reasoning_quality == "weak":
         return "incomplete", "incomplete", [], []
     return "correct", "none", [], []
+
+
+def _near_miss(q: bank.Question, c) -> bool:
+    """Within twice the label's tolerance of the truth: a rounding miss, not a method error."""
+    lab = next((l for l in q.labels if l.key == c.label), None)
+    if lab is None or c.stated is None or c.expected is None:
+        return False
+    s, t = (c.stated, c.expected) if lab.is_signed else (abs(c.stated), abs(c.expected))
+    return abs(s - t) <= 2 * max(lab.tol_abs, lab.tol_rel * abs(t))
+
+
+def rounding_note(q: bank.Question, checks: list) -> str:
+    items = [c.name for c in checks if c.status == "wrong" and _near_miss(q, c)]
+    return "Close. Check your rounding" + (f" on {', '.join(items).lower()}" if items else "") + "."
 
 
 def _choose_action(state: dict, q: bank.Question, verdict: str, explain_only: bool) -> tuple[str, bool]:
@@ -676,7 +717,8 @@ def _final_verdict(state: dict, verdict: str, explain_only: bool) -> str:
 
 
 # ---------------------------------------------------------------- interviewer
-async def _interviewer_message(sid, state, q, verdict, action, checks, mids, wrapped, d, followup=None) -> str:
+async def _interviewer_message(sid, state, q, verdict, action, checks, mids, wrapped, d, followup=None,
+                               error_type: str | None = None) -> str:
     persona = state["persona"]
     wrong_items = [c.name for c in checks if c.status == "wrong"]
     missing_items = [c.name for c in checks if c.status == "missing" and
@@ -692,6 +734,10 @@ async def _interviewer_message(sid, state, q, verdict, action, checks, mids, wra
         "misconception_fix": [LIBRARY[m].fix for m in mids][:1] if action == "reveal" else [],
         "key_idea_to_name": q.key_points[:2] if action == "note_next" else [],
         "grader_note": d.rationale if action in ("probe_why",) else "",
+        # right numbers but a wrong idea: name the concept to revisit (names only, no numbers)
+        "concept_to_revisit": [LIBRARY[m].name for m in mids if m in LIBRARY][:1]
+        if action == "nudge" and error_type == "conceptual" else [],
+        "rounding_note": rounding_note(q, checks) if error_type == "rounding" else "",
         "followup_shown_on_screen": followup or "",
     }
     prompt = ("TURN CONTEXT (from the interview engine):\n" + json.dumps(ctx, indent=1) + "\n\n" + wrapped)
@@ -731,6 +777,10 @@ async def _interviewer_message(sid, state, q, verdict, action, checks, mids, wra
                 "). Rewrite it using no numbers at all.")
     items = ", ".join(ctx["line_items_to_revisit"]) or "your reasoning"
     fb = FALLBACKS[action].format(items=items.lower())
+    if action == "nudge" and error_type == "rounding":
+        fb = ctx["rounding_note"] + " Give me the number again, a little more precisely."
+    elif action == "nudge" and ctx["concept_to_revisit"]:
+        fb = f"Your numbers hold up. One thing you said needs another look: {ctx['concept_to_revisit'][0].lower()}. Walk me through that part again."
     db.add_event(sid, "Guard", "safety", "Used the safe fallback message.", {"message": fb})
     return fb
 
@@ -840,7 +890,7 @@ async def _end_session(s: dict, tz: int | None) -> dict:
         "misconceptions_seen": sorted({m for t in ts for m in (t["misconceptions"] or [])}),
         "mastery_start": {bank.SKILLS[k]: round(v["p"] * 100) for k, v in s["mastery_start"].items() if k in bank.SKILLS},
         "mastery_end": {bank.SKILLS[k]: round(v["p"] * 100) for k, v in m_end.items()},
-        "levels_end": {bank.SKILLS[k]: bank.LEVELS.get(v, "Foundations") for k, v in levels_after.items()},
+        "levels_end": {bank.SKILLS[k]: bank.LEVELS.get(v, bank.LEVEL0_LABEL) for k, v in levels_after.items()},
     }
     debrief = None
     if summary["questions"]:
@@ -929,7 +979,7 @@ def _fallback_debrief(summary: dict, plan: dict | None = None) -> dict:
     if nxt:
         next_step = f"Next on your plan: {nxt['title']}."
     elif top:
-        next_step = f"Run a targeted drill on {bank.SKILLS.get(LIBRARY[top[0]].skill, 'your weakest skill')}."
+        next_step = f"Next time, practice {bank.SKILLS.get(LIBRARY[top[0]].skill, 'your weakest skill')} for a few short questions."
     else:
         next_step = "Try a mock interview to put it all together."
     if n and len(right) / n >= 0.7:
@@ -937,7 +987,7 @@ def _fallback_debrief(summary: dict, plan: dict | None = None) -> dict:
     elif n:
         encouragement = "Every miss you find here is one you won't make in the real interview."
     else:
-        encouragement = "One short drill is enough to get started."
+        encouragement = "One short practice session is enough to get started."
     return {"headline": headline, "went_well": went_well[:3], "work_on": work_on, "next_step": next_step,
             "encouragement": encouragement}
 
@@ -954,7 +1004,7 @@ async def build_plan(pid: str, sid: str | None = None, tz: int | None = None, pa
     facts = {k: plan[k] for k in ("group_name", "days_left", "hours_per_week", "overall_label", "target_label", "drills",
                                   "mocks", "questions", "hours_planned", "hours_available", "compressed",
                                   "minutes_per_practice_day", "final_prep", "interview_passed")}
-    facts["skills"] = [{"skill": r["name"], "now": bank.LEVELS.get(r["current"], "Foundations"),
+    facts["skills"] = [{"skill": r["name"], "now": bank.LEVELS.get(r["current"], bank.LEVEL0_LABEL),
                         "target": bank.LEVELS[r["target"]], "drills": r["drills"],
                         "weak_subskills": [w["name"] for w in r["weak_subskills"]]} for r in plan["skills"]]
     summary = None
@@ -980,7 +1030,7 @@ async def build_plan(pid: str, sid: str | None = None, tz: int | None = None, pa
         headline = f"You're at {plan['overall_label']} overall. Target: {plan['target_label']} in {plan['days_left']} days."
     plan["summary"] = summary or {
         "headline": headline,
-        "why": f"{plan['drills']} targeted drills and {plan['mocks']} mock interviews, about {plan['hours_planned']} hours in total.",
+        "why": f"{plan['drills']} short practice sessions and {plan['mocks']} mock interviews, about {plan['hours_planned']} hours in total.",
         "first_step": f"Start with: {next((t['title'] for t in plan['tasks'] if not t['done']), 'a mock interview')}.",
     }
     db.save_plan(pid, plan)
@@ -1005,8 +1055,8 @@ def _report(sid: str, tz: int | None = None) -> dict:
         "mastery_start": s["mastery_start"],
         "mastery_end": db.mastery(pid),
         "levels_start": start_levels, "levels_end": end_levels,
-        "level_ups": [{"skill": k, "name": bank.SKILLS[k], "from": bank.LEVELS.get(start_levels.get(k, 0), "Foundations"),
-                       "to": bank.LEVELS.get(v, "Foundations")} for k, v in end_levels.items() if v > start_levels.get(k, 0)],
+        "level_ups": [{"skill": k, "name": bank.SKILLS[k], "from": bank.LEVELS.get(start_levels.get(k, 0), bank.LEVEL0_LABEL),
+                       "to": bank.LEVELS.get(v, bank.LEVEL0_LABEL)} for k, v in end_levels.items() if v > start_levels.get(k, 0)],
         "plan_progress": planmod.progress(plan, planmod.user_today(tz)) if plan else None,
         "turns": [{"question": t["question"], "verdict": t["verdict"], "skill": t["skill"],
                    "misconceptions": t["misconceptions"], "seconds": t["seconds"]} for t in ts],
@@ -1031,7 +1081,7 @@ def weakness_map(pid: str) -> dict:
         hist.setdefault(h["key"], []).append({"ts": h["ts"], "p": h["p"], "level": h["level"]})
     return {
         "skills": [{"key": k, "name": bank.SKILLS[k], "p": v["p"], "n": v["n"], "label": mastery.level(v["p"], v["n"]),
-                    "level": levels.get(k, 0), "level_name": bank.LEVELS.get(levels.get(k, 0), "Foundations"),
+                    "level": levels.get(k, 0), "level_name": bank.LEVELS.get(levels.get(k, 0), bank.LEVEL0_LABEL),
                     "target": mastery.target_level(levels.get(k, 0)),
                     "avg_seconds": round(avg_secs[k]) if avg_secs.get(k) else None,
                     "subskills": sorted(subs.get(k, []), key=lambda x: x["p"]),
@@ -1073,7 +1123,7 @@ def dashboard(pid: str, tz: int | None = None) -> dict:
         "placement_partial": (plan or {}).get("placement_partial_skills") or [],
         "today": today.isoformat(),
         "interview_status": planmod.interview_status(intake.get("interview_date"), today),
-        "overall_level": overall, "overall_label": bank.LEVELS.get(overall, "Foundations"),
+        "overall_level": overall, "overall_label": bank.LEVELS.get(overall, bank.LEVEL0_LABEL),
         "target_label": bank.LEVELS[mastery.target_level(overall)],
         "plan": plan, "progress": planmod.progress(plan, today) if plan else None,
         "streak": _streak(pid, today, tz), "sessions": db.count_ended_sessions(pid), "answered": wm["answered"],

@@ -68,10 +68,21 @@ class Label:
         n = self.name.lower()
         return n.startswith("change") or "accretion" in n
 
+    def rounding(self, truth: float) -> float:
+        """The rounding a person naturally uses out loud, which must always be accepted (QA G-02):
+        whole dollars for amounts of $20+, one decimal for percentages, cents for per-share values,
+        two decimals for multiples and share counts."""
+        if self.unit == "$":
+            return 0.5 if abs(truth) >= 20 else 0.005
+        return {"%": 0.05, "$/sh": 0.005, "x": 0.005, "mm": 0.005}.get(self.unit, 0.0)
+
+    def band(self, truth: float) -> float:
+        return max(self.tol_abs, self.tol_rel * abs(truth), self.rounding(truth)) + 1e-9
+
     def close(self, stated: float, truth: float) -> bool:
         if not self.is_signed:  # a level ("IRR", "lost paydown"): direction words don't change the size
             stated, truth = abs(stated), abs(truth)
-        return abs(stated - truth) <= max(self.tol_abs, self.tol_rel * abs(truth))
+        return abs(stated - truth) <= self.band(truth)
 
 
 @dataclass
@@ -609,7 +620,7 @@ MA_STOCK = Template(
     text=lambda p: _ma_text_common(p) + " The deal is 100% stock. Is it accretive or dilutive, and by how much?",
     gen=_ma_gen,
     solve=lambda p: _ma_stock_vals(p, _ma_base(p)[2]),
-    labels=[Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", tol_abs=0.3, tol_rel=0.02),
+    labels=[Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", tol_abs=0.5, tol_rel=0.02),
             Label("new_shares", "New shares issued (mm)", "mm", required=False, tol_abs=0.05, tol_rel=0),
             Label("pf_eps", "Pro forma EPS", "$/sh", required=False, tol_abs=0.01, tol_rel=0)],
     traps={"MA_IGNORE_PREMIUM": lambda p: [_ma_stock_vals(p, p["Mt"])]},
@@ -645,7 +656,7 @@ MA_CASH = Template(
                                          f"{pct(p['r'])} interest. Tax rate is {pct(p['t'])}. Accretive or dilutive, and by how much?"),
     gen=_ma_gen,
     solve=lambda p: _ma_cash_vals(p),
-    labels=[Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", tol_abs=0.3, tol_rel=0.02),
+    labels=[Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", tol_abs=0.5, tol_rel=0.02),
             Label("pf_eps", "Pro forma EPS", "$/sh", required=False, tol_abs=0.01, tol_rel=0)],
     traps={"MA_FOREGONE_NO_TAX": lambda p: [_ma_cash_vals(p, after_tax=False)],
            "MA_SHARES_FOR_CASH": lambda p: [_ma_cash_vals(p, issue_shares=True)]},
@@ -681,7 +692,7 @@ MA_DEBT = Template(
                                          f"{pct(p['t'])}. Is it accretive or dilutive, and by how much? What's the quick test?"),
     gen=_ma_gen,
     solve=lambda p: _ma_debt_vals(p),
-    labels=[Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", tol_abs=0.3, tol_rel=0.02),
+    labels=[Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", tol_abs=0.5, tol_rel=0.02),
             Label("earnings_yield", "Target earnings yield at purchase price (%)", "%", required=False, tol_abs=0.15, tol_rel=0),
             Label("after_tax_cost", "After-tax cost of debt (%)", "%", required=False, tol_abs=0.1, tol_rel=0)],
     traps={"MA_FOREGONE_NO_TAX": lambda p: [_ma_debt_vals(p, after_tax=False)]},
@@ -810,10 +821,15 @@ LBO_IRR_RULE = Template(
 
 
 # =========================================================================== MARKETS / RATES
+# (equity weight, tax rate) pairs where the pre-tax-debt mistake moves WACC by at least 7.5bp, so a candidate who
+# rounds the right answer to one decimal still passes and the mistake still lands outside the band.
+_MW_PAIRS = [(0.7, 0.25), (0.7, 0.30), (0.7, 0.40), (0.6, 0.20), (0.6, 0.25), (0.6, 0.30), (0.6, 0.40), (0.8, 0.40)]
+
+
 def _mw_gen(r: random.Random) -> Params:
-    ev_ = r.choice([0.6, 0.7, 0.8])
-    return {"we": ev_, "w0": r.choice([0.08, 0.09, 0.10]), "b": r.choice([0.8, 1.0, 1.2]),
-            "t": r.choice(TAXES), "g": r.choice([0.02, 0.03]), "bp": 100.0}
+    we, t = r.choice(_MW_PAIRS)
+    return {"we": we, "w0": r.choice([0.08, 0.09, 0.10]), "b": r.choice([0.8, 1.0, 1.2]),
+            "t": t, "g": r.choice([0.02, 0.03]), "bp": 100.0}
 
 
 def _mw_vals(p: Params, eq_leg: bool = True, tax: bool = True) -> Values:
@@ -833,11 +849,12 @@ MKT_RATES_WACC = Template(
                     f"does a perpetuity-growth terminal value with {pct(p['g'])} growth change?"),
     gen=_mw_gen,
     solve=lambda p: _mw_vals(p),
-    # Answers are exact to 2dp; the pre-tax-debt error is only 4-16bp away, so the band must be tight.
-    labels=[Label("wacc_new", "New WACC (%)", "%", tol_abs=0.02, tol_rel=0),
-            Label("tv_change", "Change in terminal value (%)", "%", required=False, tol_abs=0.3, tol_rel=0)],
+    # One-decimal WACC ("about 8.9%") must pass; the question says "roughly" for the TV change.
+    labels=[Label("wacc_new", "New WACC (%)", "%", tol_abs=0.06, tol_rel=0),
+            Label("tv_change", "Change in terminal value (%)", "%", required=False, tol_abs=1.0, tol_rel=0)],
     traps={"MKT_RATES_DEBT_ONLY": lambda p: [_mw_vals(p, eq_leg=False)],
-           "MKT_RATES_PRETAX": lambda p: [_mw_vals(p, tax=False)],
+           # Pre-tax debt moves the "roughly" TV change by under a point, so the WACC is its fingerprint.
+           "MKT_RATES_PRETAX": lambda p: [{"wacc_new": _mw_vals(p, tax=False)["wacc_new"]}],
            "MKT_RATES_NO_EFFECT": lambda p: [{"wacc_new": _a(p["w0"] * 100), "tv_change": 0.0}]},
     explain=lambda p, v: (
         f"Cost of equity rises by beta x 100bp = {num(p['b'] * 100, 0)}bp (CAPM with a constant ERP). After-tax cost of "
@@ -861,6 +878,16 @@ def _rl_vals(p: Params, tax: bool = True, effect: bool = True) -> Values:
     return {"lost_paydown": _a(lost), "irr_new": v["irr"], "moic_new": v["moic"]}
 
 
+def _rl_no_effect(p: Params) -> Values:
+    base, new = _rl_vals(p, effect=False), _rl_vals(p)
+    sig = {"lost_paydown": 0.0}
+    if abs(base["irr_new"] - new["irr_new"]) > 1.2:
+        sig["irr_new"] = base["irr_new"]
+    if abs(base["moic_new"] - new["moic_new"]) > 0.07:
+        sig["moic_new"] = base["moic_new"]
+    return sig
+
+
 MKT_RATES_LBO = Template(
     id="mkt_rates_lbo", skill="markets", difficulty=3, kind="numeric",
     title="Rates shock: LBO returns",
@@ -870,14 +897,15 @@ MKT_RATES_LBO = Template(
                     f"{pct(p['t'])}, and reduces debt paydown one-for-one. How much debt paydown is lost, and what's the new IRR?"),
     gen=lambda r: {**_lbo_gen(r), "bp": float(r.choice([200, 300]))},
     solve=lambda p: _rl_vals(p),
-    # The rate shock moves IRR by well under a point, so the lost paydown is the graded skill;
-    # IRR and MOIC stay optional with bands tight enough to tell "no effect" apart.
+    # The rate shock moves IRR by about a point, so the lost paydown is the graded skill. IRR and MOIC are optional
+    # with interview-rounding bands ("about 18%", "2.3x").
     labels=[Label("lost_paydown", "Lost debt paydown ($mm)", "$", tol_abs=0.5, tol_rel=0),
-            Label("irr_new", "New IRR (%)", "%", required=False, tol_abs=0.3, tol_rel=0),
-            Label("moic_new", "New MOIC (x)", "x", required=False, tol_abs=0.02, tol_rel=0)],
-    # The pre-tax error moves IRR by only a few tenths, so its fingerprint is the lost paydown alone.
+            Label("irr_new", "New IRR (%)", "%", required=False, tol_abs=1.0, tol_rel=0),
+            Label("moic_new", "New MOIC (x)", "x", required=False, tol_abs=0.05, tol_rel=0)],
+    # The pre-tax error moves IRR by only a few tenths, so its fingerprint is the lost paydown alone. "No effect"
+    # always shows as zero lost paydown; its IRR/MOIC join the fingerprint only when they sit outside the band.
     traps={"MKT_RATES_PRETAX": lambda p: [{"lost_paydown": _rl_vals(p, tax=False)["lost_paydown"]}],
-           "MKT_RATES_NO_EFFECT": lambda p: [_rl_vals(p, effect=False)]},
+           "MKT_RATES_NO_EFFECT": lambda p: [_rl_no_effect(p)]},
     explain=lambda p, v: (
         f"Extra interest = {money(p['L'] * p['E0'])}mm x {num(p['bp'], 0)}bp x {num(p['n'])} years x (1 - {pct(p['t'])}) = "
         f"{money(v['lost_paydown'])}mm of paydown lost. Remaining debt at exit rises by that amount, equity out falls to "
@@ -900,7 +928,7 @@ MKT_RATES_MA = Template(
                     f"financing costs rise 200bp before signing, what's the new accretion or dilution?"),
     gen=_ma_gen,
     solve=lambda p: {"accretion_new": _ma_debt_vals(p, rd=p["rd"] + 0.02)["accretion"]},
-    labels=[Label("accretion_new", "New EPS accretion (+) / dilution (-) (%)", "%", tol_abs=0.3, tol_rel=0.02)],
+    labels=[Label("accretion_new", "New EPS accretion (+) / dilution (-) (%)", "%", tol_abs=0.5, tol_rel=0.02)],
     traps={"MKT_RATES_PRETAX": lambda p: [{"accretion_new": _ma_debt_vals(p, rd=p["rd"] + 0.02, after_tax=False)["accretion"]}],
            "MKT_RATES_NO_EFFECT": lambda p: [{"accretion_new": _ma_debt_vals(p)["accretion"]}]},
     explain=lambda p, v: (lambda NIa, NIt, price, eps: (
@@ -1111,7 +1139,8 @@ ACC_AP = Template(
 ACC_DEFREV = Template(
     id="acc_defrev", skill="accounting", difficulty=3, kind="numeric", title="3-statement walk: customer prepays",
     text=lambda p: (f"A software customer pays {money(p['X'])} in cash today for a service that will be delivered next year. "
-                    f"Tax rate is {pct(p.get('t', 0.25))}. Walk me through the three statements today."),
+                    f"Tax rate is {pct(p.get('t', 0.25))}, and assume taxes follow book income, so no tax is due on the prepayment yet. "
+                    f"Walk me through the three statements today."),
     gen=lambda r: {"X": float(r.choice([50, 100, 120, 200])), "t": r.choice(TAXES)},
     solve=lambda p: {"ni": 0.0, "cash": p["X"], "deferred_revenue": p["X"]},
     labels=[Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$"),
@@ -1258,17 +1287,19 @@ TMT_LTV = Template(
 
 HC_RNPV = Template(
     id="hc_rnpv", skill="industry", difficulty=2, kind="numeric", title="Biotech: risk-adjusted NPV",
-    text=lambda p: (f"A biotech's only drug would be worth {money(p['V'])}mm (NPV) if approved. It has a {pct(p['pr'], 0)} chance of "
-                    f"approval, and {money(p['Cd'])}mm (present value) of trial costs must be spent either way. What's the risk-adjusted NPV?"),
+    text=lambda p: (f"If a biotech's only drug is approved, its future cash flows are worth {money(p['V'])}mm today, before any trial "
+                    f"costs. It has a {pct(p['pr'], 0)} chance of approval, and {money(p['Cd'])}mm (present value) of trial costs must be "
+                    f"spent either way. What's the risk-adjusted NPV?"),
     gen=lambda r: {"V": float(r.choice([1000, 1500, 2000])), "pr": r.choice([0.2, 0.3, 0.5]), "Cd": float(r.choice([100, 150, 200]))},
     solve=lambda p: {"rnpv": _a(p["pr"] * p["V"] - p["Cd"])},
     labels=[Label("rnpv", "Risk-adjusted NPV ($mm)", "$")],
-    traps={"HC_RNPV_UNWEIGHTED": lambda p: [{"rnpv": p["V"] - p["Cd"]}, {"rnpv": _a(p["pr"] * (p["V"] - p["Cd"]))}]},
+    traps={"HC_RNPV_UNWEIGHTED": lambda p: [{"rnpv": p["V"] - p["Cd"]}],
+           "HC_RNPV_WEIGHTS_COSTS": lambda p: [{"rnpv": _a(p["pr"] * (p["V"] - p["Cd"]))}]},
     explain=lambda p, v: (f"Weight the approved-case value by the probability: {pct(p['pr'], 0)} x {money(p['V'])} = "
                           f"{money(p['pr'] * p['V'])}mm, then subtract the {money(p['Cd'])}mm of costs that are spent regardless: "
                           f"rNPV = {money(v['rnpv'])}mm."),
     key_points=["Weight the success-case value by the probability of approval", "Costs spent regardless are not probability-weighted"],
-    misconceptions=["HC_RNPV_UNWEIGHTED"], groups=["healthcare"], target_seconds=60,
+    misconceptions=["HC_RNPV_UNWEIGHTED", "HC_RNPV_WEIGHTS_COSTS"], groups=["healthcare"], target_seconds=60,
 )
 
 
@@ -1670,13 +1701,14 @@ EV_EQUITY_ISSUE = Template(
     gen=lambda r: {"X": float(r.choice([100, 200, 500]))},
     solve=lambda p: {"equity_value": p["X"], "ev": 0.0},
     labels=[Label("equity_value", "Change in equity value ($mm)", "$"), Label("ev", "Change in enterprise value ($mm)", "$")],
-    traps={"EV_FINANCING_MOVES_EV": lambda p: [{"ev": p["X"]}, {"equity_value": 0.0}]},
+    traps={"EV_FINANCING_MOVES_EV": lambda p: [{"ev": p["X"]}],
+           "EV_EQUITY_ISSUE_NO_CHANGE": lambda p: [{"equity_value": 0.0}]},
     explain=lambda p, v: (f"Equity value rises by {money(p['X'])}mm: there are more shares at the same price. EV = equity value + debt "
                           f"- cash: equity value is up {money(p['X'])} and cash is up {money(p['X'])}, so EV doesn't change. The "
                           f"business itself is the same."),
     key_points=["Equity value rises by the amount raised", "Cash rises by the same amount",
                 "EV is unchanged because the operations are unchanged"],
-    misconceptions=["EV_FINANCING_MOVES_EV"], target_seconds=40,
+    misconceptions=["EV_FINANCING_MOVES_EV", "EV_EQUITY_ISSUE_NO_CHANGE"], target_seconds=40,
 )
 
 
@@ -1729,7 +1761,7 @@ MA_SYNERGIES = Template(
                     f"make it break even?"),
     gen=_syn_gen, solve=_syn_vals,
     labels=[Label("synergies", "Break-even pre-tax synergies ($mm)", "$", tol_abs=0.3, tol_rel=0),
-            Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", required=False, tol_abs=0.3, tol_rel=0)],
+            Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", required=False, tol_abs=0.5, tol_rel=0)],
     traps={"MA_SYNERGY_NO_GROSSUP": lambda p: [{"synergies": _a(p["P"] / 20 - p["NIt"])},
                                                {"synergies": _a((p["P"] / 20 - p["NIt"]) * (1 - p["t"]))}],
            "MA_IGNORE_NEW_SHARES": lambda p: [{"accretion": _a(p["NIt"]), "synergies": 0.0}]},
@@ -1999,7 +2031,11 @@ SPEC_FIT = [
          ["FIT_FAKE_WEAKNESS", "FIT_NO_EVIDENCE"],
          "Pick a genuine setback where your choices mattered, own it in one sentence without blaming others, spend most of the "
          "answer on what you changed, and finish with a later example showing the lesson stuck."),
-    _fit("c_ma_sellside", 2, "Sell-side M&A process", "Walk me through a sell-side M&A process.",
+    # c_ma_sellside lives in SPEC_CONCEPTUAL (skill ma): it's deal-process knowledge, not a fit question (QA G-10).
+]
+
+_SELLSIDE = [
+    _concept("c_ma_sellside", "ma", 2, "Sell-side M&A process", "Walk me through a sell-side M&A process.",
          ["Prep: teaser, information memorandum and buyer list", "First round: NDAs and non-binding indications of interest",
           "Second round: management meetings, data-room diligence, final bids", "Negotiate the purchase agreement, sign and close"],
          [],
@@ -2016,7 +2052,7 @@ NUMERIC = [ACC_DA, ACC_WRITEDOWN, ACC_SBC, ACC_CAPEX, ACC_AR, ACC_DEBT, EV_BRIDG
            EV_DEBT_CASH, DCF_UFCF, DCF_TV, DCF_WACC, DCF_CAPM, MA_STOCK, MA_CASH, MA_DEBT, MA_GOODWILL,
            LBO_PAPER, LBO_IRR_RULE, MKT_RATES_WACC, MKT_RATES_LBO, MKT_RATES_MA] + NEW_NUMERIC
 
-TEMPLATES: dict[str, Template] = {t.id: t for t in NUMERIC + CONCEPTUAL + MORE_CONCEPTUAL + SPEC_CONCEPTUAL + GROUP_BASICS
+TEMPLATES: dict[str, Template] = {t.id: t for t in NUMERIC + CONCEPTUAL + MORE_CONCEPTUAL + SPEC_CONCEPTUAL + _SELLSIDE + GROUP_BASICS
                                    + BEHAVIORAL + SPEC_FIT}
 
 SKILLS = {
@@ -2029,7 +2065,10 @@ SKILLS = {
     "fit": "Fit & behavioral",
 }
 TECHNICAL = ["accounting", "ev", "dcf", "ma", "lbo"]
-LEVELS = {1: "Basic", 2: "Intermediate", 3: "Advanced"}
+# Display labels only: the integer levels (1/2/3) and all logic are unchanged. Students read levels as the recruiting
+# stage they're ready for (user feedback U-02); level 0 = nothing shown yet.
+LEVELS = {1: "Coffee-chat ready", 2: "First-round ready", 3: "Superday ready"}
+LEVEL0_LABEL = "Getting started"
 
 SPECIALIST_FOR_SKILL = {
     "accounting": "accounting", "ev": "valuation", "dcf": "valuation",
@@ -2080,6 +2119,7 @@ SUBSKILLS: dict[str, tuple[str, str]] = {
     "ma.accretion": ("ma", "Accretion / dilution"),
     "ma.purchase_accounting": ("ma", "Purchase accounting and goodwill"),
     "ma.rates": ("ma", "Financing costs and rates"),
+    "ma.process": ("ma", "Deal process"),
     "lbo.concepts": ("lbo", "LBO concepts and candidates"),
     "lbo.returns": ("lbo", "Returns math (MOIC, IRR)"),
     "lbo.paper": ("lbo", "Paper LBO"),
@@ -2155,7 +2195,7 @@ META: dict[str, tuple[int, str, list[str]]] = {
     "c_acc_most_important": (1, "accounting.links", []), "c_dcf_tv_methods": (1, "dcf.terminal_value", []),
     "c_dcf_equity_cost": (1, "dcf.discount_rate", []),
     "c_ib_role": (1, "fit.understanding_banking", []), "b_failure": (1, "fit.experiences", []),
-    "c_ma_sellside": (2, "fit.understanding_banking", []),
+    "c_ma_sellside": (2, "ma.process", []),
     # Basic group questions: every group now has coffee-chat-level material
     "c_fig_basics": (1, "industry.fig", ["fig"]), "c_tmt_arr": (1, "industry.tmt", ["tmt"]),
     "c_hc_basics": (1, "industry.healthcare", ["healthcare"]), "c_en_ebitdax": (1, "industry.energy", ["energy"]),
@@ -2303,6 +2343,10 @@ def looks_like_slip(stated: float, truth: float) -> bool:
     return False
 
 
+# Right size, wrong direction: the named misconception per skill (accounting walks; accretion vs dilution).
+SIGN_FLIP_MISCONCEPTION = {"accounting": "ACC_SIGN_FLIP", "ma": "MA_ACCRETION_SIGN"}
+
+
 def check_numbers(q: Question, stated: dict[str, float]) -> list[LabelCheck]:
     """Compare stated numbers to the answer key and to every misconception signature."""
     out: list[LabelCheck] = []
@@ -2318,8 +2362,8 @@ def check_numbers(q: Question, stated: dict[str, float]) -> list[LabelCheck]:
         matches = [mid for mid, sigs in q.signatures.items()
                    if any(lab.key in sig and lab.close(s, sig[lab.key]) for sig in sigs)]
         flip = lab.is_signed and truth is not None and abs(truth) > 1e-9 and lab.close(-s, truth)
-        if flip and not matches and q.skill == "accounting":
-            matches = ["ACC_SIGN_FLIP"]
+        if flip and not matches and q.skill in SIGN_FLIP_MISCONCEPTION:
+            matches = [SIGN_FLIP_MISCONCEPTION[q.skill]]
         slip = not matches and not flip and truth is not None and looks_like_slip(s, truth)
         out.append(LabelCheck(lab.key, lab.name, s, "wrong", truth, matches, flip, slip))
     return out

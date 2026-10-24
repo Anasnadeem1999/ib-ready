@@ -108,7 +108,6 @@ main { margin: 0 auto; padding: 28px 28px 80px; }
 .lead { font-size: 18px; line-height: 1.6; color: #4a4562; max-width: 60ch; margin: 0; }
 .h2 { font-size: 20px; font-weight: 700; margin: 0 0 var(--s-3); }
 .section-title { font-size: 16px; font-weight: 700; color: var(--ink); margin: 0 0 12px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.section-title > :first-child:not(.tip) { margin-left: 0; }
 .eyebrow { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
 .eyebrow-line { color: var(--primary); font-weight: 700; margin: 0 0 10px; font-size: 15px; }
 .textlink { color: var(--primary); font-weight: 600; font-size: 14px; text-decoration: none; background: none; border: 0; padding: 0; }
@@ -625,3 +624,48 @@ details.bts[open] > summary, details.disclosure[open] > summary { margin-bottom:
   .fr-steps li::before { grid-row: span 2; margin: 0; }
   .firstrun h2 { font-size: 20px; }
 }
+
+/* ===== round 2: milestones journey, simpler home/practice, voice menu ===== */
+.mb-4 { margin-bottom: var(--s-4); }
+.home-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "next next" "journey skills"; }
+.area-journey { grid-area: journey; }
+.upnext-actions { align-items: center; }
+.upnext-actions .primary.big { min-width: 160px; }
+.journey { list-style: none; padding: 0; margin: 4px 0 16px; display: grid; grid-template-columns: repeat(4, 1fr); position: relative; counter-reset: none; }
+.journey::before { content: ""; position: absolute; left: 12.5%; right: 12.5%; top: 13px; height: 3px; background: var(--line); border-radius: 99px; }
+.journey li { position: relative; display: grid; justify-items: center; text-align: center; gap: 4px; padding: 0 4px; min-width: 0; }
+.journey .jdot { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 3px solid var(--line); font-size: 13px; font-weight: 800; color: #fff; z-index: 1; }
+.journey li.done .jdot { background: var(--ok); border-color: var(--ok); }
+.journey li.here .jdot { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 0 5px var(--primary-soft); }
+.journey li.next .jdot { border-color: var(--primary-2); border-style: dashed; }
+.journey b { font-size: 14px; line-height: 1.3; }
+.journey li.todo b { color: var(--muted); font-weight: 600; }
+.journey small { font-size: 12px; font-weight: 700; color: var(--primary); }
+.journey li.next small { color: var(--muted); }
+.journey.static li .jdot { background: var(--surface); border-color: var(--primary-2); box-shadow: none; }
+.launch-main { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.launch-main h2 { margin: 0; font-size: 22px; }
+.launch-main .eyebrow { color: var(--primary); }
+.more-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 8px; }
+.more-grid .launch-tile { display: flex; flex-direction: column; gap: 10px; }
+.more-grid .launch-tile p { margin: 0; }
+.more-grid .secondary { align-self: flex-start; }
+.textlink.idk { padding: 8px 4px; }
+.sb-more { display: inline-flex !important; align-items: center; min-height: 40px; font-size: 14px; }
+#end-btn { min-height: 40px; }
+.sb-tools { position: absolute !important; right: 0; top: calc(100% + 6px); display: flex !important; flex-direction: column; align-items: flex-start; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; box-shadow: 0 12px 30px rgba(43, 40, 64, .16); z-index: 45; width: max-content; max-width: 80vw; }
+.sb-tools[hidden] { display: none !important; }
+.session-bar .menu-wrap { position: relative; }
+@media (max-width: 900px) {
+  .home-grid { grid-template-columns: 1fr; grid-template-areas: "next" "journey" "skills"; }
+  .more-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .journey b { font-size: 12.5px; }
+  .journey small { font-size: 11px; }
+  .mode-pill, #sb-mode-tip { display: none; }
+  .upnext-actions { align-items: stretch; }
+}
+.journey li { align-content: start; }
+.mic { justify-content: center; }
