@@ -269,3 +269,24 @@ def test_accretion_direction_flip_is_named():
     qq = q("ma_stock", Pa=40.0, Sa=100.0, PEa=10.0, Mt=1200.0, prem=0.5, PEt=15.0, r=0.04, rd=0.06, t=0.25)
     c = bank.check_numbers(qq, {"accretion": -qq.values["accretion"]})[0]
     assert c.status == "wrong" and c.matches == ["MA_ACCRETION_SIGN"]
+
+
+_STOP = set("""the a an and or of to in on for with is are be it its this that as by at from than then so not no into
+their them they you your what when which who how why more most less can does do about each per very also just only
+over under up down out usually often like such will would should may every while because""".split())
+
+
+def _terms(text):
+    import re
+    return {w[:5] for w in re.findall(r"[a-z0-9/&\-]+", text.lower()) if len(w) >= 3 and w not in _STOP}
+
+
+@pytest.mark.parametrize("tid", [tid for tid, t in bank.TEMPLATES.items() if t.kind != "numeric"])
+def test_model_answer_covers_its_own_key_points(tid):
+    """QA F-02: the worked answer shown to a student must pass its own rubric, so each key point's main
+    terms have to appear in it (at least half of them; paraphrase covers the rest)."""
+    t = bank.TEMPLATES[tid]
+    answer = _terms(t.explain({"group": "investment banking"}, {}))
+    for kp in t.key_points:
+        terms = _terms(kp)
+        assert len(terms & answer) / len(terms) >= 0.5, f"{tid}: model answer misses key point '{kp}'"

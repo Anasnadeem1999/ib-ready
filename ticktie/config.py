@@ -71,4 +71,7 @@ DAILY_PROFILE_TOKEN_BUDGET = int(os.environ.get("TICKTIE_DAILY_PROFILE_TOKENS", 
 DAILY_GLOBAL_TOKEN_BUDGET = int(os.environ.get("TICKTIE_DAILY_GLOBAL_TOKENS", 5_000_000))
 MIN_SECONDS_BETWEEN_TURNS = 1.0  # basic rate limit per session
 MAX_TURNS_PER_SESSION = 80
+SIGNIN_PER_IP_PER_MINUTE = int(os.environ.get("TICKTIE_SIGNIN_PER_MIN", 20))     # sign-in attempts per client IP
+SIGNUPS_PER_IP_PER_HOUR = int(os.environ.get("TICKTIE_SIGNUPS_PER_HOUR", 30))    # new profiles per client IP
+# (generous on purpose: a class on campus Wi-Fi can share one public IP)
 LLM_TIMEOUT_SECONDS = float(os.environ.get("TICKTIE_LLM_TIMEOUT", 45))  # per model request; the SDK default is 600 s

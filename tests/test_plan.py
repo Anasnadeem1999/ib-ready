@@ -58,7 +58,7 @@ def test_interview_today_or_tomorrow_gets_final_prep_before_the_interview():
         p = plan.build(_intake_on(days), {s: 0 for s in bank.SKILLS}, [], today=TODAY)
         drills = [t for t in p["tasks"] if t["type"] == "drill"]
         mocks = [t for t in p["tasks"] if t["type"] == "mock"]
-        assert p["final_prep"] and 1 <= len(drills) <= 2 and len(mocks) == 1
+        assert p["final_prep"] and len(drills) == {0: 0, 1: 1, 2: 2}[days] and len(mocks) == 1
         last_allowed = TODAY + dt.timedelta(days=max(days - 1, 0))
         assert all(dt.date.fromisoformat(t["date"]) <= last_allowed for t in p["tasks"])
 
@@ -133,3 +133,34 @@ def test_requirements_are_pinned():
     lines = [l.strip() for l in (config.REPO_ROOT / "requirements.txt").read_text().splitlines()
              if l.strip() and not l.startswith("#")]
     assert lines and all("==" in l for l in lines)
+
+
+def test_interview_today_has_no_drill_on_the_day():
+    p = plan.build(_intake_on(0), {s: 0 for s in bank.SKILLS}, [], today=TODAY)
+    assert [t["type"] for t in p["tasks"]] == ["mock"] and p["tasks"][0]["title"].startswith("Warm-up")
+
+
+def test_carry_over_dates_done_tasks_on_completion_and_keeps_one_final_mock():
+    old = plan.build(_intake_on(10), {s: 1 for s in bank.SKILLS}, [], today=TODAY)
+    final = next(t for t in old["tasks"] if t.get("final"))
+    final["done"], final["completed"] = True, (TODAY + dt.timedelta(days=12)).isoformat()  # after the interview
+    drill = next(t for t in old["tasks"] if t["type"] == "drill")
+    drill["done"], drill["completed"] = True, (TODAY + dt.timedelta(days=1)).isoformat()
+    new = plan.carry_over(plan.build(_intake_on(9), {s: 1 for s in bank.SKILLS}, [], today=TODAY + dt.timedelta(days=1)), old)
+    interview = TODAY + dt.timedelta(days=10)
+    assert all(dt.date.fromisoformat(t["date"]) < interview for t in new["tasks"])
+    done_drill = next(t for t in new["tasks"] if t["done"] and t["type"] == "drill")
+    assert done_drill["date"] == drill["completed"]
+    assert sum(1 for t in new["tasks"] if t.get("final")) == 1
+    assert sum(1 for t in new["tasks"] if t["title"] == "Final mock interview") == 1
+
+
+def test_rebuilt_plan_totals_match_its_tasks():
+    old = plan.build(_intake_on(21), {s: 1 for s in bank.SKILLS}, [], today=TODAY)
+    for t in [t for t in old["tasks"] if t["type"] == "drill"][:2]:
+        plan.mark_done(old, "drill", t["skill"], today=TODAY)
+    new = plan.carry_over(plan.build(_intake_on(20), {s: 2 for s in bank.SKILLS}, [], today=TODAY + dt.timedelta(days=1)), old)
+    days = {t["date"] for t in new["tasks"]}
+    minutes = sum(t["minutes"] for t in new["tasks"])
+    assert new["practice_days"] == len(days) and new["minutes_per_practice_day"] == round(minutes / len(days))
+    assert sum(r["drills"] for r in new["skills"]) == new["drills"] == sum(t["type"] == "drill" for t in new["tasks"])

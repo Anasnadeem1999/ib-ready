@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 import time
 
 from . import agents, bank, config, db, guard, llm, mastery
@@ -130,11 +131,17 @@ def _pick(pid: str, state: dict, sid: str) -> bank.Question:
         t = mastery.pick_targeted(group, tg["skill"], tg["level"], tg["subskill"], asked, act, rng)
         sub = bank.SUBSKILLS.get(tg["subskill"], ("", ""))[1]
         reason = f"Practice target: {bank.SKILLS[tg['skill']]}" + (f" / {sub}" if sub else "") + f", {bank.LEVELS[tg['level']]} questions."
+        if (tg["subskill"] and t.subskill != tg["subskill"]) or t.difficulty != tg["level"] or t.skill != tg["skill"]:
+            reason += (f" No fresh question left for that exact target, so the closest one: "
+                       f"{bank.SUBSKILLS.get(t.subskill, ('', bank.SKILLS[t.skill]))[1]}, {bank.LEVELS[t.difficulty]}.")
     elif mode == "practice":
         focus = state.get("focus") or "accounting"
         lvl = state.get("level") or mastery.target_level(levels_for(pid).get(focus, 0))
         t, served = mastery.pick_practice(group, focus, lvl, asked, act, rng)
-        if served is None:
+        if state.get("focus_swapped"):
+            reason = (f"Practice: Group specifics needs a coverage group (set one in your profile), "
+                      f"so {bank.SKILLS[t.skill]} ({bank.LEVELS[t.difficulty]}) instead.")
+        elif served is None:
             reason = f"Practice: {bank.SKILLS[focus]}, {bank.LEVELS[lvl]} questions only."
         elif t.skill != focus:
             reason = (f"Practice: no {bank.SKILLS[focus]} questions for this group, "
@@ -273,14 +280,15 @@ def start_session(profile_id: str, mode: str, persona: str, focus: str | None, l
         level = None
     intake = _intake(profile_id)
     group = intake.get("group")
-    if focus == "industry" and not mastery.pool(group, skill="industry"):
+    focus_swapped = focus == "industry" and not mastery.pool(group, skill="industry")
+    if focus_swapped:
         focus = None  # a generalist has no group-specific questions
     if mode == "practice" and not focus:
         focus = "accounting"
     state = {"seed": random.randrange(1_000_000), "mode": mode, "persona": persona, "focus": focus, "level": level,
              "asked": [], "turns": 0, "last_turn": 0.0, "done_q": 0, "goal": GOALS.get(mode),
              "levels_start": levels_for(profile_id), "stage": intake.get("stage") or "first_rounds",
-             "plan_task": task["id"] if task else None}
+             "plan_task": task["id"] if task else None, "focus_swapped": focus_swapped}
     if mode == "diagnostic":
         skills = mastery.diagnostic_skills(group)
         state["diag"] = {"skills": skills, "i": 0, "level": mastery.first_level(group, skills[0]), "results": {},
@@ -364,9 +372,10 @@ def _advance_diagnostic(pid: str, state: dict, passed: bool, sid: str) -> None:
 
 _INFLIGHT: set[str] = set()  # sessions with a turn being graded right now
 _ENDING: set[str] = set()    # sessions whose end-of-session work is running right now
+_INFLIGHT_PROFILES: set[str] = set()  # one graded turn per profile at a time (protects the token budget)
 
 
-async def answer(sid: str, raw_text: str, seconds: float | None) -> dict:
+async def answer(sid: str, raw_text: str, seconds: float | None, pid: str | None = None) -> dict:
     """One candidate turn. Only one turn per session can run at a time."""
     if sid in _ENDING:
         return {"blocked": True, "reason": FINISHED_REASON, "session": _public_session(sid), "events": [],
@@ -376,7 +385,15 @@ async def answer(sid: str, raw_text: str, seconds: float | None) -> dict:
                      {"type": "rate"})
         return {"blocked": True, "reason": "Still grading your last answer.", "session": _public_session(sid),
                 "events": db.events(sid)[-1:]}
+    if pid is None:
+        s0 = db.session(sid)
+        pid = s0["profile_id"] if s0 else None
+    if pid in _INFLIGHT_PROFILES:
+        return {"blocked": True, "reason": "You're already answering in another tab. One answer at a time.",
+                "session": _public_session(sid), "events": []}
     _INFLIGHT.add(sid)
+    if pid:
+        _INFLIGHT_PROFILES.add(pid)
     try:
         return await _answer(sid, raw_text, seconds)
     except Exception:
@@ -388,6 +405,7 @@ async def answer(sid: str, raw_text: str, seconds: float | None) -> dict:
         raise
     finally:
         _INFLIGHT.discard(sid)
+        _INFLIGHT_PROFILES.discard(pid)
 
 
 def _normalize(state: dict) -> dict:
@@ -465,31 +483,40 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
                 "answered_question": {"title": q.title, "skill": q.skill, "kind": q.kind, "seconds": seconds, "target": q.target_seconds},
                 "session": _public_session(sid), "events": db.events(sid, ev_start), "next_question": None}
     d: agents.Diagnosis = result.output
-    db.add_event(sid, agents.SPECIALISTS[spec_key][0], "llm",
-                 f"Diagnosed the answer: reasoning {d.reasoning_quality}.",
-                 {"rationale": d.rationale, "misconceptions": d.misconceptions,
-                  "stated": [v.model_dump() for v in d.stated_values], "manipulation": d.manipulation_attempt,
-                  "model": rec.model_resolved}, rec)
 
     # ---------- 3. deterministic adjudication (the code makes the call)
     verdict, error_type, mids, checks = _adjudicate(q, d, explain_only)
-    if deps.tool_calls:
-        db.add_event(sid, "Calculator", "tool", "check_numbers: " + ", ".join(
-            f"{c.name} {c.status}" + (f" ({', '.join(c.matches)})" if c.matches else "") for c in checks if c.status != "missing"),
-            {"checks": [c.to_dict() for c in checks]})
+    locked_verdict = verdict
     manipulated = d.manipulation_attempt or any(
         f in ic.flags for f in ("grade manipulation", "instruction override", "score tampering", "role hijack",
                                 "answer/prompt extraction", "system/developer prompt reference", "fake message tags"))
-    if manipulated:
-        db.add_event(sid, "Guard", "safety",
-                     "Grader lock: manipulation attempt detected. The grade comes only from the calculator checks.",
-                     {"llm_flag": d.manipulation_attempt, "filter_flags": ic.flags, "verdict_after_lock": verdict})
     no_content = (not d.key_points_hit and not any(c.status != "missing" for c in checks))
     if manipulated and no_content:
         verdict = "redirect"  # nothing to grade but the attack itself: no credit, no attempt used
 
     # ---------- 4. choose the next action
     action, resolved = _choose_action(state, q, verdict, explain_only)
+
+    # The trace goes to the browser, so it may only carry the answer key once it is earned (resolved or
+    # revealed). Until then the specialist's rationale and the calculator's expected values are kept
+    # server-side only (events.private, for the owner's export).
+    earned = resolved or action == "reveal"
+    spec_detail = {"misconceptions": d.misconceptions, "stated": [v.model_dump() for v in d.stated_values],
+                   "manipulation": d.manipulation_attempt, "model": rec.model_resolved}
+    if earned:
+        spec_detail["rationale"] = d.rationale
+    db.add_event(sid, agents.SPECIALISTS[spec_key][0], "llm", f"Diagnosed the answer: reasoning {d.reasoning_quality}.",
+                 spec_detail, rec, private=None if earned else {"rationale": d.rationale})
+    if deps.tool_calls:
+        full = [c.to_dict() for c in checks]
+        shown = full if earned else [{k: v for k, v in c.items() if k != "expected"} for c in full]
+        db.add_event(sid, "Calculator", "tool", "check_numbers: " + ", ".join(
+            f"{c.name} {c.status}" + (f" ({', '.join(c.matches)})" if c.matches else "") for c in checks if c.status != "missing"),
+            {"checks": shown}, private=None if earned else {"checks": full})
+    if manipulated:
+        db.add_event(sid, "Guard", "safety",
+                     "Grader lock: manipulation attempt detected. The grade comes only from the calculator checks.",
+                     {"llm_flag": d.manipulation_attempt, "filter_flags": ic.flags, "verdict_after_lock": locked_verdict})
 
     # ---------- 5. update the weakness map when the question resolves
     evidence = {"q": q.title, "quote": d.evidence_quote[:160], "ts": time.time()}
@@ -581,12 +608,12 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
         "action": action,
         "resolved": resolved,
         "explain_only": explain_only,
-        "checks": [{"name": c.name, "status": c.status, "stated": c.stated,
+        "checks": [{"name": c.name, "status": c.status, "stated": c.stated, "hedged": getattr(c, "hedged", False),
                     "expected": c.expected if show_detail else None,
                     "required": next(l.required for l in q.labels if l.key == c.label)} for c in checks],
         "misconceptions": [{"id": m, "name": LIBRARY[m].name, "fix": LIBRARY[m].fix} for m in mids] if show_detail else [],
-        "rationale": (rounding_note(q, checks) if error_type == "rounding" else d.rationale) if show_detail else None,
-        "note": rounding_note(q, checks) if error_type == "rounding" else None,
+        "rationale": (grading_note(q, checks, error_type) or d.rationale) if show_detail else None,
+        "note": grading_note(q, checks, error_type),
         "solution": solution,
         "answered_question": {"title": q.title, "skill": q.skill, "kind": q.kind, "seconds": seconds, "target": q.target_seconds},
         "session": _public_session(sid, {**s, "state": state}),
@@ -609,8 +636,12 @@ def _adjudicate(q: bank.Question, d: agents.Diagnosis, explain_only: bool):
     llm_mids = [m for m in d.misconceptions if m in LIBRARY and m in skill_ok]
 
     if q.kind == "numeric" and not explain_only:
-        stated = {v.label: v.value for v in d.stated_values if any(l.key == v.label for l in q.labels)}
+        stated, hedged = _committed_values(q, d)
         checks = bank.check_numbers(q, stated)
+        for i, c in enumerate(checks):
+            if c.label in hedged:  # two different answers for one line item: no credit for it
+                checks[i] = bank.LabelCheck(c.label, c.name, hedged[c.label][-1], "wrong", c.expected, [])
+                checks[i].hedged = True
         required = {l.key: l.required for l in q.labels}
         wrong_req = [c for c in checks if c.status == "wrong" and required[c.label]]
         wrong_opt = [c for c in checks if c.status == "wrong" and not required[c.label]]
@@ -620,6 +651,10 @@ def _adjudicate(q: bank.Question, d: agents.Diagnosis, explain_only: bool):
             matched = sorted({m for c in wrong_req + wrong_opt for m in c.matches})
             if matched:
                 return "incorrect", "conceptual", matched + [m for m in concept_mids if m not in matched], checks
+            real = [c for c in wrong_req if not getattr(c, "hedged", False)]
+            if len(real) < len(wrong_req) and all(_near_miss(q, c) for c in real):
+                return "incomplete", "hedged", [], checks  # nudge: "commit to one answer"
+            wrong_req = real
             if all(_near_miss(q, c) for c in wrong_req):
                 # Close to the truth and no trap explains it: interview-style rounding. Don't invent a cause.
                 return "incomplete", "rounding", [], checks
@@ -634,6 +669,8 @@ def _adjudicate(q: bank.Question, d: agents.Diagnosis, explain_only: bool):
             matched = sorted({m for c in wrong_opt for m in c.matches})
             if matched:
                 return "incomplete", "conceptual", matched, checks
+            if any(getattr(c, "hedged", False) for c in wrong_opt):
+                return "incomplete", "hedged", [], checks
             return "incomplete", ("rounding" if all(_near_miss(q, c) for c in wrong_opt) else "incomplete"), [], checks
         # Right numbers, but the answer also states a wrong idea that the specialist flagged and quoted
         # (e.g. "the unlevered beta is usually higher"): the claim is what an interviewer would catch.
@@ -660,17 +697,46 @@ def _adjudicate(q: bank.Question, d: agents.Diagnosis, explain_only: bool):
         if mids or cover < 0.67 or d.reasoning_quality == "weak":
             return "incomplete", "incomplete", mids, []  # the ids still feed the weakness map
         return "correct", "none", [], []
-    if mids or cover < 0.34 or d.reasoning_quality == "none":
+    if mids or cover < 0.25 or d.reasoning_quality == "none":
         return "incorrect", "conceptual", mids, []
     if cover < 0.67 or d.reasoning_quality == "weak":
+        # thin but right (at least a quarter of the key points, no wrong idea): nudge, don't fail
         return "incomplete", "incomplete", [], []
     return "correct", "none", [], []
+
+
+def _committed_values(q: bank.Question, d) -> tuple[dict[str, float], dict[str, list[float]]]:
+    """The number the candidate committed to per label, and the labels they hedged on
+    ("6 or maybe 7.5"): more than one distinct value (beyond the label's tolerance) for one label."""
+    labels = {l.key: l for l in q.labels}
+    seen: dict[str, list[float]] = {}
+    for v in d.stated_values:
+        if v.label in labels:
+            vals = seen.setdefault(v.label, [])
+            if not any(labels[v.label].close(v.value, x) for x in vals):
+                vals.append(v.value)
+    stated = {k: vals[0] for k, vals in seen.items() if len(vals) == 1}
+    return stated, {k: vals for k, vals in seen.items() if len(vals) > 1}
+
+
+def hedge_note(checks: list) -> str:
+    items = [c.name.lower() for c in checks if getattr(c, "hedged", False)]
+    return f"You gave two different answers for {', '.join(items) or 'one line item'}. Commit to one."
+
+
+def grading_note(q: bank.Question, checks: list, error_type: str | None) -> str | None:
+    """The neutral note shown instead of a model rationale for rounding and hedging."""
+    if error_type == "rounding":
+        return rounding_note(q, checks)
+    if error_type == "hedged":
+        return hedge_note(checks)
+    return None
 
 
 def _near_miss(q: bank.Question, c) -> bool:
     """Within twice the label's tolerance of the truth: a rounding miss, not a method error."""
     lab = next((l for l in q.labels if l.key == c.label), None)
-    if lab is None or c.stated is None or c.expected is None:
+    if lab is None or c.stated is None or c.expected is None or getattr(c, "hedged", False):
         return False
     s, t = (c.stated, c.expected) if lab.is_signed else (abs(c.stated), abs(c.expected))
     return abs(s - t) <= 2 * max(lab.tol_abs, lab.tol_rel * abs(t))
@@ -738,6 +804,7 @@ async def _interviewer_message(sid, state, q, verdict, action, checks, mids, wra
         "concept_to_revisit": [LIBRARY[m].name for m in mids if m in LIBRARY][:1]
         if action == "nudge" and error_type == "conceptual" else [],
         "rounding_note": rounding_note(q, checks) if error_type == "rounding" else "",
+        "hedge_note": hedge_note(checks) if error_type == "hedged" else "",
         "followup_shown_on_screen": followup or "",
     }
     prompt = ("TURN CONTEXT (from the interview engine):\n" + json.dumps(ctx, indent=1) + "\n\n" + wrapped)
@@ -767,18 +834,25 @@ async def _interviewer_message(sid, state, q, verdict, action, checks, mids, wra
             break
         msg = result.output.message.strip()
         oc = guard.check_output(msg, allowed, forbidden)
+        # a blocked draft never reaches the browser, not even in the trace (kept server-side for the export);
+        # the filter's reasons can quote the leaked number, so the public copy drops numbers
+        shown = _public_reasons(oc.reasons)
         db.add_event(sid, "Interviewer", "llm", f"Drafted the reply ({action}).",
-                     {"draft": msg, "filter_ok": oc.ok, "filter_reasons": oc.reasons, "model": rec.model_resolved}, rec)
+                     {**({"draft": msg} if oc.ok else {}), "filter_ok": oc.ok, "filter_reasons": shown,
+                      "model": rec.model_resolved}, rec,
+                     private=None if oc.ok else {"draft": msg, "filter_reasons": oc.reasons})
         if oc.ok:
             return msg
-        db.add_event(sid, "Guard", "safety", "Output blocked before it reached the candidate: " + "; ".join(oc.reasons),
-                     {"draft": msg, "reasons": oc.reasons})
+        db.add_event(sid, "Guard", "safety", "Output blocked before it reached the candidate: " + "; ".join(shown),
+                     {"reasons": shown}, private={"draft": msg, "reasons": oc.reasons})
         note = ("\n\nYOUR PREVIOUS DRAFT WAS BLOCKED (" + "; ".join(oc.reasons) +
                 "). Rewrite it using no numbers at all.")
     items = ", ".join(ctx["line_items_to_revisit"]) or "your reasoning"
     fb = FALLBACKS[action].format(items=items.lower())
     if action == "nudge" and error_type == "rounding":
         fb = ctx["rounding_note"] + " Give me the number again, a little more precisely."
+    elif action == "nudge" and error_type == "hedged":
+        fb = ctx["hedge_note"] + " Which one is your final answer, and why?"
     elif action == "nudge" and ctx["concept_to_revisit"]:
         fb = f"Your numbers hold up. One thing you said needs another look: {ctx['concept_to_revisit'][0].lower()}. Walk me through that part again."
     db.add_event(sid, "Guard", "safety", "Used the safe fallback message.", {"message": fb})
@@ -790,6 +864,15 @@ def _interviewer_agent(persona: str, stage: str):
         return agents.interviewer(persona, stage)
     except TypeError:  # agents.interviewer(persona) before the stage-aware prompt landed
         return agents.interviewer(persona)
+
+
+def _public_reasons(reasons: list[str]) -> list[str]:
+    """Filter reasons for the browser: drop any quoted number ("answer leak (1275)" -> "answer leak")."""
+    out = []
+    for r in reasons:
+        r = re.sub(r"\s*\([^)]*\d[^)]*\)", "", r)
+        out.append(re.sub(r"[-+$]?\d[\d,.]*%?", "a number", r))
+    return out
 
 
 def _numbers_in_text(text: str) -> list[float]:
@@ -846,6 +929,7 @@ async def _finalize(s: dict, state: dict, tz: int | None) -> str | None:
                 for sk in partial:
                     results.setdefault(sk, int(old.get(sk, 0)))
             db.set_profile_json(pid, "placement", {**old, **results})
+            state["placement_result"] = {"placed": demonstrated, "not_reached": partial}
             for sk, L in demonstrated.items():  # demonstrated levels count as achieved
                 for lvl in range(1, L + 1):
                     db.set_key(pid, f"lvl:{sk}:{lvl}", max(db.get_key(pid, f"lvl:{sk}:{lvl}"), 0.8), n_inc=2)
@@ -883,7 +967,10 @@ async def _end_session(s: dict, tz: int | None) -> dict:
         "mode": s["mode"],
         "stage": state.get("stage"),
         "questions": [{"title": t["question"][:80], "skill": bank.SKILLS.get(t["skill"], t["skill"]), "kind": t["kind"],
-                       "verdict": t["verdict"], "misconceptions": t["misconceptions"] or [],
+                       "verdict": t["verdict"], "error_type": t["error_type"],
+                       "line_items_right": [c["name"] for c in ((t["diagnosis"] or {}).get("checks") or [])
+                                            if c.get("status") == "correct"],
+                       "misconceptions": t["misconceptions"] or [],
                        "evidence": (t["diagnosis"] or {}).get("diagnosis", {}).get("evidence_quote", ""),
                        "seconds": round(t["seconds"]) if t["seconds"] else None}
                       for t in ts if t["verdict"]],
@@ -1049,7 +1136,10 @@ def _report(sid: str, tz: int | None = None) -> dict:
         "session": {"id": sid, "mode": s["mode"], "persona": s["persona"], "started": s["started"], "ended": s["ended"]},
         "debrief": s["debrief"],
         "is_placement": is_placement,
-        "placement": s["state"].get("diag", {}).get("results") if is_placement else None,
+        # what was actually credited (includes a topic in progress when the placement ended early)
+        "placement": ((s["state"].get("placement_result") or {}).get("placed")
+                      or s["state"].get("diag", {}).get("results")) if is_placement else None,
+        "placement_not_reached": (s["state"].get("placement_result") or {}).get("not_reached", []) if is_placement else [],
         "placement_partial": bool(is_placement and not s["state"].get("complete")),
         "touched_skills": sorted({t["skill"] for t in ts if t["verdict"] and t["skill"]}),
         "mastery_start": s["mastery_start"],

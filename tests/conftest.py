@@ -31,14 +31,19 @@ class FakeLLM:
         self.verdict = "right"
         self.fail: set[str] = set()
         self.calls: list[str] = []
+        self.prompts: dict[str, str] = {}    # last prompt per agent
         self.mids: list[str] = []            # misconception ids the "specialist" flags
         self.offsets: dict[str, float] = {}  # label -> amount added to the true value (for near misses)
         self.unmatched_error = "none"
+        self.rationale = "ok"
+        self.extra_values: list = []         # extra (label, value) pairs the "specialist" reports (hedging)
+        self.interviewer_message = "Good. Next one."
         self.coach_text = {"headline": "Solid work today.", "went_well": ["Clear structure."], "work_on": [],
                            "next_step": "Run a drill on your weakest skill.", "encouragement": "Keep going."}
 
     async def __call__(self, agent, agent_name, prompt, deps=None, session_id=None):
         self.calls.append(agent_name)
+        self.prompts[agent_name] = prompt
         if any(f in agent_name for f in self.fail):
             raise RuntimeError("simulated gateway failure")
         if deps is not None:  # a specialist diagnostician
@@ -46,12 +51,16 @@ class FakeLLM:
             sv = ([agents.StatedValue(label=l.key, value=(q.values[l.key] + self.offsets.get(l.key, 0.0) if ok
                                                           else q.values[l.key] * 3 + 7777))
                    for l in q.labels] if q.kind == "numeric" else [])
+            sv += [agents.StatedValue(label=k, value=v) for k, v in self.extra_values]
+            if q.kind == "numeric":
+                deps.tool_calls += 1  # the real specialist calls check_numbers once
             return _Res(agents.Diagnosis(
                 stated_values=sv, key_points_hit=list(range(len(q.key_points))) if ok else [],
                 misconceptions=list(self.mids), unmatched_error=self.unmatched_error,
-                reasoning_quality="strong" if ok else "none", rationale="ok", evidence_quote="x")), _rec(agent_name)
+                reasoning_quality="strong" if ok else "none", rationale=self.rationale,
+                evidence_quote="x")), _rec(agent_name)
         if agent_name == "Interviewer":
-            return _Res(agents.InterviewerMsg(message="Good. Next one.")), _rec(agent_name)
+            return _Res(agents.InterviewerMsg(message=self.interviewer_message)), _rec(agent_name)
         if agent_name == "Coach":
             return _Res(agents.Debrief.model_validate(self.coach_text)), _rec(agent_name)
         if agent_name == "Planner":
@@ -85,6 +94,9 @@ def fake_llm(tmp_db, monkeypatch):
     _clear_agent_caches()
     engine._INFLIGHT.clear()
     engine._ENDING.clear()
+    engine._INFLIGHT_PROFILES.clear()
+    from ticktie import server
+    server._RATE.clear()
     yield f
     _clear_agent_caches()
 

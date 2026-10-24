@@ -972,18 +972,20 @@ CONCEPTUAL = [
              ["Depreciation is a non-cash expense", "It reduced net income, so it is reversed",
               "The cash left when the asset was bought (capex)", "Its tax deductibility is a real cash saving"],
              ["ACC_NONCASH_AS_CASH"],
-             "Depreciation lowers net income but no cash leaves the business that year. The cash went out earlier, "
-             "as capex. Since the CFS starts from net income, we add depreciation back. The only real cash effect is "
-             "the tax saving, because depreciation is deductible."),
+             "Depreciation is a non-cash expense: it reduced net income, but no cash left the business this year, so it is "
+             "reversed (added back) on the cash flow statement, which starts from net income. The cash left earlier, when "
+             "the asset was bought, as capex in investing. The only real cash effect is the tax saving: depreciation is "
+             "tax-deductible, so lower taxes are a real cash saving."),
     _concept("c_ev_cash", "ev", 1, "Why subtract cash in EV",
              "Why do we subtract cash when calculating enterprise value?",
              ["EV measures the value of the core operations to all capital providers", "Cash is a non-operating asset",
               "An acquirer effectively gets the cash back, which offsets the price",
               "It keeps EV consistent with EBITDA, which excludes interest income"],
              ["EV_ADD_CASH"],
-             "Enterprise value is the value of the operating business to all capital providers. Cash isn't needed "
-             "to run the operations, and an acquirer could use the target's cash to offset what it pays, so it is "
-             "subtracted. It also keeps EV consistent with EBITDA, which excludes interest income on that cash."),
+             "EV measures the value of the core operations to all capital providers. Cash is a non-operating asset: it isn't"
+             " needed to run the business. An acquirer effectively gets the target's cash back, which offsets the price it "
+             "pays, so cash is subtracted. It also keeps EV consistent with EBITDA, which excludes interest income on that "
+             "cash."),
     _concept("c_ev_multiples", "ev", 2, "Matching multiples",
              "Why is EV/EBITDA a valid multiple but EV/Net Income isn't?",
              ["EBITDA is available to all capital providers (pre-interest)",
@@ -991,9 +993,10 @@ CONCEPTUAL = [
               "Numerator and denominator must refer to the same capital providers",
               "Equity value pairs with net income or EPS (P/E)"],
              ["EV_MULTIPLE_MISMATCH"],
-             "A multiple must match claim to metric. EV is the value to all capital providers, so it pairs with "
-             "pre-interest metrics like EBITDA or EBIT. Net income is after interest has been paid to lenders, so it "
-             "belongs only to equity holders and pairs with equity value, as in P/E. EV/Net Income mixes the two."),
+             "The numerator and denominator must refer to the same capital providers. EBITDA is pre-interest, so it is "
+             "available to all capital providers, lenders and shareholders, and pairs with EV. Net income is after interest "
+             "has been paid to lenders, so it belongs to equity holders only, and pairs with equity value: equity value / "
+             "net income, or price / EPS, is the P/E. EV / net income mixes the two groups."),
     _concept("c_dcf_walk", "dcf", 1, "Walk me through a DCF",
              "Walk me through a DCF.",
              ["Project unlevered free cash flows for about 5-10 years", "Calculate the discount rate (WACC)",
@@ -1049,9 +1052,10 @@ CONCEPTUAL = [
               "Higher discount rates lower valuations across DCFs",
               "Strategics may shift to stock consideration; volumes fall as bid-ask spreads widen"],
              ["MKT_RATES_NO_EFFECT"],
-             "Higher rates make debt more expensive, so sponsors support less leverage and earn lower IRRs at a given price. "
-             "That caps what they can pay. Higher discount rates also lower DCF values and trading multiples. Buyers and "
-             "sellers disagree more on price, so volumes fall. Strategic acquirers may lean on stock, or cash on hand, rather than debt."),
+             "Debt is more expensive, so sponsors can borrow less and their IRRs fall at any given price. That means "
+             "sponsors can pay less, so purchase prices and multiples compress. Higher discount rates also lower valuations "
+             "across DCFs. Strategic buyers may shift to stock consideration rather than debt, and volumes fall as bid-ask "
+             "spreads widen between buyers and sellers."),
     _concept("c_mkt_duration", "markets", 3, "Growth stocks and rates",
              "Why do high-growth tech stocks often fall more than value stocks when rates rise?",
              ["Growth companies' value sits further in the future (terminal value)",
@@ -1349,9 +1353,10 @@ MORE_CONCEPTUAL = [
              ["Equity value is the value of the shareholders' claim (market cap)", "Enterprise value is the value of the whole operating business to all investors",
               "Bridge: EV = equity value + debt + preferred + NCI - cash", "A house analogy: the house price (EV) vs the owner's equity after the mortgage"],
              ["EV_ADD_CASH"],
-             "Equity value is what the company's shares are worth: the shareholders' claim. Enterprise value is what the core business is worth to "
-             "everyone with a claim on it, lenders as well as shareholders. You get from equity value to EV by adding debt, preferred stock and "
-             "noncontrolling interest and subtracting cash. Like a house: EV is the price of the house; equity value is what the owner keeps after the mortgage."),
+             "Equity value is the value of the shareholders' claim: the market cap, share price times diluted shares. "
+             "Enterprise value is the value of the whole operating business to all investors, lenders as well as "
+             "shareholders. The bridge: EV = equity value + debt + preferred + NCI - cash. A house analogy: EV is the house "
+             "price; equity value is the owner's equity after the mortgage."),
     _concept("c_val_methods", "ev", 1, "The three valuation methods",
              "What are the main ways to value a company, and which usually gives the highest value?",
              ["Comparable companies (trading multiples)", "Precedent transactions (multiples paid in past deals)",
@@ -1456,16 +1461,18 @@ MORE_CONCEPTUAL = [
              ["The company keeps operating under court protection", "Creditors are paid by priority (absolute priority rule)",
               "DIP financing funds operations during the case", "A plan of reorganization swaps debt for equity or new debt; Chapter 7 is liquidation"],
              ["RX_PRO_RATA"],
-             "In Chapter 11 the company keeps operating under court protection, often funded by DIP financing, while it negotiates a plan of reorganization. "
-             "Claims are settled by priority: secured creditors first, then unsecured, then equity, often by swapping debt for new debt or equity. "
-             "Chapter 7, by contrast, is liquidation."),
+             "In Chapter 11 the company keeps operating under court protection, with DIP financing funding operations during"
+             " the case. Creditors are paid by priority under the absolute priority rule: secured creditors first, then "
+             "unsecured, then equity. A plan of reorganization swaps debt for equity or new debt. Chapter 7, by contrast, is"
+             " liquidation."),
     _concept("c_ind_cyclical", "industry", 2, "Cyclical industrials",
              "How do you value a cyclical industrial company?",
              ["Use normalized or mid-cycle earnings, not peak or trough", "EV/EBITDA on mid-cycle numbers", "Backlog and order trends matter",
               "Capital intensity: look at EV/EBIT or FCF as well as EBITDA"],
              [],
-             "Use mid-cycle or normalized earnings rather than a peak or trough year, and apply EV/EBITDA, plus EV/EBIT or free cash flow because these "
-             "businesses are capital-intensive. Backlog and order trends signal where the cycle is heading."),
+             "Use normalized or mid-cycle earnings, not a peak or trough year, and apply EV/EBITDA on those mid-cycle "
+             "numbers. Because these businesses are capital-intensive, look at EV/EBIT or free cash flow (FCF) as well as "
+             "EBITDA. Backlog and order trends matter because they signal where the cycle is heading."),
     _concept("c_consumer_metrics", "industry", 2, "Consumer and retail metrics",
              "What operating metrics matter most for a retail company?",
              ["Same-store sales growth", "Store count and new-store productivity", "Gross margin and inventory turns",
@@ -1509,53 +1516,65 @@ BEHAVIORAL = [
          ["Clear structure: past, then present, then future", "Connects the steps with the reasons behind each choice",
           "Builds to why investment banking now", "About two minutes, without reading the resume line by line"],
          ["FIT_NO_STRUCTURE", "FIT_GENERIC"],
-         "A strong answer is a two-minute story, not a list: where you started and what drew you to business, the key steps and why you took each one, "
-         "what you learned that points to banking, and why this role is the logical next step now."),
+         "Use a clear structure: past, then present, then future. Start with what drew you to business, walk through the"
+         " key steps and connect them with the reasons behind each choice, and build to why investment banking now is "
+         "the logical next step. Keep it to about two minutes, telling a story rather than reading the resume line by "
+         "line."),
     _fit("b_why_ib", 1, "Why investment banking", "Why investment banking?",
          ["Specific reasons (deal exposure, learning curve, working on strategic decisions)", "Evidence from your own experience",
           "Realistic view of the job (hours, analytical work)", "Not mainly about money or prestige", "Link to longer-term goals"],
          ["FIT_GENERIC", "FIT_MONEY_PRESTIGE"],
-         "Give two or three specific reasons, each backed by something you've done: a project where you enjoyed financial analysis, a deal you followed "
-         "closely, conversations with bankers. Show you understand the job's demands, and connect it to where you want to be in the long run."),
+         "Give two or three specific reasons, such as deal exposure, the learning curve and working on strategic "
+         "decisions, each backed by evidence from your own experience: a project where you enjoyed financial analysis, a"
+         " deal you followed, conversations with bankers. Show a realistic view of the job, including the hours and "
+         "analytical work. Keep it from sounding mainly about money or prestige, and link it to your longer-term goals."),
     _fit("b_why_group", 2, "Why this group", "Why do you want to work in {group}?",
          ["Knowledge of the group's sector or product", "A specific trend or recent deal in the space", "A personal connection or prior experience",
           "How your skills fit the group's work"],
          ["FIT_GENERIC", "FIT_NO_EVIDENCE"],
-         "Show you know what the group does and what's happening in its space (a trend or recent deal), why it genuinely interests you (a personal link or "
-         "prior experience), and how your background fits the work."),
+         "Show knowledge of the group's sector or product and what it does, mention a specific trend or recent deal in "
+         "the space, explain a personal connection or prior experience that makes it genuinely interesting to you, and "
+         "say how your skills fit the group's work."),
     _fit("b_why_firm", 2, "Why our firm", "Why our firm over the other banks you're talking to?",
          ["Specific differentiators (deal flow, group strengths, culture)", "People you've met and what you learned from them",
           "Fit between you and the firm", "Not generic praise"],
          ["FIT_GENERIC"],
-         "Name concrete differentiators (group strengths, recent deals, culture), mention people you've spoken with and what stood out, and explain why that "
-         "fits you specifically. Avoid praise that could apply to any bank."),
+         "Name specific differentiators: deal flow, group strengths and culture. Mention people you've met and what you "
+         "learned from them. Explain the fit between you and the firm specifically. Avoid generic praise that could "
+         "apply to any bank."),
     _fit("b_deal", 2, "Tell me about a deal", "Tell me about a recent deal you've followed.",
          ["Who, what and size (parties, value, consideration)", "Strategic rationale", "Valuation (multiple or premium paid)",
           "Your own view: good deal or not, and why", "Key risks"],
          ["FIT_NO_VIEW", "FIT_NO_EVIDENCE"],
-         "Cover the parties, size and consideration; the strategic rationale; the valuation (multiple or premium); then take a view on whether it creates "
-         "value and name the biggest risk. The view is what interviewers are really testing."),
+         "Cover who, what and size: the parties, the deal value and the consideration. Explain the strategic rationale "
+         "and the valuation (the multiple or premium paid). Then give your own view: is it a good deal or not, and why. "
+         "Finish with the key risks. The view is what interviewers are really testing."),
     _fit("b_team", 1, "Teamwork under pressure", "Tell me about a time you worked on a team under pressure.",
          ["STAR structure: situation, task, action, result", "Your specific role and actions (\"I\", not just \"we\")",
           "A concrete, ideally quantified result", "What you learned"],
          ["FIT_NO_STRUCTURE", "FIT_NO_EVIDENCE"],
-         "Use STAR: set the situation and stakes briefly, explain your task, spend most of the time on what you personally did, give a concrete result, "
-         "and close with what you learned."),
+         "Use the STAR structure: situation, task, action, result. Set the situation briefly, then spend most of the "
+         "time on your specific role and actions, saying \"I\", not just \"we\". Give a concrete, ideally quantified result,"
+         " and close with what you learned."),
     _fit("b_weakness", 1, "Greatest weakness", "What's your greatest weakness?",
          ["A real weakness, not a disguised strength", "Not disqualifying for the job", "A concrete example",
           "Specific steps you're taking, with evidence of progress"],
          ["FIT_FAKE_WEAKNESS", "FIT_NO_EVIDENCE"],
-         "Pick a genuine, non-fatal weakness, illustrate it with a real example, and spend most of the answer on what you're doing about it and the progress so far."),
+         "Pick a real weakness, not a disguised strength, and one that isn't disqualifying for the job. Illustrate it "
+         "with a concrete example, then spend most of the answer on the specific steps you're taking, with evidence of "
+         "progress."),
     _fit("b_leadership", 2, "Leading without authority", "Tell me about a time you had to lead or influence people without formal authority.",
          ["STAR structure", "How you persuaded or aligned people", "A concrete result", "Reflection on your leadership style"],
          ["FIT_NO_STRUCTURE", "FIT_NO_EVIDENCE"],
-         "Use STAR, focus on how you built buy-in (listening, data, small wins), give the outcome, and reflect on what it taught you about leading."),
+         "Use the STAR structure. Focus on how you persuaded or aligned people without authority (listening, data, small"
+         " wins), give a concrete result, and finish with a reflection on your leadership style and what it taught you."),
     _fit("b_pitch", 3, "Pitch me a stock", "Pitch me a stock you'd buy today.",
          ["A clear thesis in one sentence", "Two or three supporting points with numbers", "Valuation: why it's mispriced",
           "Catalysts and key risks"],
          ["FIT_NO_VIEW", "FIT_NO_EVIDENCE"],
-         "State the thesis up front, support it with two or three data-backed points, show why the valuation is attractive versus peers or history, "
-         "and finish with catalysts and the main risk."),
+         "Start with a clear thesis in one sentence. Support it with two or three supporting points with numbers. "
+         "Explain the valuation: why it's mispriced versus peers or history. Finish with the catalysts and the key "
+         "risks."),
 ]
 
 # =========================================================================== COVERAGE ADDITIONS (learning-design spec, Oct 2026)
@@ -1905,13 +1924,14 @@ SPEC_CONCEPTUAL = [
              "income statement, because together they let you rebuild the cash flow statement."),
     _concept("c_dcf_tv_methods", "dcf", 1, "Two ways to get terminal value",
              "What are the two ways to calculate terminal value, and when would you prefer each?",
-             ["Perpetuity growth: final-year FCF x (1 + g) / (WACC - g)", "Exit multiple: final-year EBITDA x a market multiple",
-              "The exit multiple is anchored in the market; perpetuity growth is more theoretical",
-              "Cross-check each with the other's implied number (implied growth or implied multiple)"],
+             ["Perpetuity growth: the final-year cash flow grows forever, TV = FCF x (1 + g) / (WACC - g)",
+              "Exit multiple: TV = final-year EBITDA x a multiple like peers trade at",
+              "The exit multiple is anchored in the market; perpetuity growth suits stable businesses"],
              ["DCF_TV_PLUS_G"],
-             "Perpetuity growth assumes cash flows grow at a modest rate forever; the exit multiple assumes the company is sold at a "
-             "multiple like its peers. Bankers often lead with the exit multiple because it's anchored in the market, then check the "
-             "growth rate it implies. The growth method suits stable businesses without good comparables."),
+             "There are two ways. The perpetuity growth method assumes the final-year cash flow grows forever at a modest "
+             "rate: TV = FCF x (1 + g) / (WACC - g). The exit multiple method assumes the company is sold at the end: TV = "
+             "final-year EBITDA x a multiple like its peers trade at. The exit multiple is anchored in the market, so "
+             "bankers often lead with it; perpetuity growth suits stable businesses without good comparables."),
     _concept("c_dcf_equity_cost", "dcf", 1, "Why equity costs more than debt",
              "Why is equity more expensive than debt?",
              ["Shareholders are paid last", "Their returns aren't fixed or promised", "Interest is tax-deductible, lowering debt's cost further"],
@@ -1924,10 +1944,10 @@ SPEC_CONCEPTUAL = [
               "It depends on what the target earns versus what it costs to pay for it (new shares, lost interest, new debt)",
               "Public buyers care because investors watch EPS, but a dilutive deal can still create value"],
              ["MA_PE_RULE"],
-             "A deal is accretive if the buyer's earnings per share rise once the target's profits are added and the cost of paying "
-             "for it (new shares, lost interest on cash, or new interest on debt) is taken off; dilutive if EPS falls. Public buyers "
-             "watch it because investors focus on EPS, but it's a short-term test: a dilutive deal can still create value through "
-             "growth or synergies."),
+             "A deal is accretive if the buyer's EPS goes up after the deal and dilutive if EPS goes down. It depends on "
+             "what the target earns versus what it costs to pay for it: new shares issued, lost interest on cash, or new "
+             "interest on debt. Public buyers care because investors watch EPS, but it's a short-term test: a dilutive deal "
+             "can still create value through growth or synergies."),
     _concept("c_ma_consideration", "ma", 1, "Cash vs stock",
              "How does a buyer decide whether to pay with cash, debt or stock?",
              ["Cost: after-tax cost of cash or debt versus the cost of stock (the inverse of the buyer's P/E)",
@@ -1935,10 +1955,11 @@ SPEC_CONCEPTUAL = [
               "Stock shares risk with the seller's shareholders and dilutes the buyer's ownership and control",
               "Signalling: paying in stock can suggest the buyer thinks its shares are richly valued"],
              ["MA_SHARES_FOR_CASH"],
-             "Mostly on cost and capacity. Cash is usually cheapest (it only loses interest income), then debt (after-tax interest), "
-             "then stock, whose cost is roughly the buyer's earnings yield. A buyer with a high P/E finds stock cheap. Stock also "
-             "shares the deal's risk with the seller and dilutes existing owners' control, and paying in stock can signal that the "
-             "buyer thinks its shares are fully valued, while cash signals confidence."),
+             "Mostly on cost and availability. Cost: cash is usually cheapest (it only loses after-tax interest income), "
+             "then debt (after-tax interest), then stock, whose cost is roughly the inverse of the buyer's P/E, its earnings"
+             " yield. Availability: how much cash the buyer has on hand and how much debt it can carry. Stock shares the "
+             "deal's risk with the seller's shareholders but dilutes the buyer's ownership and control. Signalling: paying "
+             "in stock can suggest the buyer thinks its shares are richly valued, while cash signals confidence."),
 ]
 
 # Basic (coffee-chat level) group questions, so every group has something to drill at every level it needs.
@@ -1949,9 +1970,10 @@ GROUP_BASICS = [
               "Interest is an operating cost, not a financing cost", "Regulators require it to hold capital against its loans",
               "So bankers use equity metrics: P/E, P/TBV, ROE"],
              ["FIG_USES_EV"],
-             "A bank makes money by borrowing (deposits) and lending at a higher rate, so its debt and interest are part of how it "
-             "operates, not how it's financed. Regulators also require it to hold capital against its loans. That's why bankers skip "
-             "EV and EBITDA and look at equity metrics like P/E, price to tangible book and return on equity."),
+             "A bank's balance sheet is the business: deposits and loans are its raw material, since it borrows deposits and"
+             " lends them out at a higher rate. So interest is an operating cost, not a financing cost. Regulators also "
+             "require it to hold capital against its loans. That's why bankers skip EV and EBITDA and use equity metrics: "
+             "P/E, P/TBV (price to tangible book) and ROE."),
     _concept("c_tmt_arr", "industry", 1, "ARR and why software trades on revenue",
              "What is ARR, and why are software companies often valued on revenue?",
              ["ARR = annual recurring revenue from subscriptions", "Recurring revenue is predictable, so investors pay up for it",
@@ -1966,24 +1988,26 @@ GROUP_BASICS = [
              ["Its pipeline of drugs in development and their odds of approval", "Patents: protection, and the cliff when they expire",
               "Sales of its approved drugs and their growth", "Regulation and pricing pressure"],
              ["HC_RNPV_UNWEIGHTED"],
-             "A pharma company is worth the cash its drugs will earn: today's approved products, how long their patents protect them "
-             "from generics, and the pipeline of drugs in trials weighted by their chances of approval. Regulation and drug-pricing "
-             "pressure shape all of it."),
+             "Its pipeline of drugs in development, weighted by their odds of approval; its patents, which give protection "
+             "until the patent cliff when they expire and generics arrive; sales of its approved drugs and their growth; and"
+             " regulation and drug-pricing pressure, which shape all of it."),
     _concept("c_en_ebitdax", "industry", 1, "What EBITDAX is",
              "What is EBITDAX, and why do oil and gas companies use it?",
              ["EBITDA before exploration expense", "Some producers expense exploration costs, others capitalize them",
               "Adding exploration back makes companies comparable", "Used in EV/EBITDAX multiples"],
              ["EN_EBITDA_ONLY"],
-             "EBITDAX is EBITDA before exploration expense. Oil and gas producers account for exploration differently: some expense "
-             "it right away, some capitalize it. Adding it back puts everyone on the same footing, so peers are compared on EV/EBITDAX."),
+             "EBITDAX is EBITDA before exploration expense. Oil and gas producers account for exploration differently: some "
+             "producers expense exploration costs right away, others capitalize them. Adding exploration back makes "
+             "companies comparable, so peers are valued on EV/EBITDAX multiples."),
     _concept("c_ind_backlog", "industry", 1, "Backlog",
              "What is backlog, and why do bankers covering industrials care about it?",
              ["Orders signed but not yet delivered or billed", "It gives visibility into future revenue",
               "Growing backlog signals demand ahead of reported revenue", "Book-to-bill above 1 means backlog is growing"],
              [],
-             "Backlog is the value of orders a company has won but not yet delivered. For industrial businesses with long lead times "
-             "it shows future revenue before it appears on the income statement, so bankers watch its size and growth, often through "
-             "the book-to-bill ratio: new orders divided by revenue billed."),
+             "Backlog is orders signed but not yet delivered or billed. It gives visibility into future revenue, which "
+             "matters for industrial businesses with long lead times. Growing backlog signals demand ahead of reported "
+             "revenue. Bankers track it with book-to-bill, new orders divided by revenue billed: book-to-bill above 1 means "
+             "backlog is growing."),
     _concept("c_cons_sss", "industry", 1, "Same-store sales",
              "What are same-store sales, and why do they matter for a retailer?",
              ["Sales growth from stores open at least a year", "Strips out growth that comes only from opening new stores",
@@ -1997,9 +2021,10 @@ GROUP_BASICS = [
              ["Advises companies in or near financial distress, or their creditors", "Fixes a capital structure the business can't support",
               "Tools: amend-and-extend, debt-for-equity swaps, new money, Chapter 11", "Value is split by priority: secured, unsecured, then equity"],
              ["RX_PRO_RATA"],
-             "Restructuring bankers advise companies that can't support their debt, or the creditors owed money. They work out how much "
-             "debt the business can really carry and negotiate a fix: extending maturities, swapping debt for equity, raising new money, "
-             "or a Chapter 11 process, with value shared out by priority."),
+             "Restructuring bankers advise companies in or near financial distress, or their creditors. They fix a capital "
+             "structure the business can't support by working out how much debt it can really carry. Tools: amend-and-extend"
+             " (pushing out maturities), debt-for-equity swaps, new money, or a Chapter 11 process. Value is split by "
+             "priority: secured creditors, then unsecured, then equity."),
     _concept("c_ma_group_role", "industry", 1, "What an M&A group does",
              "What does an M&A group at a bank do, compared with an industry group?",
              ["Advises on buying, selling and merging companies", "Owns valuation, deal process and negotiation execution",
@@ -2013,8 +2038,9 @@ GROUP_BASICS = [
              ["Covers private equity firms as clients", "Pitches buyout ideas and sale opportunities to them",
               "Arranges acquisition financing (often leveraged loans and bonds)", "Advises on exits: sales and IPOs of portfolio companies"],
              ["LBO_NO_LEVER_LOGIC"],
-             "A financial sponsors group covers private equity firms as clients. It brings them companies to buy, helps arrange the "
-             "debt for their buyouts with the leveraged finance team, and advises on selling or taking public the companies they own."),
+             "A financial sponsors group covers private equity firms as clients. It pitches them buyout ideas and sale "
+             "opportunities, arranges acquisition financing for their deals (often leveraged loans and bonds, with the "
+             "leveraged finance team), and advises on exits: sales and IPOs of their portfolio companies."),
 ]
 
 SPEC_FIT = [
@@ -2023,14 +2049,15 @@ SPEC_FIT = [
           "Supports live deals: diligence, data rooms, process work", "Accuracy and fast turnaround matter most",
           "Learns from Associates and VPs on the team"],
          ["FIT_GENERIC"],
-         "Most of the week goes into financial models, valuation work and presentation decks for pitches and live deals, plus "
-         "process work like diligence lists and data rooms. The analyst is the team's engine: accuracy and turnaround matter most, "
-         "and the payoff is a steep learning curve from seeing how senior bankers advise clients.", secs=90),
+         "An analyst builds financial models and valuation analyses, and makes pitch books and other client materials. "
+         "On live deals the analyst supports the process: diligence, data rooms and process work. Accuracy and fast "
+         "turnaround matter most, and the payoff is a steep learning curve: the analyst learns from the Associates and "
+         "VPs on the team and sees how senior bankers advise clients.", secs=90),
     _fit("b_failure", 1, "A time you failed", "Tell me about a time you failed.",
          ["A real failure you owned", "What you did right after", "A concrete lesson", "Evidence you applied it later"],
          ["FIT_FAKE_WEAKNESS", "FIT_NO_EVIDENCE"],
-         "Pick a genuine setback where your choices mattered, own it in one sentence without blaming others, spend most of the "
-         "answer on what you changed, and finish with a later example showing the lesson stuck."),
+         "Pick a real failure you owned, where your choices mattered, and own it in one sentence without blaming others."
+         " Explain what you did right after, name the concrete lesson, and give evidence you applied it later."),
     # c_ma_sellside lives in SPEC_CONCEPTUAL (skill ma): it's deal-process knowledge, not a fit question (QA G-10).
 ]
 

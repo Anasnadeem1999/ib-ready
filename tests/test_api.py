@@ -387,3 +387,125 @@ def test_openers_are_plain_language(pid):
     assert engine.start_session(pid, "practice", "associate", "ma", 1)["opener"].startswith(
         "Practice: M&A, coffee-chat level questions.")
     assert engine.start_session(pid, "diagnostic", "associate", None)["opener"].startswith("This is a quick check, not a test.")
+
+
+# ---------------------------------------------------------------- safety QA round 2 (S1, S2, abuse limits)
+def _numbers_in(obj) -> str:
+    import json as _json
+    return _json.dumps(obj).replace(",", "")
+
+
+def test_unresolved_wrong_attempt_leaks_no_answer_key(client, fake_llm):
+    import json as _json
+    sid = client.post("/api/session", json={"mode": "drill", "focus": "dcf"}).json()["id"]
+    _set_question(sid, "dcf_tv", {"F": 100.0, "w": 0.10, "g": 0.02})  # answer key: TV = 1,275
+    fake_llm.verdict = "wrong"
+    fake_llm.rationale = "The right terminal value is 1,275, not what they said."
+    fake_llm.interviewer_message = "Close, but the answer is 1,275."  # blocked by the output filter
+    r = client.post(f"/api/session/{sid}/answer", json={"text": "TV is about 900"}).json()
+    assert r["action"] == "nudge" and not r["resolved"]
+    ev = client.get(f"/api/session/{sid}/events").json()
+    for body in (r, ev):
+        text = _json.dumps(body)
+        assert "1275" not in text and "1,275" not in text, body
+    # kept server-side for the owner's export
+    with db.conn() as c:
+        private = " ".join(row["private"] or "" for row in c.execute("SELECT private FROM events WHERE session_id=?", (sid,)))
+    assert "1275" in private and "the answer is 1,275" in private
+
+
+def test_resolved_question_shows_the_answer_key_in_the_trace(client, fake_llm):
+    sid = client.post("/api/session", json={"mode": "drill", "focus": "dcf"}).json()["id"]
+    _set_question(sid, "dcf_tv", {"F": 100.0, "w": 0.10, "g": 0.02})
+    fake_llm.verdict = "wrong"
+    client.post(f"/api/session/{sid}/answer", json={"text": "900"})
+    r = client.post(f"/api/session/{sid}/answer", json={"text": "still 900"}).json()  # second miss: reveal
+    assert r["action"] == "reveal"
+    calc = [e for e in r["events"] if e["actor"] == "Calculator"]
+    assert calc and calc[-1]["detail"]["checks"][0]["expected"] == 1275.0
+
+
+def test_hedged_answer_turn_asks_to_commit(pid, fake_llm):
+    sid = engine.start_session(pid, "drill", "associate", "dcf")["id"]
+    _set_question(sid, "dcf_tv", {"F": 100.0, "w": 0.10, "g": 0.02})
+    fake_llm.extra_values = [("tv", 1500.0)]  # "1,275, or maybe 1,500"
+    r = answer(sid)
+    assert r["verdict"] == "incomplete" and r["error_type"] == "hedged" and r["note"].endswith("Commit to one.")
+    assert r["checks"][0]["status"] == "wrong" and r["checks"][0]["hedged"]
+
+
+def test_club_counts_only_members_with_graded_answers(pid):
+    for i in range(4):
+        db.sign_in(f"Empty Profile {i}", "secret123")
+    assert db.club_summary()["members"] == 0
+    sid = engine.start_session(pid, "mock", "associate", None)["id"]
+    answer(sid)
+    assert db.club_summary()["members"] == 1
+
+
+def test_lockout_is_per_name_and_ip(tmp_db):
+    db.sign_in("Victim", "rightpass", "1.1.1.1")
+    for _ in range(db.MAX_FAILURES):
+        with pytest.raises(db.AuthError):
+            db.sign_in("Victim", "wrongpass", "6.6.6.6")
+    with pytest.raises(db.AuthError, match="locked"):
+        db.sign_in("Victim", "rightpass", "6.6.6.6")
+    assert db.sign_in("Victim", "rightpass", "1.1.1.1")[0]["name"] == "Victim"  # the owner's network still works
+
+
+def test_signin_and_signup_rate_limits(client, monkeypatch):
+    monkeypatch.setattr(config, "SIGNUPS_PER_IP_PER_HOUR", 2)  # the fixture already created one profile
+    assert client.post("/api/signin", json={"name": "Second Person", "password": "secret123"}).status_code == 200
+    r = client.post("/api/signin", json={"name": "Third Person", "password": "secret123"})
+    assert r.status_code == 429 and "new profiles" in r.json()["detail"]
+    assert client.post("/api/signin", json={"name": "Second Person", "password": "secret123"}).status_code == 200
+    monkeypatch.setattr(config, "SIGNIN_PER_IP_PER_MINUTE", 5)
+    codes = [client.post("/api/signin", json={"name": "Second Person", "password": "secret123"}).status_code
+             for _ in range(5)]
+    assert codes[-1] == 429
+
+
+def test_one_graded_turn_per_profile(pid, fake_llm):
+    a = engine.start_session(pid, "mock", "associate", None)["id"]
+    engine._INFLIGHT_PROFILES.add(pid)  # a turn is being graded in another tab
+    calls = len(fake_llm.calls)
+    r = answer(a)
+    assert r["blocked"] and "another tab" in r["reason"] and len(fake_llm.calls) == calls
+    engine._INFLIGHT_PROFILES.discard(pid)
+    assert not answer(a)["blocked"]
+
+
+def test_coach_summary_has_error_type_and_right_line_items(pid, fake_llm):
+    import json as _json
+    sid = engine.start_session(pid, "drill", "associate", "dcf")["id"]
+    _set_question(sid, "dcf_tv", {"F": 100.0, "w": 0.10, "g": 0.02})
+    answer(sid)
+    run(engine.end_session(sid))
+    qs = _json.loads(fake_llm.prompts["Coach"])["questions"]
+    tv = engine.bank.TEMPLATES["dcf_tv"].labels[0].name
+    assert qs[0]["error_type"] == "none" and qs[0]["line_items_right"] == [tv]
+
+
+def test_partial_placement_report_shows_the_credited_topic(pid):
+    sid = engine.start_session(pid, "diagnostic", "associate", None)["id"]
+    answer(sid)
+    answer(sid)  # climbing accounting, not yet placed when the session ends
+    rep = run(engine.end_session(sid))
+    assert rep["placement"].get("accounting", 0) >= 1 and "ev" in rep["placement_not_reached"]
+
+
+def test_generalist_group_specifics_practice_explains_the_swap(pid):
+    sid = engine.start_session(pid, "practice", "associate", "industry")["id"]
+    pick = next(e for e in db.events(sid) if e["kind"] == "pick")
+    assert "coverage group" in pick["detail"]["reason"]
+
+
+def test_drill_trace_admits_when_it_leaves_the_exact_target(pid):
+    out = engine.start_session(pid, "drill", "associate", "ma", 3)
+    st = db.session(out["id"])["state"]
+    pick = next(e for e in db.events(out["id"]) if e["kind"] == "pick")
+    t = engine.bank.TEMPLATES[st["current"]["template_id"]]
+    if t.difficulty != st["target"]["level"]:
+        assert "closest one" in pick["detail"]["reason"]
+    else:
+        assert "closest one" not in pick["detail"]["reason"]

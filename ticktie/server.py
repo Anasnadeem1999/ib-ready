@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hmac
 import os
+import time
 import traceback
+from collections import deque
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -72,12 +74,40 @@ class SignIn(BaseModel):
     password: str = Field(min_length=1, max_length=200)
 
 
+_RATE: dict[tuple[str, str], deque] = {}  # (bucket, client IP) -> recent timestamps (one process, see render.yaml)
+
+
+def _rate_ok(bucket: str, ip: str, limit: int, window: float, record: bool = True) -> bool:
+    now = time.time()
+    q = _RATE.setdefault((bucket, ip), deque())
+    while q and q[0] <= now - window:
+        q.popleft()
+    if len(q) >= limit:
+        return False
+    if record:
+        q.append(now)
+    return True
+
+
+def client_ip(request: Request) -> str:
+    # behind Render's proxy, uvicorn --proxy-headers + FORWARDED_ALLOW_IPS=* puts the real client here
+    return request.client.host if request.client else "unknown"
+
+
 @app.post("/api/signin")
-def signin(body: SignIn) -> dict:
+def signin(body: SignIn, request: Request) -> dict:
+    ip = client_ip(request)
+    if not _rate_ok("signin", ip, config.SIGNIN_PER_IP_PER_MINUTE, 60):
+        raise HTTPException(429, "Too many sign-in attempts from this network. Wait a minute and try again.")
+    if not db.name_exists(body.name):
+        if not _rate_ok("signup", ip, config.SIGNUPS_PER_IP_PER_HOUR, 3600, record=False):
+            raise HTTPException(429, "Too many new profiles from this network in the last hour. Try again later.")
     try:
-        prof, token, created = db.sign_in(body.name, body.password)
+        prof, token, created = db.sign_in(body.name, body.password, ip)
     except db.AuthError as e:
         raise HTTPException(400, str(e))
+    if created:
+        _rate_ok("signup", ip, config.SIGNUPS_PER_IP_PER_HOUR, 3600)
     return {"profile": {"id": prof["id"], "name": prof["name"]}, "token": token, "created": created}
 
 
@@ -182,7 +212,7 @@ class AnswerIn(BaseModel):
 async def answer(sid: str, body: AnswerIn, prof: dict = Depends(current_profile)) -> dict:
     own_session(sid, prof)
     try:
-        return await engine.answer(sid, body.text, body.seconds)
+        return await engine.answer(sid, body.text, body.seconds, prof["id"])
     except ValueError as e:
         raise HTTPException(400, str(e))
 

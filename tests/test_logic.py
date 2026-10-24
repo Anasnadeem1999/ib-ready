@@ -234,3 +234,37 @@ def test_near_miss_is_rounding_not_an_invented_error():
     far = q.values["wacc_new"] - 0.5  # well outside rounding: a real error (whatever its cause)
     assert _adjudicate(q, _diag({"wacc_new": far}, unmatched_error="arithmetic"), False)[:2] in (
         ("incorrect", "arithmetic"), ("incorrect", "conceptual"))
+
+
+# ---------------------------------------------------------------- safety QA S1: hedging; QA C04: thin but right
+def _diag_pairs(pairs, quality="adequate", **kw):
+    return Diagnosis(stated_values=[StatedValue(label=k, value=v) for k, v in pairs],
+                     reasoning_quality=quality, rationale="x", **kw)
+
+
+def test_hedged_answer_gets_no_credit_whatever_the_order():
+    q = bank.build(bank.TEMPLATES["acc_da"], {"X": 10.0, "t": 0.25})
+    for order in ([("ni", -10.0), ("ni", -7.5)], [("ni", -7.5), ("ni", -10.0)]):
+        verdict, etype, mids, checks = _adjudicate(q, _diag_pairs(order + [("cash", 2.5)]), False)
+        ni = next(c for c in checks if c.label == "ni")
+        assert ni.status == "wrong" and ni.hedged and verdict != "correct"
+        assert (verdict, etype) == ("incomplete", "hedged")
+    assert engine.hedge_note(checks).endswith("Commit to one.")
+
+
+def test_restating_the_same_number_is_not_hedging():
+    q = bank.build(bank.TEMPLATES["acc_da"], {"X": 10.0, "t": 0.25})
+    d = _diag_pairs([("ni", -7.5), ("ni", -7.5), ("cash", 2.5)])
+    assert _adjudicate(q, d, False)[0] == "correct"
+
+
+def test_thin_but_right_conceptual_answer_is_a_nudge():
+    q = bank.build(bank.TEMPLATES["c_lbo_what"], {})
+    one_of_four = Diagnosis(key_points_hit=[0], reasoning_quality="adequate", rationale="r")
+    assert _adjudicate(q, one_of_four, False)[:2] == ("incomplete", "incomplete")
+    nothing = Diagnosis(key_points_hit=[], reasoning_quality="adequate", rationale="r")
+    assert _adjudicate(q, nothing, False)[0] == "incorrect"
+    flagged = Diagnosis(key_points_hit=[0], reasoning_quality="adequate", rationale="r", misconceptions=["LBO_NO_LEVER_LOGIC"])
+    assert _adjudicate(q, flagged, False)[0] == "incorrect"
+    no_reasoning = Diagnosis(key_points_hit=[0], reasoning_quality="none", rationale="r")
+    assert _adjudicate(q, no_reasoning, False)[0] == "incorrect"

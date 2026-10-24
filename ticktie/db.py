@@ -102,10 +102,12 @@ def init() -> None:
         except sqlite3.DatabaseError:
             pass
         c.executescript(SCHEMA)
-        cols = {r["name"] for r in c.execute("PRAGMA table_info(profiles)")}
-        for col in ("intake", "placement"):
-            if col not in cols:  # migrate databases created before these columns existed
-                c.execute(f"ALTER TABLE profiles ADD COLUMN {col} TEXT")
+        # migrate databases created before these columns existed
+        for table, col in (("profiles", "intake"), ("profiles", "placement"), ("events", "private"),
+                           ("login_failures", "ip")):
+            cols = {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
+            if col not in cols:
+                c.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
 
 
 def new_id() -> str:
@@ -126,16 +128,25 @@ def _hash(password: str, salt: bytes, iterations: int) -> str:
     return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations).hex()
 
 
-def sign_in(name: str, password: str) -> tuple[dict, str, bool]:
-    """Log in, or create the profile if the name is new. Returns (profile, token, created)."""
+def name_exists(name: str) -> bool:
+    with conn() as c:
+        return c.execute("SELECT 1 FROM profiles WHERE lower(name)=lower(?)", (name.strip()[:40],)).fetchone() is not None
+
+
+def sign_in(name: str, password: str, ip: str | None = None) -> tuple[dict, str, bool]:
+    """Log in, or create the profile if the name is new. Returns (profile, token, created).
+
+    Wrong-password lockout counts failures per (name, client IP), so nobody can lock a profile
+    from another network."""
+    ip = ip or ""
     name = name.strip()[:40]
     if len(name) < 2:
         raise AuthError("Use at least 2 characters for your name.")
     if len(password) < 6:
         raise AuthError("Use a password of at least 6 characters.")
     with conn() as c:
-        recent = c.execute("SELECT COUNT(*) n FROM login_failures WHERE lower(name)=lower(?) AND ts>?",
-                           (name, time.time() - LOCKOUT_SECONDS)).fetchone()["n"]
+        recent = c.execute("""SELECT COUNT(*) n FROM login_failures WHERE lower(name)=lower(?) AND COALESCE(ip,'')=?
+                              AND ts>?""", (name, ip, time.time() - LOCKOUT_SECONDS)).fetchone()["n"]
         if recent >= MAX_FAILURES:
             raise AuthError("Too many wrong passwords. This profile is locked for 15 minutes.")
         row = c.execute("SELECT * FROM profiles WHERE lower(name)=lower(?)", (name,)).fetchone()
@@ -160,7 +171,7 @@ def sign_in(name: str, password: str) -> tuple[dict, str, bool]:
                 c.execute("INSERT INTO credentials VALUES (?,?,?,?)",
                           (prof["id"], salt.hex(), _hash(password, salt, PBKDF2_ITERATIONS), PBKDF2_ITERATIONS))
             elif not hmac.compare_digest(_hash(password, bytes.fromhex(cred["salt"]), cred["iterations"]), cred["pw_hash"]):
-                c.execute("INSERT INTO login_failures VALUES (?,?)", (name, time.time()))
+                c.execute("INSERT INTO login_failures (name, ts, ip) VALUES (?,?,?)", (name, time.time(), ip))
                 wrong = True  # raise only after the failure is committed, or the lockout never counts it
         if wrong:
             raise AuthError("That name is taken and the password doesn't match. Pick another name, or check your password.")
@@ -373,7 +384,9 @@ def profile_turns(pid: str) -> list[dict]:
 
 
 # ---------------------------------------------------------------- events (agent trace + audit trail)
-def add_event(sid: str, actor: str, kind: str, summary: str, detail: dict | None = None, rec=None) -> dict:
+def add_event(sid: str, actor: str, kind: str, summary: str, detail: dict | None = None, rec=None,
+              private: dict | None = None) -> dict:
+    """detail goes to the browser (the trace); private stays server-side (owner export only)."""
     tok = rec.to_dict() if rec is not None else {}
     ev = {
         "ts": time.time(), "actor": actor, "kind": kind, "summary": summary, "detail": detail or {},
@@ -382,9 +395,9 @@ def add_event(sid: str, actor: str, kind: str, summary: str, detail: dict | None
     }
     with conn() as c:
         c.execute("INSERT INTO events (session_id, ts, actor, kind, summary, detail, input_tokens, cached_tokens, "
-                  "output_tokens, cost_usd) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                  "output_tokens, cost_usd, private) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                   (sid, ev["ts"], actor, kind, summary, json.dumps(ev["detail"]), ev["input_tokens"],
-                   ev["cached_tokens"], ev["output_tokens"], ev["cost_usd"]))
+                   ev["cached_tokens"], ev["output_tokens"], ev["cost_usd"], json.dumps(private) if private else None))
     return ev
 
 
@@ -394,6 +407,7 @@ def events(sid: str, after_id: int = 0) -> list[dict]:
     out = []
     for r in rows:
         d = dict(r)
+        d.pop("private", None)  # never sent to the browser
         d["detail"] = json.loads(d["detail"] or "{}")
         out.append(d)
     return out
@@ -425,14 +439,21 @@ def tokens_since(since: float, pid: str | None = None) -> int:
 
 
 # ---------------------------------------------------------------- club view
+# A club member is an opted-in profile with at least one graded answer, so empty sign-ups
+# ("sybils") can't push a small group over the k-anonymity threshold.
+_MEMBERS = """SELECT p.id FROM profiles p WHERE p.club_opt_in=1 AND EXISTS (
+                SELECT 1 FROM turns t JOIN sessions s ON s.id=t.session_id
+                WHERE s.profile_id=p.id AND t.verdict IS NOT NULL)"""
+
+
 def club_summary() -> dict:
     with conn() as c:
-        members = c.execute("SELECT COUNT(*) n FROM profiles WHERE club_opt_in=1").fetchone()["n"]
-        mis = c.execute("""SELECT mid, COUNT(*) members, SUM(hits) hits FROM misconceptions m
-                           JOIN profiles p ON p.id=m.profile_id
-                           WHERE p.club_opt_in=1 AND hits>0 GROUP BY mid ORDER BY members DESC, hits DESC""").fetchall()
-        sk = c.execute("""SELECT skill, AVG(p) avg_p, SUM(n) answers FROM mastery m JOIN profiles p ON p.id=m.profile_id
-                          WHERE p.club_opt_in=1 GROUP BY skill""").fetchall()
+        members = c.execute(f"SELECT COUNT(*) n FROM ({_MEMBERS})").fetchone()["n"]
+        mis = c.execute(f"""SELECT mid, COUNT(*) members, SUM(hits) hits FROM misconceptions m
+                            WHERE m.profile_id IN ({_MEMBERS}) AND hits>0
+                            GROUP BY mid ORDER BY members DESC, hits DESC""").fetchall()
+        sk = c.execute(f"""SELECT skill, AVG(p) avg_p, SUM(n) answers FROM mastery m
+                           WHERE m.profile_id IN ({_MEMBERS}) GROUP BY skill""").fetchall()
         answered = c.execute("""SELECT COUNT(*) n FROM turns t JOIN sessions s ON s.id=t.session_id
                                 JOIN profiles p ON p.id=s.profile_id WHERE p.club_opt_in=1 AND t.verdict IS NOT NULL""").fetchone()["n"]
     return {"members": members, "answers": answered,
@@ -497,8 +518,8 @@ def export_all() -> dict:
                       t.error_type, t.misconceptions, t.interviewer, t.input_tokens, t.cached_tokens,
                       t.output_tokens, t.cost_usd FROM turns t ORDER BY t.id""")]
         events_ = [dict(r) for r in c.execute(
-            "SELECT session_id, ts, actor, kind, summary, detail, input_tokens, cached_tokens, output_tokens, cost_usd "
-            "FROM events ORDER BY id")]
+            "SELECT session_id, ts, actor, kind, summary, detail, private, input_tokens, cached_tokens, output_tokens, "
+            "cost_usd FROM events ORDER BY id")]
     return {"feedback": all_feedback(), "sessions": sessions, "turns": turns_, "events": events_}
 
 

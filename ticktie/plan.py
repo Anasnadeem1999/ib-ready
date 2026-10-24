@@ -153,7 +153,7 @@ def build(intake: dict, levels: dict[str, int], weak_subskills: list[str], today
     avail_min = round(hours_week * 60 * weeks)
     compressed = need_min > avail_min
     if final_prep:
-        keep = 1 if days < 2 else 2
+        keep = {0: 0, 1: 1}.get(days, 2)  # interview today: just a warm-up mock, no drill on the day
         compressed = len(tasks) > keep
         tasks = tasks[:keep]
     elif compressed:
@@ -187,7 +187,7 @@ def build(intake: dict, levels: dict[str, int], weak_subskills: list[str], today
         if t["type"] == "drill":
             t["title"] = _drill_title(t["skill"], t["level"], t["subskill"], t.pop("level_wanted"))
         else:
-            t["title"] = "Final mock interview" if t.get("final") else "Mock interview"
+            t["title"] = ("Warm-up mock interview" if days == 0 else "Final mock interview") if t.get("final")                 else "Mock interview"
 
     tech = [levels.get(s, 0) for s in bank.TECHNICAL]
     overall = int(sum(tech) / len(tech) + 0.5) if tech else 0  # nearest level (4 of 5 skills at level 1 = level 1)
@@ -279,16 +279,44 @@ def carry_over(new: dict, old: dict | None) -> dict:
                 continue
             del remaining[i]
             break
-    tasks = [dict(t) for t in done] + remaining
+    created = dt.date.fromisoformat(new["created"])
+    interview = created + dt.timedelta(days=new["days_left"]) if new.get("interview_status") == "ok" else None
+    carried = []
+    for d in done:
+        t = dict(d)
+        # a completed task sits on the day it was done, never on or after the interview
+        when = parse_date(t.get("completed")) or parse_date(t["date"]) or created
+        if interview and when >= interview:
+            when = interview - dt.timedelta(days=1)
+        t["date"] = when.isoformat()
+        if t["type"] == "mock" and t.get("final"):
+            t["final"], t["title"] = False, "Mock interview"  # the new plan has its own final mock
+        carried.append(t)
+    tasks = carried + remaining
     tasks.sort(key=lambda t: (t["date"], not t.get("done"), t["type"] != "drill"))
     for i, t in enumerate(tasks):
         t["id"] = i
     new["tasks"] = tasks
-    new["drills"] = sum(1 for t in tasks if t["type"] == "drill")
-    new["mocks"] = sum(1 for t in tasks if t["type"] == "mock")
-    new["questions"] = new["drills"] * DRILL_QUESTIONS + new["mocks"] * MOCK_QUESTIONS
-    task_min = new["drills"] * DRILL_MIN + new["mocks"] * MOCK_MIN
-    new["hours_planned"] = round(task_min / 60, 1)
-    new["review_hours"] = round(task_min * REVIEW_SHARE / 60, 1)
+    _refresh_totals(new)
     new["carried_over"] = len(done)
     return new
+
+
+def _refresh_totals(p: dict) -> None:
+    """Recompute every summary number from the task list, so nothing goes stale after a rebuild."""
+    tasks = p["tasks"]
+    p["drills"] = sum(1 for t in tasks if t["type"] == "drill")
+    p["mocks"] = sum(1 for t in tasks if t["type"] == "mock")
+    p["questions"] = p["drills"] * DRILL_QUESTIONS + p["mocks"] * MOCK_QUESTIONS
+    task_min = p["drills"] * DRILL_MIN + p["mocks"] * MOCK_MIN
+    p["hours_planned"] = round(task_min / 60, 1)
+    p["review_hours"] = round(task_min * REVIEW_SHARE / 60, 1)
+    days = len({t["date"] for t in tasks})
+    p["practice_days"] = days
+    p["minutes_per_practice_day"] = round(task_min / max(days, 1))
+    per_skill: dict[str, int] = {}
+    for t in tasks:
+        if t["type"] == "drill":
+            per_skill[t["skill"]] = per_skill.get(t["skill"], 0) + 1
+    for r in p.get("skills", []):
+        r["drills"] = per_skill.get(r["skill"], 0)

@@ -22,6 +22,8 @@ services:
         value: /var/data
       - key: APP_NAME
         value: IB Ready
+      - key: FORWARDED_ALLOW_IPS   # trust Render's proxy, so per-IP sign-in limits see the real client IP
+        value: "*"
     disk:
       name: ticktie-data
       mountPath: /var/data
