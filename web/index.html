@@ -3,95 +3,136 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Tick &amp; Tie · IB technical interview coach</title>
+  <title>Tick &amp; Tie · IB interview coach</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <span class="logo">✓</span>
-      <div>
-        <div class="brand-name">Tick &amp; Tie</div>
-        <div class="brand-sub">IB technicals, diagnosed</div>
-      </div>
+      <div><div class="brand-name">Tick &amp; Tie</div><div class="brand-sub">IB technicals, diagnosed</div></div>
     </div>
-    <nav class="tabs" id="tabs">
-      <button data-view="interview" class="tab active">Interview</button>
-      <button data-view="map" class="tab">Weakness map</button>
+    <nav class="tabs" id="tabs" hidden>
+      <button data-view="dashboard" class="tab">Dashboard</button>
+      <button data-view="plan" class="tab">My plan</button>
+      <button data-view="interview" class="tab">Interview</button>
+      <button data-view="skills" class="tab">Skills map</button>
       <button data-view="trace" class="tab">Agents &amp; cost</button>
       <button data-view="club" class="tab">Finance Club</button>
     </nav>
     <div class="top-right">
-      <div class="meter" id="meter" title="Tokens used this session vs. the session budget">
+      <div class="meter" id="meter" hidden title="Tokens used this session">
         <div class="meter-label"><span id="meter-cost">$0.0000</span> · <span id="meter-tokens">0</span> tokens</div>
         <div class="meter-bar"><div id="meter-fill"></div></div>
       </div>
-      <button class="chip" id="profile-chip" title="Switch profile">—</button>
+      <button class="chip" id="profile-chip" hidden>—</button>
     </div>
   </header>
 
   <main>
-    <!-- ======================= START ======================= -->
-    <section id="view-start" class="view">
+    <!-- ================= WELCOME / SIGN IN ================= -->
+    <section id="view-welcome" class="view welcome">
       <div class="hero">
-        <h1>Find out <em>why</em> you got it wrong.</h1>
-        <p class="lead">An AI interviewer for investment banking technicals. Every number you say is checked by a
-          calculator, every mistake is matched to a named misconception, and the next question goes straight at
-          your weakest spot.</p>
-        <div class="hero-points">
-          <div><b>Calculator-checked</b><span>The AI never grades your math. Code does.</span></div>
-          <div><b>Fresh numbers every time</b><span>You can't memorise your way through.</span></div>
-          <div><b>A weakness map that remembers</b><span>Misconceptions clear only after you beat them twice.</span></div>
+        <h1>Find out <em>why</em> you got it wrong, then fix it.</h1>
+        <p class="lead">An AI interviewer for investment banking. Code checks every number you say, each mistake is matched to the
+          misconception behind it, and you get a personal plan that takes you up a level before your interviews.</p>
+        <div class="steps">
+          <div class="c-accounting"><div><b>Placement interview</b><span>About 15 minutes. Find your level in every skill, down to sub-skills.</span></div></div>
+          <div class="c-ev"><div><b>Personal action plan</b><span>Hours, drills and mock interviews, day by day, until your interview date.</span></div></div>
+          <div class="c-dcf"><div><b>Targeted drills and mocks</b><span>Associate, VP, Director or MD interviewers. Speak or type.</span></div></div>
+          <div class="c-ma"><div><b>Watch your skills grow</b><span>Every session updates your skills map and your plan.</span></div></div>
         </div>
       </div>
-
-      <form class="card setup" id="setup">
-        <div class="row2 even">
-          <label class="field">
-            <span>Your name</span>
-            <input id="name" maxlength="40" placeholder="e.g. Anas" autocomplete="username" required />
-          </label>
-          <label class="field">
-            <span>Password</span>
-            <input id="password" type="password" minlength="6" maxlength="200" placeholder="6+ characters" autocomplete="current-password" required />
-          </label>
-        </div>
-        <p class="fine-muted" id="signin-note">First time? Pick any name and password and you get a private profile with your own weakness map. Next time, use the same pair to pick up where you left off.</p>
-
-        <div class="field">
-          <span>Session type</span>
-          <div class="choice" id="mode-choice">
-            <button type="button" data-v="diagnostic" class="opt sel"><b>Diagnostic</b><small>One question per area to build your map</small></button>
-            <button type="button" data-v="drill" class="opt"><b>Targeted drill</b><small>Goes after your weakest skill and active mistakes</small></button>
-            <button type="button" data-v="mixed" class="opt"><b>Mixed</b><small>Drill plus a few curveballs, like a real Superday</small></button>
-          </div>
-        </div>
-
-        <div class="row2">
-          <div class="field">
-            <span>Interviewer</span>
-            <div class="choice small" id="persona-choice">
-              <button type="button" data-v="associate" class="opt sel"><b>Associate</b><small>Friendly first round</small></button>
-              <button type="button" data-v="vp" class="opt"><b>VP</b><small>Superday, rapid-fire</small></button>
-            </div>
-          </div>
-          <label class="field">
-            <span>Focus (optional)</span>
-            <select id="focus">
-              <option value="">All areas</option>
-            </select>
-          </label>
-        </div>
-
-        <button class="primary big" type="submit" id="start-btn">Start interview</button>
-        <p class="fine" id="key-warning" hidden>No API key found. Add <code>PORTKEY_API_KEY</code> to a <code>.env</code> file (see README).</p>
+      <form class="card signin" id="signin">
+        <div class="card-title">Sign in or create your profile</div>
+        <label class="field"><span>Your name</span><input id="name" maxlength="40" placeholder="e.g. Anas" autocomplete="username" required /></label>
+        <label class="field"><span>Password</span><input id="password" type="password" minlength="6" maxlength="200" placeholder="6+ characters" autocomplete="current-password" required /></label>
+        <p class="small muted" style="margin:0">First time? Any name and password create a private profile. Use the same pair next time to pick up where you left off.</p>
+        <button class="primary big" id="signin-btn" type="submit">Continue</button>
+        <p class="small" id="key-warning" style="color:var(--bad)" hidden>No API key found. Add <code>PORTKEY_API_KEY</code> to a <code>.env</code> file (see README).</p>
       </form>
     </section>
 
-    <!-- ======================= INTERVIEW ======================= -->
+    <!-- ================= INTAKE ================= -->
+    <section id="view-intake" class="view" hidden>
+      <form class="intake" id="intake">
+        <div><h2>Let's tailor your prep</h2><p class="muted" style="margin:6px 0 0">Four quick questions, then a placement interview to find your level.</p></div>
+        <div class="card field"><span>Which group are you targeting?</span>
+          <div class="small muted">Coverage groups</div><div class="groups" id="groups-coverage"></div>
+          <div class="small muted" style="margin-top:8px">Product groups</div><div class="groups" id="groups-product"></div>
+        </div>
+        <div class="card field"><span>Where are you in recruiting?</span><div class="choice cols4" id="stages"></div></div>
+        <div class="card row2">
+          <label class="field"><span>When is your next interview (or deadline)?</span><input type="date" id="interview-date" /></label>
+          <div class="field"><span>How many hours a week can you practise?</span>
+            <div class="hours"><input type="range" id="hours" min="1" max="20" value="6" /><b id="hours-val">6 h/week</b></div></div>
+        </div>
+        <div class="card field"><span>Who should interview you? (you can change this any time)</span>
+          <div class="choice cols4" id="persona-choice">
+            <button type="button" class="opt sel" data-v="associate"><b>Associate</b><small>Friendly, mostly technicals</small></button>
+            <button type="button" class="opt" data-v="vp"><b>Vice President</b><small>Rapid-fire technicals</small></button>
+            <button type="button" class="opt" data-v="director"><b>Director</b><small>Judgement and fit, some technicals</small></button>
+            <button type="button" class="opt" data-v="md"><b>Managing Director</b><small>Mostly story, motivation and fit</small></button>
+          </div></div>
+        <button class="primary big" type="submit" id="intake-btn">Save and start my placement interview</button>
+      </form>
+    </section>
+
+    <!-- ================= DASHBOARD ================= -->
+    <section id="view-dashboard" class="view" hidden>
+      <div class="dash-head">
+        <div><h2 id="dash-hello">Welcome back</h2><div class="muted" id="dash-sub"></div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="ghost" id="edit-intake">Edit targets</button>
+          <button class="primary" id="dash-cta">Start</button>
+        </div>
+      </div>
+      <div class="dash-grid">
+        <div class="card"><div class="card-title">Your level</div>
+          <div class="level-card"><div><div class="level-big" id="lvl-now">—</div><div class="muted small" id="lvl-target"></div>
+            <div class="ladder" id="lvl-ladder"></div></div></div></div>
+        <div class="card"><div class="card-title">Plan progress <span class="status" id="plan-status"></span></div>
+          <div class="level-card"><div class="ring" id="plan-ring"><div id="plan-pct">0%</div></div>
+            <div class="small" id="plan-text"></div></div></div>
+        <div class="card"><div class="card-title">Momentum</div>
+          <div class="stat-row"><div class="stat"><b id="st-streak">0</b><span>day streak</span></div>
+            <div class="stat"><b id="st-sessions">0</b><span>sessions</span></div>
+            <div class="stat"><b id="st-answers">0</b><span>answers graded</span></div></div></div>
+      </div>
+      <div class="two-col">
+        <div class="card"><div class="card-title">Your skills <button class="link" data-goto="skills">details →</button></div>
+          <div class="skills-grid" id="dash-skills"></div></div>
+        <div class="stack">
+          <div class="card today"><div class="card-title">Today's plan <button class="link" data-goto="plan">full plan →</button></div><ul id="today"></ul></div>
+          <div class="card"><div class="card-title">Practise anything</div>
+            <div class="quick" style="grid-template-columns:1fr">
+              <div class="row"><select id="q-persona"></select><button class="ghost" id="q-mock">Mock interview</button></div>
+              <div class="row"><select id="q-skill"></select><select id="q-level"></select><button class="ghost" id="q-practice">Practise</button></div>
+            </div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= PLAN ================= -->
+    <section id="view-plan" class="view" hidden>
+      <div class="plan-head">
+        <div class="card plan-summary" id="plan-summary"></div>
+        <div class="card"><div class="card-title">From where you are to where you need to be</div><table class="ladder-table" id="plan-ladder"></table></div>
+      </div>
+      <div class="card"><div class="card-title">Day by day <span><button class="link" id="plan-rebuild">Rebuild plan from my latest results</button></span></div>
+        <div class="calendar" id="calendar"></div></div>
+    </section>
+
+    <!-- ================= INTERVIEW ================= -->
     <section id="view-interview" class="view" hidden>
       <div class="interview">
         <div class="chat-col">
+          <div class="session-bar">
+            <span class="pill" id="sb-mode">Session</span>
+            <div class="progress"><span class="lbl" id="sb-label">—</span><div><i id="sb-fill"></i></div></div>
+            <label class="toggle" title="The interviewer reads questions aloud"><input type="checkbox" id="tts-toggle" /> Voice</label>
+            <label class="toggle" title="After the interviewer speaks, the microphone opens. Say 'submit' to send."><input type="checkbox" id="handsfree-toggle" /> Hands-free</label>
+          </div>
           <div class="chat" id="chat"></div>
           <form class="composer" id="composer">
             <textarea id="answer" rows="3" placeholder="Answer like you would out loud: direction, size, and why. Enter to send, Shift+Enter for a new line."></textarea>
@@ -100,160 +141,83 @@
               <div class="composer-actions">
                 <button type="button" class="ghost mic" id="mic-btn" title="Answer out loud (Chrome or Edge)">
                   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z"/></svg>
-                  <span id="mic-label">Speak</span>
-                </button>
-                <button type="button" class="ghost" id="end-btn">End &amp; debrief</button>
+                  <span id="mic-label">Speak</span></button>
+                <button type="button" class="ghost" id="end-btn">End session</button>
                 <button type="submit" class="primary" id="send-btn">Submit answer</button>
               </div>
             </div>
           </form>
         </div>
-
         <aside class="side-col">
-          <div class="card diag" id="diag">
-            <div class="card-title">Live diagnosis</div>
-            <div class="empty" id="diag-empty">Answer the question to see how each line item is graded.</div>
+          <div class="card" id="diag"><div class="card-title">Live diagnosis</div>
+            <div class="muted small" id="diag-empty">Answer the question to see how each line item is graded.</div>
             <div id="diag-body" hidden>
               <div class="verdict" id="verdict"></div>
               <ul class="checks" id="checks"></ul>
               <div id="mis-wrap"></div>
               <div class="rationale" id="rationale"></div>
-              <details class="solution" id="solution-wrap" hidden>
-                <summary>Worked solution (calculator)</summary>
-                <p id="solution"></p>
-              </details>
-            </div>
-          </div>
-          <div class="card shield" id="shield" hidden>
-            <div class="card-title">Safety</div>
-            <ul id="shield-list"></ul>
-          </div>
-          <div class="card mini-trace">
-            <div class="card-title">This turn's agents <button class="link" data-goto="trace">full trace →</button></div>
-            <ul id="turn-trace" class="trace-list compact"></ul>
-          </div>
+              <details class="solution" id="solution-wrap" hidden><summary id="solution-label">Worked solution (calculator)</summary><p id="solution"></p></details>
+            </div></div>
+          <div class="card shield" id="shield" hidden><div class="card-title">Safety</div><ul id="shield-list"></ul></div>
+          <div class="card"><div class="card-title">This turn's agents <button class="link" data-goto="trace">full trace →</button></div>
+            <ul class="trace-list compact" id="turn-trace"></ul></div>
         </aside>
       </div>
     </section>
 
-    <!-- ======================= MAP ======================= -->
-    <section id="view-map" class="view" hidden>
-      <div class="page-head">
-        <h2>Your weakness map</h2>
-        <p class="muted">Mastery is a Bayesian estimate updated after every question. A misconception stays
-          <span class="tag active">active</span> until you answer two questions that test it cleanly.</p>
-      </div>
-      <div class="map-grid">
-        <div class="card">
-          <div class="card-title">Skills</div>
-          <div id="skills"></div>
+    <!-- ================= RESULTS (after every session) ================= -->
+    <section id="view-results" class="view" hidden>
+      <div class="results">
+        <div><div class="pill" id="res-kind">Session complete</div><h2 id="res-title" style="margin-top:8px">Your skills, updated</h2>
+          <p class="muted" id="res-sub" style="margin:6px 0 0"></p></div>
+        <div class="levelups" id="res-levelups"></div>
+        <div class="card"><div class="card-title">Skills map: before → after this session</div><div id="res-deltas"></div></div>
+        <div class="next-box" id="res-next"></div>
+        <div class="two-col">
+          <div class="card"><div class="card-title">Debrief</div><h3 id="db-headline" style="margin:0 0 10px;font-size:18px"></h3>
+            <div class="small muted" style="font-weight:700;margin-bottom:6px">STRENGTHS</div><ul id="db-strengths" style="margin-top:0"></ul>
+            <div class="small muted" style="font-weight:700;margin-bottom:6px">FOCUS NEXT</div><div id="db-focus"></div>
+            <p class="small muted" id="db-foot"></p></div>
+          <form class="card survey" id="survey"><div class="card-title">30-second feedback</div>
+            <div class="survey-grid">
+              <label class="field wide"><span>How useful was this session? (1 = not at all, 10 = extremely)</span><div class="scale" id="rating"></div></label>
+              <label class="field"><span>Compared with how you prep today</span><select id="vs-current"><option value="">Choose…</option><option>Much better</option><option>Somewhat better</option><option>About the same</option><option>Worse</option></select></label>
+              <label class="field"><span>Found a weak spot you didn't know?</span><select id="found-new"><option value="">Choose…</option><option>Yes</option><option>Partly</option><option>No</option></select></label>
+              <label class="field wide"><span>With your usual prep, how long would finding these take?</span><select id="time-to-find"><option value="">Choose…</option><option>Under 15 minutes</option><option>15–60 minutes</option><option>1–3 hours</option><option>More than 3 hours</option><option>I probably wouldn't find them</option></select></label>
+              <label class="field wide"><span>How do you prep today?</span><input id="prep-today" maxlength="300" placeholder="e.g. BIWS guide + 1 mock a week with a friend" /></label>
+              <label class="field wide"><span>Anything else, in your own words?</span><textarea id="quote" rows="2" maxlength="1000"></textarea></label>
+              <label class="consent wide"><input type="checkbox" id="consent" /> OK to quote me by first name in an MGT 409 class report.</label>
+            </div>
+            <div style="display:flex;justify-content:flex-end;align-items:center;gap:10px;margin-top:10px"><span class="small muted" id="survey-status"></span><button class="ghost" type="submit">Send feedback</button></div>
+          </form>
         </div>
-        <div class="card">
-          <div class="card-title">Misconceptions, with your own words as evidence</div>
-          <div id="mis-list" class="mis-list"></div>
-        </div>
-      </div>
-      <div class="map-actions">
-        <button class="primary" id="drill-btn">Start a targeted drill</button>
       </div>
     </section>
 
-    <!-- ======================= TRACE & COST ======================= -->
+    <!-- ================= SKILLS ================= -->
+    <section id="view-skills" class="view" hidden>
+      <div class="page-head"><h2>Skills map</h2><p>Each skill has three levels. A level counts as reached once you've shown it (mastery of 75%+ on at least 2 questions).
+        Sub-skills in red are where your drills go first. Misconceptions stay <span class="pill tag-active">active</span> until you beat them twice in a row.</p></div>
+      <div class="two-col"><div class="skills-grid" id="skills-full"></div>
+        <div class="card"><div class="card-title">Misconceptions, with your own words as evidence</div><div class="mis-list" id="mis-list"></div></div></div>
+    </section>
+
+    <!-- ================= TRACE ================= -->
     <section id="view-trace" class="view" hidden>
-      <div class="page-head">
-        <h2>Agents &amp; cost</h2>
-        <p class="muted">Every step of this session: what the director decided, what each agent did, what the
-          calculator checked, what the guard blocked, and exactly what it cost (gpt-6-luna,
-          $0.10 / $0.01 / $0.50 per 1M input / cached / output tokens).</p>
-      </div>
-      <div class="trace-grid">
-        <div class="card">
-          <div class="card-title">Session trace</div>
-          <ul id="trace" class="trace-list"></ul>
-        </div>
-        <div class="stack">
-          <div class="card">
-            <div class="card-title">This session</div>
-            <div class="kpis" id="kpis"></div>
-          </div>
-          <div class="card">
-            <div class="card-title">All sessions on this install, by agent</div>
-            <table class="tbl" id="agent-tbl"></table>
-          </div>
-        </div>
-      </div>
+      <div class="page-head"><h2>Agents &amp; cost</h2><p>Every step of your latest session: what the director decided, what each agent did, what the calculator checked,
+        what the guard blocked, and exactly what it cost (gpt-6-luna: $0.10 / $0.01 / $0.50 per 1M input / cached / output tokens).</p></div>
+      <div class="two-col"><div class="card"><div class="card-title">Session trace</div><ul class="trace-list" id="trace"></ul></div>
+        <div class="stack"><div class="card"><div class="card-title">This session</div><div class="kpis" id="kpis"></div></div>
+          <div class="card"><div class="card-title">All sessions on this install, by agent</div><table class="tbl" id="agent-tbl"></table></div></div></div>
     </section>
 
-    <!-- ======================= CLUB ======================= -->
+    <!-- ================= CLUB ================= -->
     <section id="view-club" class="view" hidden>
-      <div class="page-head">
-        <h2>Finance Club view</h2>
-        <p class="muted">Anonymised and aggregated across every member on this install. Shows which misconceptions
-          are most common, so the club's technical-training workshops can target them. No names or answers are shown.</p>
-      </div>
-      <div class="map-grid">
-        <div class="card"><div class="card-title">Most common misconceptions</div><div id="club-mis"></div></div>
-        <div class="card"><div class="card-title">Average mastery by skill</div><div id="club-skills"></div></div>
-      </div>
+      <div class="page-head"><h2>Finance Club view</h2><p>Anonymised and aggregated across every member, so the club's technical-training workshops can target what members actually get wrong. No names or answers are shown.</p></div>
+      <div class="two-col"><div class="card"><div class="card-title">Most common misconceptions</div><div id="club-mis"></div></div>
+        <div class="card"><div class="card-title">Average mastery by skill</div><div id="club-skills"></div></div></div>
     </section>
   </main>
-
-  <!-- ======================= DEBRIEF ======================= -->
-  <div class="modal" id="debrief" hidden>
-    <div class="modal-card">
-      <button class="x" id="debrief-close" aria-label="Close">×</button>
-      <div class="card-title">Session debrief</div>
-      <h3 id="db-headline"></h3>
-      <div class="db-grid">
-        <div>
-          <h4>Mastery, start → end</h4>
-          <div id="db-mastery"></div>
-        </div>
-        <div>
-          <h4>Strengths</h4>
-          <ul id="db-strengths"></ul>
-          <h4>Focus next</h4>
-          <div id="db-focus"></div>
-        </div>
-      </div>
-      <p class="next" id="db-next"></p>
-      <div class="db-foot" id="db-foot"></div>
-
-      <form class="survey" id="survey">
-        <h4>Quick feedback (30 seconds), which helps us improve this</h4>
-        <div class="survey-grid">
-          <label class="field"><span>How useful was this session? (1 = not at all, 10 = extremely)</span>
-            <div class="scale" id="rating">
-              <button type="button">1</button><button type="button">2</button><button type="button">3</button><button type="button">4</button><button type="button">5</button>
-              <button type="button">6</button><button type="button">7</button><button type="button">8</button><button type="button">9</button><button type="button">10</button>
-            </div>
-          </label>
-          <label class="field"><span>Compared with how you prep today, this is…</span>
-            <select id="vs-current"><option value="">Choose…</option><option>Much better</option><option>Somewhat better</option><option>About the same</option><option>Worse</option></select>
-          </label>
-          <label class="field"><span>Did it find a weak spot you didn't know you had?</span>
-            <select id="found-new"><option value="">Choose…</option><option>Yes</option><option>Partly</option><option>No</option></select>
-          </label>
-          <label class="field"><span>With your usual prep, how long would finding these weak spots take?</span>
-            <select id="time-to-find"><option value="">Choose…</option><option>Under 15 minutes</option><option>15–60 minutes</option><option>1–3 hours</option><option>More than 3 hours</option><option>I probably wouldn't find them</option></select>
-          </label>
-          <label class="field wide"><span>How do you prep for technicals today? (guides, question banks, mock partners, coaches, ChatGPT…)</span>
-            <input id="prep-today" maxlength="300" placeholder="e.g. BIWS guide + 1 mock a week with a friend" />
-          </label>
-          <label class="field wide"><span>Anything else, in your own words?</span>
-            <textarea id="quote" rows="2" maxlength="1000" placeholder="What worked, what didn't, what you'd change"></textarea>
-          </label>
-          <label class="consent wide"><input type="checkbox" id="consent" /> It's OK to quote me by first name in an MGT 409 class report.</label>
-        </div>
-        <div class="survey-actions"><span class="muted" id="survey-status"></span><button class="ghost" type="submit">Send feedback</button></div>
-      </form>
-
-      <div class="modal-actions">
-        <button class="ghost" data-goto="map">Open weakness map</button>
-        <button class="primary" id="db-again">Start another session</button>
-      </div>
-    </div>
-  </div>
 
   <div class="toast" id="toast" hidden></div>
   <script src="/static/app.js"></script>

@@ -149,10 +149,11 @@ def progress(plan: dict) -> dict:
     today = _today().isoformat()
     tasks = plan.get("tasks", [])
     done = [t for t in tasks if t["done"]]
-    due = [t for t in tasks if t["date"] <= today]
+    due = [t for t in tasks if t["date"] <= today]          # due by the end of today
     due_done = [t for t in due if t["done"]]
+    overdue = [t for t in tasks if t["date"] < today and not t["done"]]  # only earlier days count as late
     status = "on track"
-    if len(due_done) < len(due) - 1:
+    if overdue:
         status = "behind"
     elif len(done) > len(due):
         status = "ahead"

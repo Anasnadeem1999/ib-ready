@@ -366,7 +366,7 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
         return {"blocked": False, "interviewer": msg, "verdict": "redirect", "final_verdict": None,
                 "error_type": "blocked", "action": "redirect", "resolved": False, "explain_only": explain_only,
                 "checks": [], "misconceptions": [], "rationale": None, "solution": None,
-                "answered_question": {"title": q.title, "skill": q.skill, "seconds": seconds, "target": q.target_seconds},
+                "answered_question": {"title": q.title, "skill": q.skill, "kind": q.kind, "seconds": seconds, "target": q.target_seconds},
                 "session": _public_session(sid), "events": db.events(sid)[ev_start:], "next_question": None}
     d: agents.Diagnosis = result.output
     db.add_event(sid, agents.SPECIALISTS[spec_key][0], "llm",
@@ -486,7 +486,7 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
         "misconceptions": [{"id": m, "name": LIBRARY[m].name, "fix": LIBRARY[m].fix} for m in mids] if show_detail else [],
         "rationale": d.rationale if show_detail else None,
         "solution": solution,
-        "answered_question": {"title": q.title, "skill": q.skill, "seconds": seconds, "target": q.target_seconds},
+        "answered_question": {"title": q.title, "skill": q.skill, "kind": q.kind, "seconds": seconds, "target": q.target_seconds},
         "session": _public_session(sid),
         "events": db.events(sid)[ev_start:],
         "next_question": next_q.to_public() if next_q else None,
