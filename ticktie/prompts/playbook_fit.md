@@ -17,7 +17,7 @@ These are typed practice answers from MBA students, not polished transcripts.
 - Credit a key point when the answer substantively addresses it, even briefly or implicitly. "I worked nights during busy season, so I know the hours" covers a realistic view of the job. One concrete experience (a job, project, deal, conversation with a banker) is evidence.
 - Do not require quantified results for "adequate". Quantification moves an answer toward "strong".
 - Do not judge whether the story is true, impressive enough, or from a prestigious employer or school. A small, real example well told beats a big vague one.
-- Approximate public deal facts are fine ("about 69 billion in cash"). Do not penalise a missing exact multiple if the candidate gives a rationale and a view.
+- Approximate public deal facts are fine ("about 69 billion in cash"). Do not penalize a missing exact multiple if the candidate gives a rationale and a view.
 
 ### Misconception flags versus missing key points
 A misconception flag is heavier than a missed key point. Use it only when the problem describes the answer as a whole.
@@ -37,7 +37,7 @@ If the candidate describes how they would answer instead of answering ("I would 
 Never invent facts about the candidate. Grade only what they wrote.
 
 ### Calibration examples (paraphrased, for grading only)
-- "Walk me through your resume." Strong: a short arc. Grew up around a family business, so studied economics. Two years in corporate development, built the model for a bolt-on acquisition and realised they wanted to be closer to deals. MBA to switch, banking for early transaction reps. Weak: jobs in order with dates, no reasons, no link to banking.
+- "Walk me through your resume." Strong: a short arc. Grew up around a family business, so studied economics. Two years in corporate development, built the model for a bolt-on acquisition and realized they wanted to be closer to deals. MBA to switch, banking for early transaction reps. Weak: jobs in order with dates, no reasons, no link to banking.
 - "Why investment banking?" Strong: two specific pulls tied to real experience, awareness of the hours, a long-term goal. Weak: "I like fast-paced environments, smart people and great exit opportunities." (FIT_GENERIC, FIT_MONEY_PRESTIGE)
 - "Why investment banking?", genuine but imperfect: "In my FP&A internship I helped build numbers for a deck on buying a supplier and liked seeing analysis turn into a decision. I know the hours are long; I worked nights in busy season. Long term I'd like corp dev or PE, but I want to learn the deal process first." Key points: specific reason, own experience, realism, long-term goal. Mentioning PE as a later goal is not FIT_MONEY_PRESTIGE. Adequate, no flags.
 - "Why investment banking?", honest about pay: "Pay is part of it since I have loans, but the bigger reason is that in consulting I kept doing the strategy side of M&A projects and wanted to be on the transaction side. I spoke to three bankers and what stuck was how much responsibility analysts get." Specific reason and own experience hit; pay is secondary, so no FIT_MONEY_PRESTIGE; the experience is evidence, so no FIT_NO_EVIDENCE. Missing realism and long-term goal. Adequate, no flags.

@@ -143,3 +143,38 @@ def test_debrief_schema_trims_lists():
                        work_on=[{"misconception_id": "X", "why": "w", "try_this": "t"}] * 3,
                        next_step="n", encouragement="e")
     assert len(d.went_well) == 3 and len(d.work_on) == 2
+
+
+# ---------------------------------------------------------------- house style + QA round 2 prompt rules
+@pytest.mark.parametrize("raw,clean", [
+    ("The key issue\u2014not the price.", "The key issue, not the price."),
+    ("right \u2013 but think about taxes", "right, but think about taxes"),
+    ("about 15\u201320% IRR", "about 15-20% IRR"),
+    ("No dashes here.", "No dashes here."),
+])
+def test_candidate_facing_text_has_no_em_or_en_dashes(raw, clean):
+    assert agents.plain_dashes(raw) == clean
+    assert agents.InterviewerMsg(message=raw).message == clean
+
+
+def test_debrief_fields_are_dash_free():
+    d = agents.Debrief(headline="Close\u2014tighten it", went_well=["Method\u2014right"],
+                       work_on=[{"misconception_id": "X", "why": "a\u2014b", "try_this": "c \u2013 d"}],
+                       next_step="Drill\u2014deals", encouragement="Nearly\u2014there")
+    text = " ".join([d.headline, *d.went_well, d.next_step, d.encouragement, d.work_on[0].why, d.work_on[0].try_this])
+    assert "\u2014" not in text and "\u2013" not in text
+
+
+def test_prompts_use_us_spelling():
+    for name in ("coach.md", "interviewer.md", "planner.md", "playbook_fit.md", "diagnostician_base.md"):
+        text = agents._prompt(name).lower()
+        for british in ("practise", "memorisation", "penalise", "realised", "prioritises", "judgement", "full stop"):
+            assert british not in text, (name, british)
+
+
+def test_rounding_is_close_not_a_mistake_in_coach_and_interviewer():
+    coach = agents._prompt("coach.md")
+    inter = agents._prompt("interviewer.md")
+    assert "`rounding`" in coach and "never as a mistake" in coach
+    assert "rounding_note" in inter and "Never call it a mistake" in inter
+    assert "concept_to_revisit" in inter

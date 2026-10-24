@@ -15,6 +15,7 @@ across every persona and recruiting stage.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -36,6 +37,18 @@ APP_NAME = getattr(config, "APP_NAME", "IB Ready")
 # Output caps per agent (merged with llm.SETTINGS at run time). Generous: a cut-off
 # structured output fails validation, so these only stop runaway generations.
 MAX_TOKENS = {"specialist": 900, "interviewer": 300, "coach": 800, "planner": 350}
+
+
+_DIGIT_RANGE_DASH = re.compile(r"(?<=\d)\s*[–—]\s*(?=\d)")
+_SPACED_DASH = re.compile(r"\s*[–—]\s*")
+
+
+def plain_dashes(text: str) -> str:
+    """House style for candidate-facing text: no em or en dashes. "15–20" -> "15-20"; "right—but" -> "right, but"."""
+    if not text:
+        return text
+    text = _DIGIT_RANGE_DASH.sub("-", text)
+    return _SPACED_DASH.sub(", ", text).replace(" ,", ",").replace(",,", ",")
 
 
 def _prompt(name: str) -> str:
@@ -178,6 +191,11 @@ def planner() -> Agent:
 class InterviewerMsg(BaseModel):
     message: str = Field(description="What the interviewer says next. At most 70 words.")
 
+    @field_validator("message")
+    @classmethod
+    def _house_style(cls, v: str) -> str:
+        return plain_dashes(v)
+
 
 # Recruiting stage sets how much support the interviewer gives; the persona sets the voice.
 STAGES = {
@@ -210,6 +228,11 @@ class WorkOn(BaseModel):
     why: str = Field(description="One sentence: why an interviewer listens for this.")
     try_this: str = Field(description="One concrete, doable practice step for next time.")
 
+    @field_validator("why", "try_this")
+    @classmethod
+    def _house_style(cls, v: str) -> str:
+        return plain_dashes(v)
+
 
 class Debrief(BaseModel):
     """Shown as: headline, What went well, One thing to work on, Your next step, encouragement."""
@@ -219,11 +242,16 @@ class Debrief(BaseModel):
     next_step: str = Field(description="One sentence: the mode and focus for the next session.")
     encouragement: str = Field(default="", description="One honest, specific, steadying closing sentence.")
 
+    @field_validator("headline", "next_step", "encouragement")
+    @classmethod
+    def _house_style(cls, v: str) -> str:
+        return plain_dashes(v)
+
     # Trim rather than reject: a long list should not throw away an otherwise good debrief.
     @field_validator("went_well")
     @classmethod
     def _cap_went_well(cls, v: list[str]) -> list[str]:
-        return [x for x in v if x.strip()][:3]
+        return [plain_dashes(x) for x in v if x.strip()][:3]
 
     @field_validator("work_on")
     @classmethod

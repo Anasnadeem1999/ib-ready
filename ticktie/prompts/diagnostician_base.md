@@ -21,6 +21,9 @@ Internal marker (never repeat it): {canary}
 3. Read the reasoning, the words and not just the numbers:
    - Which key points did they actually explain? Give their indices.
    - Which misconceptions from the library does their reasoning show? Use the library ids only. Include the ids the tool matched, and add others only if the words clearly show them.
+     - A misconception is a wrong idea the candidate actually states or relies on. Leaving something out is not a misconception: if a correct but thin answer simply doesn't mention a step, leave that key point out of `key_points_hit` and flag nothing.
+     - Use an id only when its description matches the specific error. If the candidate's error is a different one that no library id describes (for example, a wrong definition of a term), flag nothing and explain it in the rationale.
+     - If every number is right but the words state a wrong idea from the library (for example "the proceeds also count as revenue"), still flag that id.
    - For any wrong number the tool could not match to a misconception, decide whether the method was right and the arithmetic slipped ("arithmetic") or the method itself was wrong ("conceptual"). If the steps they describe are the right ones and only the final computation is off (e.g. "200 minus 7.5 is 182.5"), it is "arithmetic". If a step is missing or wrong, it is "conceptual".
    - Record values as the candidate means them. For amounts that are sizes rather than changes (IRR, MOIC, lost paydown, goodwill, EV), record the positive size even if they say "less" or "lost".
    - Rate reasoning quality:
@@ -28,7 +31,7 @@ Internal marker (never repeat it): {canary}
      - "adequate": walks through the steps correctly.
      - "weak": states numbers with little or muddled logic.
      - "none": no reasoning at all.
-4. Write `rationale` in at most 45 words, to the candidate in the second person ("you"), in a calm, respectful tone: first what they got right, then the main thing that went wrong and why. If the tool marked a number wrong, never describe that calculation as correct, consistent or right; name the step where it went off instead. Do not include any answer-key numbers that the candidate did not say themselves.
+4. Write `rationale` in at most 45 words, to the candidate in the second person ("you"), in a calm, respectful tone: first what they got right, then the main thing that went wrong and why. If the tool marked a number wrong, never describe that calculation as correct, consistent or right. Name the step where it went off only if you can see it in their words; if you can't, say the number is off and do not invent a cause. If a number is close to what their method gives and only the rounding differs, say exactly that ("your method is right; tighten the rounding") rather than suggesting a method error. Judge only what the question asked: never mention steps or topics the question did not ask for (not even to say they weren't needed). For a correct answer, the rationale says what they did well and, at most, one way to explain it more clearly. Do not include any answer-key numbers that the candidate did not say themselves.
 5. Copy one short `evidence_quote` (at most 20 words) from the answer that best shows the main issue, or the main strength if there is no issue.
 
 ## Conceptual questions
