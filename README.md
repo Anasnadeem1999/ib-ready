@@ -1,9 +1,10 @@
 # IB Ready: an IB interview coach that finds out *why* you got it wrong
 
-**Live app:** _link added after deployment_
+**Run it:** locally from a fresh clone in about 3 minutes (below). No hosted copy; `render.yaml` is a ready one-click Render blueprint.
+**Report and slides:** [`docs/report.html`](docs/report.html) and [`docs/slides.html`](docs/slides.html) (self-contained; open by double-click).
 **Author:** Anas Nadeem (Yale SOM, MGT 409 AI Foundations for Managers, Fall 2026)
 
-IB Ready (code name and package: `ticktie`, "Tick & Tie") runs mock investment banking interviews: accounting, EV, DCF, M&A, LBOs, group specifics and fit. **Code checks every number you say.** For each question, deterministic calculators compute the right answer *and* the exact wrong answer each common misconception produces, so a mistake is matched to its cause, not guessed at by the model. Each question uses new numbers, so you can't memorise answers. A short placement interview sets your level per skill, the app builds a dated action plan up to your interview, and a weakness map steers every drill at your weakest spot. You can type or speak your answers.
+IB Ready (code name and package: `ticktie`, "Tick & Tie") runs mock investment banking interviews: accounting, EV, DCF, M&A, LBOs, group specifics and fit. **Code checks every number you say.** For each question, deterministic calculators compute the right answer *and* the exact wrong answer each common misconception produces, so a mistake is matched to its cause, not guessed at by the model. Each question uses new numbers, so you can't memorise answers. A short placement interview sets your level per skill, the app builds a dated action plan up to your interview, a weakness map steers every drill at your weakest spot, and every technical answer is checked for length so you learn to answer concisely. You can type or speak your answers.
 
 ## Run it locally (about 5 minutes)
 
@@ -13,7 +14,6 @@ You need Python 3.10+ (3.12 recommended) and an API key.
    ```bash
    git clone https://github.com/Anasnadeem1999/tick-and-tie.git
    cd tick-and-tie
-   git checkout v2        # until v2 is merged into main
    ```
 2. The key: put `PORTKEY_API_KEY=your-key-here` in a `.env` file **in this folder or in the folder above it**. The app checks both; the first non-empty value wins, so an empty `.env` copied from `.env.example` here does no harm.
 3. Create a virtual environment and install. No activation needed (this avoids PowerShell's execution-policy error):
@@ -51,7 +51,7 @@ All agents run on **gpt-6-luna** through the course Portkey gateway. Every call 
 ## Tests and evaluations
 
 ```bash
-python -m pytest                           # 340+ offline tests (no API calls): calculators, grading, plan, guard, logins, full API flow
+python -m pytest                           # 500 offline tests (no API calls): calculators, grading, plan, guard, logins, full API flow
 python -m evals.run_eval --set holdout     # grading accuracy vs plain gpt-6-luna (uses the API)
 python -m evals.redteam                    # 14 attacks through the full app (uses the API)
 ```
@@ -88,7 +88,7 @@ ticktie/               backend (FastAPI + PydanticAI)
 web/                   front end (plain HTML/CSS/JS, no build step)
 evals/                 labeled answer sets, eval runner, red-team suite, results
 tests/                 offline tests (conftest.py stubs the model, so they need no key or network)
-render.yaml            one-click deploy on Render (branch v2, 1 GB disk at /var/data)
+render.yaml            one-click deploy on Render (branch main, 1 GB disk at /var/data)
 ```
 
 Built with an AI coding assistant (Claude Code), in the "building agents with agents" style of the course.

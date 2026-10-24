@@ -1,12 +1,10 @@
 # One-click deploy on Render (render.com -> New -> Blueprint -> pick this repo).
-# NOTE: Render deploys the branch below. v2 must be pushed to GitHub first
-# (git push -u origin v2), or merge v2 into main and change `branch` to main.
 services:
   - type: web
-    name: tick-and-tie
+    name: ib-ready
     runtime: python
     plan: starter
-    branch: v2
+    branch: main
     buildCommand: pip install -r requirements.txt
     # One worker on purpose: in-flight turn and end-of-session guards live in process memory.
     startCommand: uvicorn ticktie.server:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers
