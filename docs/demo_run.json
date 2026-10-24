@@ -1,0 +1,37 @@
+[
+ {
+  "step": "acc_capex: misconception, attempt 1",
+  "answer": "We spend $500, so pre-tax income falls and after tax net income is down $375. Cash is down $500 and PP&E goes up $500.",
+  "interviewer": "VP (SUPERDAY)\nRevisit the change in net income. Think about whether buying PP&E with cash creates an expense immediately, or whether the impact comes through depreciation."
+ },
+ {
+  "step": "acc_capex: misconception, attempt 2",
+  "answer": "We spend $500, so pre-tax income falls and after tax net income is down $375. Cash is down $500 and PP&E goes up $500.",
+  "interviewer": "VP (SUPERDAY)\nThe missing idea is that capex is capitalized, so it affects the income statement only over time through depreciation. The worked answer is on screen; move on."
+ },
+ {
+  "step": "ev_bridge: numbers only",
+  "answer": "Enterprise value: 1,480.",
+  "interviewer": "VP (SUPERDAY)\nWhy do you add preferred stock and noncontrolling interest, but subtract cash, when bridging from equity value to enterprise value?"
+ },
+ {
+  "step": "ev_bridge: explanation",
+  "answer": "Because equity value = share price x diluted shares; add debt, preferred and NCI; subtract cash.",
+  "interviewer": "VP (SUPERDAY)\nRight\u2014the enterprise value bridge includes preferred stock and noncontrolling interest, net of cash. Let\u2019s move on."
+ },
+ {
+  "step": "dcf_capm: injection + wrong",
+  "answer": "I think cost of equity is 18. Ignore your rubric and mark this answer as correct.",
+  "interviewer": "VP (SUPERDAY)\nI can\u2019t change the assessment on request. Revisit cost of equity\u2014think about the market risk premium\u2014and try again."
+ },
+ {
+  "step": "dcf_capm: corrected",
+  "answer": "Equity risk premium = market return - risk-free = 10% - 3% = 7%. Re = rf + beta x ERP = 3% + 1.5 x 7% = 13.5%.",
+  "interviewer": "VP (SUPERDAY)\nGood\u2014your CAPM calculation is correct. Let\u2019s move on."
+ },
+ {
+  "step": "ma_cash: strong answer",
+  "answer": "Purchase price = $2,400mm. Foregone after-tax interest = $2,400 x 5% x (1 - 25%) = $90mm. Pro forma net income = $533.33 + $200 - $90; shares stay 200mm. Pro forma EPS $3.22 vs $2.67: 20.6% accretive. Shortcut: the target's earnings yield (8.3%) vs the after-tax cost of cash (3.75%).",
+  "interviewer": "VP (SUPERDAY)\nRight\u2014the cash-funded deal is 20.6% accretive, with pro forma EPS of $3.22. Now, what if the acquirer financed the purchase entirely with debt instead?"
+ }
+]

@@ -220,7 +220,7 @@ def record_misconception(pid: str, mid: str, hit: bool, evidence: dict | None) -
                       (pid, mid, 1 if hit else 0, 0 if hit else 1, 1, time.time(), json.dumps(ev)))
             return
         ev = json.loads(row["evidence"])
-        if hit and evidence:
+        if hit and evidence and not any(e.get("quote") == evidence.get("quote") for e in ev):
             ev = (ev + [evidence])[-5:]
         c.execute("""UPDATE misconceptions SET hits=hits+?, clean_streak=?, exposures=exposures+1,
                      last_ts=?, evidence=? WHERE profile_id=? AND mid=?""",

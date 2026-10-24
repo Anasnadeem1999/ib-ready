@@ -96,3 +96,8 @@ def test_output_filter_blocks_invented_numbers_but_allows_question_numbers():
     assert ok.ok
     bad = guard.check_output("Most banks expect this in 37 seconds.", [10, 0.25], [])
     assert not bad.ok
+
+
+def test_one_answer_cannot_certify_a_skill():
+    assert mastery.level(0.9, 1) == "solid"
+    assert mastery.level(0.9, 3) == "interview-ready"

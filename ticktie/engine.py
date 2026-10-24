@@ -262,13 +262,15 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
         state["first_verdict"] = verdict
 
     # ---------- 6. interviewer message (LLM) through the output filters
-    msg = await _interviewer_message(sid, state, q, verdict, action, checks, mids, wrapped, d)
+    # A what-if follow-up is computed by the calculator first, so the interviewer can only introduce it.
+    nq = bank.variation(q, _rng(state)) if action == "ack_whatif" else None
+    msg = await _interviewer_message(sid, state, q, verdict, action, checks, mids, wrapped, d,
+                                     followup=nq.text if nq else None)
 
     # ---------- 7. advance the interview
     solution = q.solution if (action == "reveal" or resolved) else None
     next_q = None
     if action == "ack_whatif":
-        nq = bank.variation(q, _rng(state))
         state["current"] = {**nq.to_state(), "text": nq.text, "whatif": True}
         state["attempts"] = 0
         state["phase"] = "answer"
@@ -405,7 +407,7 @@ def _final_verdict(state: dict, verdict: str, explain_only: bool) -> str:
 
 
 # ---------------------------------------------------------------- interviewer
-async def _interviewer_message(sid, state, q, verdict, action, checks, mids, wrapped, d) -> str:
+async def _interviewer_message(sid, state, q, verdict, action, checks, mids, wrapped, d, followup=None) -> str:
     persona = state["persona"]
     wrong_items = [c.name for c in checks if c.status == "wrong"]
     missing_items = [c.name for c in checks if c.status == "missing" and
@@ -421,6 +423,7 @@ async def _interviewer_message(sid, state, q, verdict, action, checks, mids, wra
         "misconception_fix": [LIBRARY[m].fix for m in mids][:1] if action == "reveal" else [],
         "key_idea_to_name": q.key_points[:2] if action == "note_next" else [],
         "grader_note": d.rationale if action in ("probe_why",) else "",
+        "followup_shown_on_screen": followup or "",
     }
     prompt = ("TURN CONTEXT (from the interview engine):\n" + json.dumps(ctx, indent=1) + "\n\n" + wrapped)
 
@@ -544,7 +547,7 @@ def weakness_map(pid: str) -> dict:
         secs = [t["seconds"] for t in ts if t["skill"] == s and t["seconds"]]
         speed[s] = round(sum(secs) / len(secs)) if secs else None
     return {
-        "skills": [{"key": k, "name": bank.SKILLS[k], "p": v["p"], "n": v["n"], "level": mastery.level(v["p"]),
+        "skills": [{"key": k, "name": bank.SKILLS[k], "p": v["p"], "n": v["n"], "level": mastery.level(v["p"], v["n"]),
                     "avg_seconds": speed[k]} for k, v in m.items()],
         "misconceptions": [{"id": x["mid"], "name": LIBRARY[x["mid"]].name, "skill": LIBRARY[x["mid"]].skill,
                             "hits": x["hits"], "active": x["active"], "clean_streak": x["clean_streak"],

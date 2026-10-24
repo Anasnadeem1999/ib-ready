@@ -36,9 +36,16 @@ def bkt_update(p: float, verdict: str, kind: str) -> float:
     return round(post + (1 - post) * P_LEARN, 4)
 
 
-def level(p: float) -> str:
-    if p >= 0.80:
+MIN_EVIDENCE_FOR_READY = 3
+
+
+def level(p: float, n: int = MIN_EVIDENCE_FOR_READY) -> str:
+    """Label for a mastery estimate. 'Interview-ready' needs at least 3 graded questions,
+    because one lucky answer shouldn't certify a skill."""
+    if p >= 0.80 and n >= MIN_EVIDENCE_FOR_READY:
         return "interview-ready"
+    if p >= 0.80:
+        return "solid"
     if p >= 0.55:
         return "solid"
     if p >= 0.35:

@@ -418,7 +418,7 @@ async function renderMap() {
     const t = s.avg_seconds ? ` · avg ${s.avg_seconds}s per answer` : "";
     return `<div class="skill"><div class="skill-top"><b>${esc(s.name)}</b><span>${pct}% · ${esc(s.level)}</span></div>
       <div class="bar lv-${s.level.replace(" ", "-")}"><div style="width:${pct}%"></div></div>
-      <div class="skill-sub">${s.n} question${s.n === 1 ? "" : "s"} graded${t}</div></div>`;
+      <div class="skill-sub">${s.n} question${s.n === 1 ? "" : "s"} graded${t}${s.n > 0 && s.n < 3 ? " · early estimate" : ""}</div></div>`;
   }).join("");
   $("#mis-list").innerHTML = m.misconceptions.length ? m.misconceptions.map((x) => {
     const ev = (x.evidence || []).slice(-2).reverse().map((e) => e.quote ? `<q>${esc(e.quote)}</q>` : "").join("");

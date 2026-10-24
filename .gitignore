@@ -21,3 +21,4 @@ data/llm_calls.jsonl
 .vscode/
 .DS_Store
 Thumbs.db
+docs/_demo_data/
