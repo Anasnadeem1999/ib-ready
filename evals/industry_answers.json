@@ -1,0 +1,21 @@
+{
+ "about": "Industry (group-specific) eval set. Same format as labeled_answers.json. Values: fig_ptbv 1.5x (P/BV 1.25x); re_ffo 200; tmt_ltv 9,000 and 3.0x; hc_rnpv 300; rx_waterfall unsecured 50%, senior 100%; en_ebitdax 6.67x; re_cap_rate 160.",
+ "items": [
+  {"id": 1, "t": "fig_ptbv", "p": {"M": 1500, "E": 1200, "G": 200}, "expect": "NONE",
+   "a": "Tangible book is equity less goodwill and intangibles, so 1,200 minus 200 = 1,000. P/TBV = 1,500 / 1,000 = 1.5x. We use tangible book for banks because deposits and debt are part of operations, so EV metrics don't work."},
+  {"id": 2, "t": "re_ffo", "p": {"NI": 150, "DA": 80, "G": 30}, "expect": "RE_FFO_GAIN",
+   "a": "FFO is net income plus real estate depreciation because buildings don't really lose value, so 150 + 80 = 230."},
+  {"id": 3, "t": "tmt_ltv", "p": {"A": 1200, "gm": 0.75, "ch": 0.1, "C": 3000}, "expect": "TMT_LTV_NO_MARGIN",
+   "a": "Customer lifetime is 1/churn = 10 years, so LTV is 1,200 x 10 = 12,000 and LTV/CAC is 12,000 / 3,000 = 4x, which is healthy."},
+  {"id": 4, "t": "hc_rnpv", "p": {"V": 1500, "pr": 0.3, "Cd": 150}, "expect": "NONE",
+   "a": "Probability-weight the approved value: 30% x 1,500 = 450. The 150 of trial costs gets spent either way, so it isn't weighted. rNPV = 450 - 150 = 300."},
+  {"id": 5, "t": "rx_waterfall", "p": {"X": 700, "S": 500, "U": 400}, "expect": "RX_PRO_RATA",
+   "a": "Total claims are 900 against 700 of value, so everyone gets 700/900, about 78 cents on the dollar. Unsecured recover about 78%."},
+  {"id": 6, "t": "en_ebitdax", "p": {"V": 4000, "E": 500, "X": 100}, "expect": "EN_EBITDA_ONLY",
+   "a": "EV over EBITDA is 4,000 / 500 = 8.0x. Exploration expense is just a cost so I leave it out."},
+  {"id": 7, "t": "re_cap_rate", "p": {"NOI": 8, "c": 0.05}, "expect": "GEN_ARITHMETIC",
+   "a": "Value is NOI divided by the cap rate, so 8 / 0.05 = 16mm. A lower cap rate means a higher value, like a higher multiple."},
+  {"id": 8, "t": "c_fig_no_ev", "p": {}, "expect": "FIG_USES_EV",
+   "a": "I'd value a bank like any company: compute EV with debt and deposits, then use EV/EBITDA versus peers and run a DCF on free cash flow."}
+ ]
+}

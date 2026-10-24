@@ -105,19 +105,61 @@ def pick_targeted(group: str | None, skill: str, lvl: int, subskill: str | None,
     Numeric questions may repeat (the calculator draws new numbers each time); conceptual and
     behavioral questions are never repeated within the last few questions, so the selector widens
     the sub-skill or level before it would ask the same words twice."""
-    recent = set(asked[-8:])
     for attempt in (
         dict(skill=skill, levels=(lvl,), subskill=subskill),
         dict(skill=skill, levels=(lvl,)),
         dict(skill=skill, levels=(max(lvl - 1, 1), min(lvl + 1, 3))),
         dict(skill=skill),
     ):
-        cands = pool(group, **attempt)
-        fresh = [t for t in cands if t.kind == "numeric" and asked[-1:] != [t.id] or t.id not in recent]
+        fresh = _fresh(pool(group, **attempt), asked)
         if fresh:
             return choose(fresh, asked, active, rng)
     cands = pool(group, skill=skill) or list(bank.TEMPLATES.values())
     return choose(cands, asked, active, rng)
+
+
+def _fresh(cands: list[bank.Template], asked: list[str]) -> list[bank.Template]:
+    """Numeric questions may come back (new numbers each time) but never back to back; word questions
+    (conceptual, behavioral) are not repeated within the last 8 questions."""
+    recent = set(asked[-8:])
+    return [t for t in cands if (t.kind == "numeric" and asked[-1:] != [t.id]) or t.id not in recent]
+
+
+def available_levels(group: str | None, skill: str) -> list[int]:
+    """Levels that have at least one question for this group."""
+    return [L for L in (1, 2, 3) if pool(group, skill=skill, levels=(L,))]
+
+
+def nearest_level(group: str | None, skill: str, lvl: int) -> int | None:
+    """The level closest to `lvl` that has questions (ties go to the lower level); None if the skill has none."""
+    avail = available_levels(group, skill)
+    if not avail:
+        return None
+    return min(avail, key=lambda L: (abs(L - lvl), L))
+
+
+def pick_practice(group: str | None, skill: str, lvl: int, asked: list[str], active: dict[str, int],
+                  rng: random.Random) -> tuple[bank.Template, int | None]:
+    """Free practice at the level the candidate chose. Returns (question, served_level or None if exact).
+
+    The chosen level is strict while it has a fresh question. When it has none (or no questions at all
+    for this group), the nearest level with a fresh question is used and reported, so the trace and
+    the UI can say so truthfully instead of quietly serving another level."""
+    exact = _fresh(pool(group, skill=skill, levels=(lvl,)), asked)
+    if exact:
+        return choose(exact, asked, active, rng), None
+    for L in sorted((1, 2, 3), key=lambda L: (abs(L - lvl), L)):
+        if L == lvl:
+            continue
+        fresh = _fresh(pool(group, skill=skill, levels=(L,)), asked)
+        if fresh:
+            return choose(fresh, asked, active, rng), L
+    cands = pool(group, skill=skill)
+    if cands:  # every question of this skill was asked recently: repeat the least-recent one
+        t = choose(cands, asked, active, rng)
+        return t, (t.difficulty if t.difficulty != lvl else None)
+    t = choose(_fresh(pool(group, skill="accounting"), asked) or pool(group, skill="accounting"), asked, active, rng)
+    return t, t.difficulty
 
 
 def pick_mock(group: str | None, persona: str, levels: dict[str, int], weights: dict[str, float],

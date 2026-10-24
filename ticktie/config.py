@@ -5,17 +5,31 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 # The teaching staff keep their .env one folder above the cloned repo, so look
-# in the repo first and then its parent. load_dotenv never overrides a value
-# that is already set, so the repo's own .env wins if both exist.
+# in the repo first and then its parent. The first NON-EMPTY value wins, and a
+# real environment variable always wins. (load_dotenv(override=False) would let
+# an empty `PORTKEY_API_KEY=` copied from .env.example mask the real key above.)
 ENV_FILES = [REPO_ROOT / ".env", REPO_ROOT.parent / ".env"]
-for _f in ENV_FILES:
-    if _f.exists():
-        load_dotenv(_f, override=False)
+
+
+def load_env(files: list[Path]) -> None:
+    for f in files:
+        if not f.exists():
+            continue
+        for k, v in dotenv_values(f).items():
+            if v and not os.environ.get(k):
+                os.environ[k] = v
+
+
+load_env(ENV_FILES)
+
+# ---------------------------------------------------------------- product name (rename in one place)
+APP_NAME = os.environ.get("APP_NAME", "IB Ready")
+APP_TAGLINE = os.environ.get("APP_TAGLINE", "Practice IB interviews. Learn why. Get a plan.")
 
 DATA_DIR = Path(os.environ.get("TICKTIE_DATA_DIR", REPO_ROOT / "data"))
 DB_PATH = DATA_DIR / "ticktie.db"
@@ -56,4 +70,5 @@ SESSION_TOKEN_BUDGET = int(os.environ.get("TICKTIE_SESSION_TOKENS", 120_000))
 DAILY_PROFILE_TOKEN_BUDGET = int(os.environ.get("TICKTIE_DAILY_PROFILE_TOKENS", 600_000))
 DAILY_GLOBAL_TOKEN_BUDGET = int(os.environ.get("TICKTIE_DAILY_GLOBAL_TOKENS", 5_000_000))
 MIN_SECONDS_BETWEEN_TURNS = 1.0  # basic rate limit per session
-MAX_TURNS_PER_SESSION = 60
+MAX_TURNS_PER_SESSION = 80
+LLM_TIMEOUT_SECONDS = float(os.environ.get("TICKTIE_LLM_TIMEOUT", 45))  # per model request; the SDK default is 600 s

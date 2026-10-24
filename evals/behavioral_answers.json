@@ -1,0 +1,25 @@
+{
+ "about": "Behavioral (fit) eval set. Written like real MBA students type in practice. expect = main misconception id, NONE (should pass) or INCOMPLETE (genuine but missing key points). expect_verdict lists acceptable engine verdicts. forbid_mids lists ids that would be unfair to flag.",
+ "items": [
+  {"id": 1, "t": "b_why_ib", "p": {}, "expect": "NONE", "expect_verdict": ["correct"], "forbid_mids": ["FIT_MONEY_PRESTIGE", "FIT_GENERIC"],
+   "a": "Honestly I got interested in banking during my summer internship at a mid-size manufacturing company. I was in the FP&A team and we were looking at buying a smaller supplier, and I helped put together some of the numbers for the deck that went to the CEO. I really liked seeing how the analysis turned into an actual decision. I know the hours are long but I'm okay with that, I worked nights during busy season. Long term I'd like to end up in corp dev or at a PE fund, but I want to learn the deal process first."},
+  {"id": 2, "t": "b_why_ib", "p": {}, "expect": "FIT_GENERIC", "expect_verdict": ["incorrect"], "forbid_mids": [],
+   "a": "I want to do investment banking because I like fast-paced environments and working with smart, driven people. It's a great learning experience and the exit opportunities are really strong."},
+  {"id": 3, "t": "b_why_ib", "p": {}, "expect": "INCOMPLETE", "expect_verdict": ["incomplete", "correct"], "forbid_mids": ["FIT_MONEY_PRESTIGE", "FIT_NO_EVIDENCE"],
+   "a": "I'll be honest, the pay is part of it since I have loans from undergrad. But the bigger reason is that in my two years at a consulting firm I kept doing the strategy part of M&A projects and wanted to be on the transaction side. I talked to three bankers from my school and the thing that stuck was how much responsibility analysts get on live deals."},
+  {"id": 4, "t": "b_weakness", "p": {}, "expect": "FIT_FAKE_WEAKNESS", "expect_verdict": ["incorrect"], "forbid_mids": [],
+   "a": "I'm a perfectionist. I care so much about getting things right that I sometimes spend too long on details."},
+  {"id": 5, "t": "b_weakness", "p": {}, "expect": "NONE", "expect_verdict": ["correct"], "forbid_mids": ["FIT_FAKE_WEAKNESS", "FIT_NO_EVIDENCE", "FIT_NO_STRUCTURE"],
+   "a": "my weakness is public speaking, in my first job i was very nervous in client meetings and my manager told me i speak too fast. so i joined toastmasters last year and i volunteer to present in our team meeting every week, now i feel more confident and my manager said my last presentation was clear"},
+  {"id": 6, "t": "b_team", "p": {}, "expect": "INCOMPLETE", "expect_verdict": ["incomplete"], "forbid_mids": [],
+   "a": "We had a case competition with 48 hours to prepare. We split the work, we did the research together and we built the deck overnight. We ended up placing second out of 20 teams. It taught us a lot about working under pressure."},
+  {"id": 7, "t": "b_team", "p": {}, "expect": "FIT_NO_EVIDENCE", "expect_verdict": ["incorrect"], "forbid_mids": [],
+   "a": "I would answer this with the STAR method. First I would describe the situation and the deadline, then my task, then the actions I personally took, and finally the result, ideally quantified, plus what I learned."},
+  {"id": 8, "t": "b_deal", "p": {}, "expect": "FIT_NO_VIEW", "expect_verdict": ["incorrect"], "forbid_mids": [],
+   "a": "Recently Mars agreed to buy Kellanova for about 36 billion dollars. Mars makes candy and Kellanova makes snacks like Pringles. It's an interesting deal in consumer."},
+  {"id": 9, "t": "b_resume", "p": {}, "expect": "FIT_NO_STRUCTURE", "expect_verdict": ["incorrect", "incomplete"], "forbid_mids": [],
+   "a": "I went to Michigan from 2014 to 2018 and majored in economics and minored in Spanish. Then from 2018 to 2020 I worked at Deloitte in audit. Then 2020 to 2022 I was at a fintech startup doing operations. Then 2022 to 2024 I was at Amazon in finance. Now I'm at SOM."},
+  {"id": 10, "t": "b_why_group", "p": {"group": "Technology, Media & Telecom"}, "expect": "NONE", "expect_verdict": ["correct"], "forbid_mids": ["FIT_GENERIC", "FIT_NO_EVIDENCE"],
+   "a": "Before SOM I was a product manager at a B2B SaaS company for three years, so I already think in ARR, net retention and CAC payback. I've been following the consolidation in cybersecurity software, where sponsors and strategics are paying up for platforms with high retention, and I want to be on the advisory side of those decisions. My product background means I can get to a client's metrics quickly and understand what actually drives their multiple."}
+ ]
+}

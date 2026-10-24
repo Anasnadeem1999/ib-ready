@@ -49,7 +49,8 @@ _ALL = [
         "Buying PP&E or inventory lowers net income right away.",
         "Capex is capitalised: it shows up in investing cash flow and as PP&E on the "
         "balance sheet. It reaches the income statement only over time, through "
-        "depreciation.",
+        "depreciation. Inventory works the same way: it sits on the balance sheet and "
+        "hits COGS only when it's sold.",
     ),
     Misconception(
         "ACC_AR_IGNORED", "accounting", "Forgets the working-capital (AR) adjustment",
@@ -87,9 +88,9 @@ _ALL = [
     Misconception(
         "EV_MISS_CLAIMS", "ev", "Leaves out preferred stock or minority interest",
         "Only debt and cash appear in the bridge.",
-        "Every claim on the operating business belongs in EV: preferred stock and "
-        "noncontrolling interest are added, just like debt, because EBITDA includes "
-        "100% of consolidated subsidiaries.",
+        "Every claim on the operating business belongs in EV. Preferred stock is a claim "
+        "senior to common shareholders, so it's added like debt; noncontrolling interest "
+        "is added because EBITDA includes 100% of subsidiaries you only partly own.",
     ),
     Misconception(
         "EV_BRIDGE_SIGN", "ev", "Runs the bridge the wrong way",
@@ -358,6 +359,94 @@ _ALL = [
         "\"I work too hard\" or \"I'm a perfectionist.\"",
         "Pick a real, non-disqualifying weakness, show a concrete example, and explain the specific steps you're taking "
         "and the progress you've made.",
+    ),
+    # ---------------- Learning-design additions (Oct 2026) ----------------
+    Misconception(
+        "EV_SKIP_BRIDGE", "ev", "Treats equity value as enterprise value",
+        "\"EV equals market cap\", or divides EV by shares to get the share price.",
+        "EV and equity value differ by the claims of other investors. Going up to EV: add debt (and preferred and NCI), "
+        "subtract cash. Going down to equity value: the reverse, then divide by diluted shares.",
+    ),
+    Misconception(
+        "ACC_EBITDA_AFTER_DA", "accounting", "Subtracts D&A to get EBITDA",
+        "EBITDA comes out equal to EBIT.",
+        "EBITDA is earnings before interest, taxes, depreciation and amortization, so D&A is not subtracted. "
+        "EBIT = EBITDA - D&A.",
+    ),
+    Misconception(
+        "ACC_INTEREST_IN_EBIT", "accounting", "Subtracts interest before EBIT",
+        "EBIT is reduced by interest expense.",
+        "EBIT measures the operating business before financing. Interest comes after EBIT, giving pre-tax income.",
+    ),
+    Misconception(
+        "ACC_DIVIDEND_EXPENSED", "accounting", "Treats a dividend as an expense",
+        "Net income falls (often after tax) when a dividend is paid.",
+        "Dividends are a distribution of profit to owners, not a cost of running the business. They skip the income "
+        "statement, aren't tax-deductible, and reduce cash and retained earnings directly.",
+    ),
+    Misconception(
+        "ACC_PRINCIPAL_EXPENSED", "accounting", "Treats repaying debt as an expense",
+        "Net income falls when debt principal is repaid.",
+        "Only interest is an expense. Repaying principal just swaps cash for less debt: a financing outflow, with cash "
+        "and debt both down.",
+    ),
+    Misconception(
+        "ACC_GAIN_DOUBLE_COUNT", "accounting", "Counts an asset-sale gain twice in cash",
+        "Cash rises by the full proceeds plus the after-tax gain.",
+        "The gain is already inside the proceeds. On the cash flow statement subtract the gain from operating cash flow, "
+        "then show the full proceeds in investing.",
+    ),
+    Misconception(
+        "ACC_PROCEEDS_AS_REVENUE", "accounting", "Treats sale proceeds as revenue",
+        "Net income rises by the whole sale price after tax.",
+        "Selling an asset isn't revenue. Only the gain (price minus book value) hits the income statement.",
+    ),
+    Misconception(
+        "DCF_TV_NOT_DISCOUNTED", "dcf", "Forgets to discount the terminal value",
+        "Adds the year-5 terminal value straight to today's value.",
+        "The terminal value is worth that amount at the end of the forecast. Multiply it by that year's discount factor "
+        "(or divide by (1 + WACC)^n) before adding it up.",
+    ),
+    Misconception(
+        "DCF_DF_INVERTED", "dcf", "Divides by a discount factor",
+        "The present value comes out bigger than the future value.",
+        "A discount factor is below 1 and you multiply by it. If your present value is larger than the future value, the "
+        "operation is flipped.",
+    ),
+    Misconception(
+        "DCF_BETA_NO_TAX", "dcf", "Unlevers beta without the tax shield",
+        "Uses 1 + D/E in the denominator.",
+        "Debt's extra risk for shareholders is softened by the interest tax shield: "
+        "unlevered beta = levered beta / (1 + (1 - t) x D/E).",
+    ),
+    Misconception(
+        "DCF_BETA_DIRECTION", "dcf", "Unlevers beta in the wrong direction",
+        "The unlevered beta comes out higher than the levered beta.",
+        "Removing debt removes financial risk, so the unlevered beta must be smaller. Divide by the leverage factor to "
+        "unlever; multiply to relever.",
+    ),
+    Misconception(
+        "MA_SYNERGY_NO_GROSSUP", "ma", "Forgets to gross synergies up for tax",
+        "Break-even synergies equal the after-tax EPS shortfall.",
+        "Synergies are taxed before they reach net income, so the pre-tax amount needed = net income shortfall / (1 - t).",
+    ),
+    Misconception(
+        "MA_IGNORE_NEW_SHARES", "ma", "Forgets the new shares in a stock deal",
+        "Divides combined net income by the old share count.",
+        "In a stock deal the buyer issues new shares (purchase price / share price). Pro forma EPS divides combined net "
+        "income by the old plus new shares.",
+    ),
+    Misconception(
+        "MA_PREMIUM_ON_OFFER", "ma", "Measures the premium against the offer price",
+        "Premium = (offer - current price) / offer.",
+        "A premium is measured against the target's current, undisturbed share price, what shareholders would have "
+        "without the deal: premium = offer / current price - 1. A $30 offer for a $25 stock is a 20% premium, not 16.7%.",
+    ),
+    Misconception(
+        "CR_RATIO_INVERTED", "industry", "Flips a credit ratio",
+        "Leverage = EBITDA / debt, or coverage = interest / EBITDA.",
+        "Leverage puts debt on top (how many years of EBITDA the debt equals); coverage puts EBITDA on top (how many "
+        "times interest is covered). Lower leverage and higher coverage are safer.",
     ),
     # ---------------- Generic ----------------
     Misconception(

@@ -123,3 +123,61 @@ def test_word_questions_are_not_repeated_in_a_drill():
     for i in range(1, len(words)):
         assert words[i] != words[i - 1]
     assert len(set(asked)) >= 4
+
+
+# ---------------------------------------------------------------- behavioral verdicts (ML review P0 #1)
+def _fit_diag(points, quality, mids=()):
+    return Diagnosis(key_points_hit=list(points), reasoning_quality=quality, misconceptions=list(mids), rationale="r")
+
+
+def _fit_q():
+    t = bank.TEMPLATES["b_why_ib"]
+    return bank.build(t, {"group": "investment banking"})
+
+
+def test_fit_flag_with_substance_is_a_nudge_not_a_fail():
+    v, _, mids, _ = _adjudicate(_fit_q(), _fit_diag([0, 1, 3], "adequate", ["FIT_MONEY_PRESTIGE"]), False)
+    assert v == "incomplete" and mids == ["FIT_MONEY_PRESTIGE"]
+
+
+def test_fit_empty_answer_is_incorrect():
+    assert _adjudicate(_fit_q(), _fit_diag([], "none"), False)[0] == "incorrect"
+
+
+def test_fit_full_answer_is_correct():
+    q = _fit_q()
+    assert _adjudicate(q, _fit_diag(range(len(q.key_points)), "adequate"), False)[0] == "correct"
+
+
+def test_fit_thin_answer_with_flag_is_incorrect():
+    assert _adjudicate(_fit_q(), _fit_diag([0], "weak", ["FIT_NO_VIEW"]), False)[0] == "incorrect"
+
+
+# ---------------------------------------------------------------- practice freshness (QA-06, QA-07)
+def test_practice_never_repeats_a_word_question_back_to_back():
+    rng = random.Random(1)
+    asked: list[str] = []
+    for _ in range(6):
+        t, _served = mastery.pick_practice(None, "ma", 1, asked, {}, rng)
+        if t.kind != "numeric":
+            assert t.id not in asked[-8:]
+        asked.append(t.id)
+
+
+def test_practice_reports_a_widened_level_truthfully():
+    # Group specifics for a group with no Advanced questions: the served level must be reported.
+    for g in bank.GROUPS:
+        if g == "generalist" or not mastery.pool(g, skill="industry"):
+            continue
+        avail = mastery.available_levels(g, "industry")
+        for lvl in (1, 2, 3):
+            t, served = mastery.pick_practice(g, "industry", lvl, [], {}, random.Random(0))
+            if lvl in avail:
+                assert served is None and t.difficulty == lvl
+            else:
+                assert served == t.difficulty and served in avail
+
+
+def test_practice_industry_without_group_falls_back():
+    t, served = mastery.pick_practice(None, "industry", 2, [], {}, random.Random(0))
+    assert t.skill != "industry" and served is not None

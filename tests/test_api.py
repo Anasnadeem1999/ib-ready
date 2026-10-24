@@ -1,0 +1,337 @@
+"""Session flow, end-of-session safety and the HTTP API, fully offline (FakeLLM in conftest.py)."""
+
+import asyncio
+import datetime as dt
+
+import pytest
+
+from ticktie import config, db, engine, llm
+from ticktie import plan as planmod
+
+
+def run(coro):
+    return asyncio.run(coro)
+
+
+def answer(sid, text="my answer"):
+    return run(engine.answer(sid, text, 20))
+
+
+def finish_diagnostic(pid):
+    sid = engine.start_session(pid, "diagnostic", "associate", None)["id"]
+    for _ in range(60):
+        if answer(sid).get("complete"):
+            break
+    assert db.session(sid)["state"].get("complete")
+    return sid
+
+
+def answer_until(sid, done_q):
+    for _ in range(40):
+        if db.session(sid)["state"]["done_q"] >= done_q:
+            return
+        answer(sid)
+    raise AssertionError("never reached done_q")
+
+
+def done_count(pid):
+    return sum(t["done"] for t in db.get_plan(pid)["tasks"])
+
+
+# ---------------------------------------------------------------- end of session
+def test_end_session_survives_coach_failure(pid, fake_llm):
+    sid = engine.start_session(pid, "drill", "associate", None)["id"]
+    answer_until(sid, 2)
+    fake_llm.fail = {"Coach"}
+    rep = run(engine.end_session(sid))
+    assert rep["session"]["ended"]
+    deb = rep["debrief"]
+    assert set(deb) >= {"headline", "went_well", "work_on", "next_step", "encouragement", "plan_event"}
+    assert any("Coach unavailable" in e["summary"] for e in rep["events"])
+
+
+def test_end_session_twice_ticks_plan_once(pid, fake_llm):
+    run(engine.end_session(finish_diagnostic(pid)))
+    sid = engine.start_session(pid, "drill", "associate", None)["id"]
+    answer_until(sid, 3)
+    before = done_count(pid)
+    hist = len(db.history(pid))
+    run(engine.end_session(sid))
+    run(engine.end_session(sid))
+    assert done_count(pid) == before + 1
+    assert len(db.history(pid)) - hist == len(engine.levels_for(pid))
+
+
+def test_concurrent_end_session_runs_side_effects_once(pid, fake_llm, monkeypatch):
+    run(engine.end_session(finish_diagnostic(pid)))
+    sid = engine.start_session(pid, "drill", "associate", None)["id"]
+    answer_until(sid, 3)
+    before = done_count(pid)
+    real = llm.run
+
+    async def slow(*a, **k):
+        await asyncio.sleep(0.05)
+        return await real(*a, **k)
+
+    monkeypatch.setattr(llm, "run", slow)
+
+    async def both():
+        return await asyncio.gather(engine.end_session(sid), engine.end_session(sid), return_exceptions=True)
+
+    results = run(both())
+    assert done_count(pid) == before + 1
+    assert sum(1 for e in db.events(sid) if e["kind"] == "end") == 1
+    assert any(isinstance(r, engine.Busy) for r in results) and any(isinstance(r, dict) for r in results)
+
+
+def test_interviewer_failure_falls_back_and_saves_state(pid, fake_llm):
+    sid = engine.start_session(pid, "mock", "associate", "accounting")["id"]
+    n0 = db.mastery(pid)["accounting"]["n"]
+    fake_llm.fail = {"Interviewer"}
+    r = answer(sid)  # a right answer: graded, map updated, then the interviewer call fails
+    assert not r["blocked"] and r["interviewer"]
+    assert any("Interviewer unavailable" in e["summary"] for e in r["events"])
+    st = db.session(sid)["state"]
+    assert st["turns"] == 1  # the turn was saved, so a retry can't re-grade it
+    n1 = db.mastery(pid)["accounting"]["n"]
+    assert n1 == n0 + 1
+    if r["resolved"] and r["action"] == "ack_next":
+        assert r["next_question"] is not None
+
+
+def test_no_answers_after_complete_diagnostic(pid, fake_llm):
+    sid = finish_diagnostic(pid)
+    calls = len(fake_llm.calls)
+    r = answer(sid)
+    assert r["blocked"] and r["reason"] == engine.FINISHED_REASON
+    assert len(fake_llm.calls) == calls  # no model call
+
+
+def test_no_regrade_after_practice_complete(pid, fake_llm):
+    sid = engine.start_session(pid, "practice", "associate", "accounting")["id"]
+    for _ in range(40):
+        if answer(sid).get("complete"):
+            break
+    n = db.mastery(pid)["accounting"]["n"]
+    r = answer(sid)
+    assert r["blocked"] and db.mastery(pid)["accounting"]["n"] == n
+
+
+def test_answer_after_end_is_blocked_not_error(pid, fake_llm):
+    sid = engine.start_session(pid, "mock", "associate", None)["id"]
+    run(engine.end_session(sid))
+    r = answer(sid)
+    assert r["blocked"] and r["reason"] == engine.FINISHED_REASON
+
+
+def test_practice_industry_for_generalist_does_not_crash(pid):
+    out = engine.start_session(pid, "practice", "associate", "industry")
+    assert out["question"]["skill"] != "industry"
+
+
+def test_turn_cap_still_gets_coach_debrief(pid, fake_llm):
+    sid = engine.start_session(pid, "mock", "associate", None)["id"]
+    answer(sid)
+    st = db.session(sid)["state"]
+    st["turns"] = config.MAX_TURNS_PER_SESSION
+    db.save_state(sid, st)
+    fake_llm.calls.clear()
+    run(engine.end_session(sid))
+    assert "Coach" in fake_llm.calls
+
+
+# ---------------------------------------------------------------- placement (QA-03)
+def test_empty_diagnostic_is_not_marked_done(pid):
+    sid = engine.start_session(pid, "diagnostic", "associate", None)["id"]
+    run(engine.end_session(sid))
+    d = engine.dashboard(pid)
+    assert d["diagnostic_done"] is False and d["plan"] is None and d["can_retake_placement"]
+
+
+def test_partial_diagnostic_places_and_builds_plan(pid):
+    sid = engine.start_session(pid, "diagnostic", "associate", None)["id"]
+    answer(sid)
+    answer(sid)  # two right accounting answers: climbed to at least Intermediate
+    rep = run(engine.end_session(sid))
+    placed = db.get_profile_json(pid, "placement")
+    assert placed["accounting"] >= 1
+    assert set(placed) >= {"ev", "dcf", "ma", "lbo", "fit"}  # the rest placed at Foundations
+    d = engine.dashboard(pid)
+    assert d["diagnostic_done"] and d["plan"] is not None and "ev" in d["placement_partial"]
+    assert rep["is_placement"] and rep["placement_partial"]
+    assert rep["debrief"]["plan_event"] == "plan_created_partial"
+
+
+def test_retake_full_placement_clears_partial_flag(pid):
+    sid = engine.start_session(pid, "diagnostic", "associate", None)["id"]
+    answer(sid)
+    run(engine.end_session(sid))
+    run(engine.end_session(finish_diagnostic(pid)))
+    assert engine.dashboard(pid)["placement_partial"] == []
+
+
+# ---------------------------------------------------------------- plan (QA-04, QA-11, contract #8)
+def test_rebuild_plan_keeps_completed_tasks(pid):
+    run(engine.end_session(finish_diagnostic(pid)))
+    plan = db.get_plan(pid)
+    drills = [t for t in plan["tasks"] if t["type"] == "drill"][:2]
+    for t in drills:
+        planmod.mark_done(plan, "drill", t["skill"])
+    db.save_plan(pid, plan)
+    total = len(plan["tasks"])
+    new = run(engine.build_plan(pid))
+    done = [t for t in new["tasks"] if t["done"]]
+    assert len(done) == 2 and {t["date"] for t in done} == {t["date"] for t in drills}
+    assert len(new["tasks"]) == total  # unchanged inputs: no inflation
+
+
+def test_start_specific_plan_task_targets_and_ticks_it(pid):
+    run(engine.end_session(finish_diagnostic(pid)))
+    plan = db.get_plan(pid)
+    drills = [t for t in plan["tasks"] if t["type"] == "drill"]
+    pick = next((t for t in reversed(drills) if t["skill"] != drills[0]["skill"]), drills[-1])
+    out = engine.start_session(pid, "drill", "associate", None, None, task_id=pick["id"])
+    st = db.session(out["id"])["state"]
+    assert st["target"]["skill"] == pick["skill"] and st["target"]["level"] == pick["level"]
+    answer_until(out["id"], 3)
+    run(engine.end_session(out["id"]))
+    ticked = next(t for t in db.get_plan(pid)["tasks"] if t["id"] == pick["id"])
+    assert ticked["done"]
+
+
+def test_group_change_resets_group_specifics(pid):
+    engine.save_intake(pid, {"group": "tmt"})
+    db.set_profile_json(pid, "placement", {"industry": 1, "accounting": 2})
+    db.set_key(pid, "lvl:industry:1", 0.9, n_inc=3)
+    out = engine.save_intake(pid, {"group": "fig"})
+    assert out.get("group_changed")
+    assert "industry" not in db.get_profile_json(pid, "placement")
+    assert engine.levels_for(pid)["industry"] == 0 and engine.levels_for(pid)["accounting"] == 2
+
+
+def test_save_intake_rejects_bad_date(pid):
+    assert engine.save_intake(pid, {"interview_date": "not-a-date"})["interview_date"] is None
+    assert engine.save_intake(pid, {"interview_date": "2026-11-03"})["interview_date"] == "2026-11-03"
+
+
+def test_fallback_debrief_shape_and_tone():
+    summary = {"questions": [{"title": "Walk me through a DCF", "skill": "DCF", "verdict": "correct", "misconceptions": []},
+                             {"title": "EV bridge", "skill": "EV", "verdict": "incorrect",
+                              "misconceptions": ["EV_CASH_ADD"]}],
+               "misconceptions_seen": ["EV_CASH_ADD"]}
+    d = engine._fallback_debrief(summary, None)
+    assert set(d) == {"headline", "went_well", "work_on", "next_step", "encouragement"}
+    assert len(d["went_well"]) <= 3 and len(d["work_on"]) <= 2
+    assert d["headline"].startswith("Thanks")
+    for w in d["work_on"]:
+        assert set(w) == {"misconception_id", "name", "why", "try_this"}
+
+
+# ---------------------------------------------------------------- HTTP API
+def test_e2e_signin_intake_placement_plan_drill(client):
+    tomorrow3w = (dt.date.today() + dt.timedelta(days=21)).isoformat()
+    assert client.post("/api/intake", json={"group": "generalist", "stage": "first_rounds",
+                                            "interview_date": tomorrow3w, "hours_per_week": 6}).status_code == 200
+    s = client.post("/api/session", json={"mode": "diagnostic"}).json()
+    sid = s["id"]
+    for _ in range(60):
+        r = client.post(f"/api/session/{sid}/answer", json={"text": "answer", "seconds": 20}).json()
+        for c in r.get("checks", []):
+            if not r["resolved"]:
+                assert c["expected"] is None  # no answer key before the question resolves
+        if r.get("complete"):
+            break
+    rep = client.post(f"/api/session/{sid}/end").json()
+    assert rep["is_placement"] and rep["placement"] and rep["plan_progress"]
+    dash = client.get("/api/dashboard").json()
+    assert dash["diagnostic_done"] and dash["plan"]
+    d = client.post("/api/session", json={"mode": "drill"}).json()
+    for _ in range(40):
+        r = client.post(f"/api/session/{d['id']}/answer", json={"text": "answer"}).json()
+        if r["progress"]["answered"] >= 3:
+            break
+    rep = client.post(f"/api/session/{d['id']}/end").json()
+    assert rep["touched_skills"] and not rep["is_placement"]
+    assert client.get("/api/dashboard").json()["progress"]["done"] == 1
+
+
+@pytest.mark.parametrize("method,path", [
+    ("get", "/api/me"), ("get", "/api/dashboard"), ("get", "/api/map"), ("get", "/api/costs"), ("get", "/api/club"),
+    ("get", "/api/session/active"), ("post", "/api/intake"), ("post", "/api/plan/rebuild"), ("post", "/api/session"),
+    ("post", "/api/feedback"),
+])
+def test_personal_endpoints_require_token(client, method, path):
+    client.headers.pop("X-Auth-Token")
+    r = getattr(client, method)(path, **({"json": {}} if method == "post" else {}))
+    assert r.status_code == 401
+
+
+def test_cannot_touch_another_users_session(client):
+    sid = client.post("/api/session", json={"mode": "mock"}).json()["id"]
+    other = client.post("/api/signin", json={"name": "Someone Else", "password": "secret123"}).json()["token"]
+    client.headers["X-Auth-Token"] = other
+    assert client.post(f"/api/session/{sid}/answer", json={"text": "x"}).status_code == 404
+    assert client.post(f"/api/session/{sid}/end").status_code == 404
+    assert client.get(f"/api/session/{sid}/events").status_code == 404
+    assert client.post("/api/feedback", json={"session_id": sid, "rating": 5}).status_code == 404
+    assert client.get("/api/session/active").json()["session"] is None
+
+
+def test_admin_export_hidden_without_token(client, monkeypatch):
+    monkeypatch.delenv("TICKTIE_ADMIN_TOKEN", raising=False)
+    assert client.get("/api/admin/export", headers={"X-Admin-Token": "x"}).status_code == 404
+    monkeypatch.setenv("TICKTIE_ADMIN_TOKEN", "s3cret")
+    assert client.get("/api/admin/export", headers={"X-Admin-Token": "wrong"}).status_code == 404
+    assert client.get("/api/admin/export", headers={"X-Admin-Token": "s3cret"}).json().keys() >= {
+        "feedback", "sessions", "turns", "events", "costs", "club"}
+
+
+def test_no_key_gives_503_and_session_still_ends(client, monkeypatch):
+    from ticktie import agents
+    monkeypatch.setattr(config, "PORTKEY_API_KEY", None)
+    monkeypatch.setattr(config, "OPENAI_API_KEY", None)
+    monkeypatch.setattr(llm, "_model", None)
+    for fn in (agents.specialist, agents.interviewer, agents.coach, agents.planner):
+        getattr(fn, "cache_clear", lambda: None)()
+    sid = client.post("/api/session", json={"mode": "mock"}).json()["id"]
+    r = client.post(f"/api/session/{sid}/answer", json={"text": "my answer"})
+    assert r.status_code == 503 and "No API key" in r.json()["error"]
+    assert client.post(f"/api/session/{sid}/end").status_code == 200
+
+
+def test_meta_exposes_app_name(client):
+    m = client.get("/api/meta").json()
+    assert m["app_name"] == config.APP_NAME == "IB Ready" and m["tagline"] == config.APP_TAGLINE
+    assert client.get("/api/health").json()["ok"]
+
+
+def test_active_session_resume(client):
+    assert client.get("/api/session/active").json() == {"session": None}
+    s = client.post("/api/session", json={"mode": "drill"}).json()
+    client.post(f"/api/session/{s['id']}/answer", json={"text": "answer"})
+    a = client.get("/api/session/active").json()["session"]
+    assert a["id"] == s["id"] and a["opener"] is None and "question" in a and "progress" in a and "events" in a
+    client.post(f"/api/session/{s['id']}/end")
+    assert client.get("/api/session/active").json() == {"session": None}
+
+
+def test_finished_session_answer_is_blocked(client):
+    s = client.post("/api/session", json={"mode": "mock"}).json()
+    client.post(f"/api/session/{s['id']}/end")
+    r = client.post(f"/api/session/{s['id']}/answer", json={"text": "more"}).json()
+    assert r["blocked"] and r["reason"] == "This session is finished — see your results."
+
+
+def test_dashboard_today_follows_client_timezone(client):
+    utc_today = dt.datetime.now(dt.timezone.utc).date()
+    east = client.get("/api/dashboard", headers={"X-TZ-Offset": "-840"}).json()["today"]  # UTC+14
+    west = client.get("/api/dashboard", headers={"X-TZ-Offset": "720"}).json()["today"]   # UTC-12
+    default = client.get("/api/dashboard").json()["today"]
+    assert default == utc_today.isoformat()
+    assert dt.date.fromisoformat(east) - dt.date.fromisoformat(west) == dt.timedelta(days=1)
+
+
+def test_costs_and_club_signed_in(client):
+    assert client.get("/api/costs").status_code == 200
+    c = client.get("/api/club").json()
+    assert c["too_few_members"] and c["misconceptions"] == []

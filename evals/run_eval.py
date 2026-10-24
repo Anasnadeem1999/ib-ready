@@ -4,8 +4,15 @@
     python -m evals.run_eval --only ticktie
 
     python -m evals.run_eval --set holdout
+    python -m evals.run_eval --set behavioral   # fit answers: fairness (verdict match, unfair flags)
+    python -m evals.run_eval --set industry     # group-specific technicals
 
 Writes evals/results/<set>_eval.json and .md.
+
+Item format: {"id", "t" (template id), "p" (params; numbers or text such as a group
+name), "expect" (main misconception id, NONE or INCOMPLETE), "a" (the answer)}.
+Optional, used by the behavioral set: "expect_verdict" (engine verdicts that count
+as fair) and "forbid_mids" (misconception ids it would be unfair to flag).
 """
 
 from __future__ import annotations
@@ -84,6 +91,18 @@ async def run_baseline(item: dict, q: bank.Question, ag: Agent) -> dict:
             "error_type": g.error_type, "mids": mids, "rec": rec.to_dict()}
 
 
+SETS = ["labeled", "holdout", "behavioral", "industry"]
+
+
+def params_of(item: dict) -> dict:
+    """Numbers become floats; text params (e.g. a coverage group's name) pass through."""
+    return {k: (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else v) for k, v in item["p"].items()}
+
+
+def _ratio(a: int, b: int) -> float:
+    return a / b if b else 0.0
+
+
 def score(rows: list[dict]) -> dict:
     right = [r for r in rows if r["expect"] == "NONE"]
     wrong = [r for r in rows if r["expect"] != "NONE"]
@@ -97,15 +116,23 @@ def score(rows: list[dict]) -> dict:
     tok_c = sum(r["rec"]["cached_tokens"] for r in rows)
     tok_o = sum(r["rec"]["output_tokens"] for r in rows)
     cost = sum(r["rec"]["cost_usd"] for r in rows)
-    return {
+    out = {
         "n": n, "n_correct_answers": len(right), "n_wrong_answers": len(wrong),
-        "verdict_accuracy": verdict_ok / n,
-        "wrong_answers_caught": caught / len(wrong),
-        "exact_misconception_named": named / len(wrong),
-        "false_alarms_on_correct": false_alarm / len(right),
-        "avg_input_tokens": tok_in / n, "avg_cached_tokens": tok_c / n, "avg_output_tokens": tok_o / n,
-        "cost_per_answer_usd": cost / n, "avg_ms": sum(r["rec"]["ms"] for r in rows) / n,
+        "verdict_accuracy": _ratio(verdict_ok, n),
+        "wrong_answers_caught": _ratio(caught, len(wrong)),
+        "exact_misconception_named": _ratio(named, len(wrong)),
+        "false_alarms_on_correct": _ratio(false_alarm, len(right)),
+        "avg_input_tokens": _ratio(tok_in, n), "avg_cached_tokens": _ratio(tok_c, n), "avg_output_tokens": _ratio(tok_o, n),
+        "cost_per_answer_usd": _ratio(cost, n), "avg_ms": _ratio(sum(r["rec"]["ms"] for r in rows), n),
     }
+    # Fairness metrics (behavioral set): did the engine land on an acceptable verdict, and did it
+    # flag any misconception that would be unfair for this answer?
+    fair_rows = [r for r in rows if r.get("expect_verdict")]
+    if fair_rows:
+        out["verdict_match"] = _ratio(sum(r["verdict"] in r["expect_verdict"] for r in fair_rows), len(fair_rows))
+        out["unfair_flags"] = _ratio(sum(bool(set(r["mids"]) & set(r.get("forbid_mids") or [])) for r in fair_rows),
+                                     len(fair_rows))
+    return out
 
 
 async def main(only: list[str], args_set: str = "labeled") -> None:
@@ -118,7 +145,7 @@ async def main(only: list[str], args_set: str = "labeled") -> None:
 
     async def one(system: str, item: dict) -> dict:
         t = bank.TEMPLATES[item["t"]]
-        q = bank.build(t, {k: float(v) for k, v in item["p"].items()})
+        q = bank.build(t, params_of(item))
         async with sem:
             for attempt in range(3):
                 try:
@@ -132,9 +159,11 @@ async def main(only: list[str], args_set: str = "labeled") -> None:
                         r = {"pred_correct": True, "verdict": "error", "error_type": str(e)[:80], "mids": [],
                              "rec": {"input_tokens": 0, "cached_tokens": 0, "output_tokens": 0, "cost_usd": 0, "ms": 0}}
                     await asyncio.sleep(2)
-        return {"id": item["id"], "t": item["t"], "expect": item["expect"], **r}
+        extra = {k: item[k] for k in ("expect_verdict", "forbid_mids") if k in item}
+        return {"id": item["id"], "t": item["t"], "expect": item["expect"], **extra, **r}
 
-    systems = only or ["ticktie", "ticktie_lite", "baseline"]
+    # The lite variant drops the domain playbook; for fit and industry the playbook IS the grading logic.
+    systems = only or (["ticktie", "ticktie_lite", "baseline"] if args_set in ("labeled", "holdout") else ["ticktie", "baseline"])
     for system in systems:
         t0 = time.time()
         rows = await asyncio.gather(*(one(system, it) for it in data))
@@ -142,7 +171,8 @@ async def main(only: list[str], args_set: str = "labeled") -> None:
         s = score(results[system])
         print(f"{system:14} verdict {s['verdict_accuracy']:.0%} | caught {s['wrong_answers_caught']:.0%} | "
               f"named {s['exact_misconception_named']:.0%} | false alarms {s['false_alarms_on_correct']:.0%} | "
-              f"${s['cost_per_answer_usd']:.5f}/answer | {time.time() - t0:.0f}s")
+              f"${s['cost_per_answer_usd']:.5f}/answer | {time.time() - t0:.0f}s"
+              + (f" | fair verdict {s['verdict_match']:.0%} | unfair flags {s['unfair_flags']:.0%}" if "verdict_match" in s else ""))
 
     prev = {}
     if (OUT / f"{args_set}_eval.json").exists() and only:
@@ -150,12 +180,15 @@ async def main(only: list[str], args_set: str = "labeled") -> None:
     allsys = {**prev, **{k: {"summary": score(v), "rows": v} for k, v in results.items()}}
     (OUT / f"{args_set}_eval.json").write_text(json.dumps({"run_at": time.strftime("%Y-%m-%d %H:%M"),
                                                          "systems": allsys}, indent=1), encoding="utf-8")
-    md = ["| System | Verdict accuracy | Wrong answers caught | Exact misconception named | False alarms on correct | Tokens in (cached) / out | Cost per answer |",
-          "|---|---|---|---|---|---|---|"]
+    fair = any("verdict_match" in v["summary"] for v in allsys.values())
+    md = ["| System | Verdict accuracy | Wrong answers caught | Exact misconception named | False alarms on correct | "
+          + ("Fair verdict | Unfair flags | " if fair else "") + "Tokens in (cached) / out | Cost per answer |",
+          "|---|---|---|---|---|---|---|" + ("---|---|" if fair else "")]
     for k, v in allsys.items():
         s = v["summary"]
+        fair_cols = (f"{s.get('verdict_match', 0):.0%} | {s.get('unfair_flags', 0):.0%} | " if fair else "")
         md.append(f"| {k} | {s['verdict_accuracy']:.0%} | {s['wrong_answers_caught']:.0%} | {s['exact_misconception_named']:.0%} | "
-                  f"{s['false_alarms_on_correct']:.0%} | {s['avg_input_tokens']:.0f} ({s['avg_cached_tokens']:.0f}) / {s['avg_output_tokens']:.0f} | "
+                  f"{s['false_alarms_on_correct']:.0%} | {fair_cols}{s['avg_input_tokens']:.0f} ({s['avg_cached_tokens']:.0f}) / {s['avg_output_tokens']:.0f} | "
                   f"${s['cost_per_answer_usd']:.5f} |")
     (OUT / f"{args_set}_eval.md").write_text("\n".join(md) + "\n", encoding="utf-8")
     print("\n".join(md))
@@ -164,6 +197,6 @@ async def main(only: list[str], args_set: str = "labeled") -> None:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", nargs="*", default=[])
-    ap.add_argument("--set", default="labeled", choices=["labeled", "holdout"])
+    ap.add_argument("--set", default="labeled", choices=SETS)
     a = ap.parse_args()
     asyncio.run(main(a.only, a.set))

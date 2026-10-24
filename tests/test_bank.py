@@ -135,3 +135,88 @@ def test_levels_ignore_direction_words():
     # ...but direction still matters for changes
     qd = q("acc_da", X=10.0, t=0.25)
     assert {c.label: c for c in bank.check_numbers(qd, {"ni": 7.5})}["ni"].status == "wrong"
+
+
+# --------------------------------------------------------------------------- grading-band properties
+# QA-02 found templates where a misconception's wrong number sat inside the grading tolerance, so the wrong
+# answer was marked correct (mkt_rates_lbo, dcf_pv, mkt_rates_wacc, ev_tsm, ev_bridge). These tests check
+# the raw trap formulas (before build() filters anything) over 300 random instances of every template.
+NUMERIC_IDS = [tid for tid, t in bank.TEMPLATES.items() if t.kind == "numeric"]
+
+
+def _wrong_parts(sig, truth):
+    """Entries equal to the truth are the parts of a fingerprint the candidate still gets right."""
+    return {k: x for k, x in sig.items() if abs(x - truth[k]) > 1e-9}
+
+
+@pytest.mark.parametrize("tid", NUMERIC_IDS)
+def test_no_misconception_is_graded_correct(tid):
+    t = bank.TEMPLATES[tid]
+    labels = {l.key: l for l in t.labels}
+    for seed in range(300):
+        p = t.gen(random.Random(seed))
+        truth = t.solve(p)
+        for mid, fn in t.traps.items():
+            for sig in fn(p):
+                assert set(sig) <= set(labels), (tid, mid, sig)
+                wrong = _wrong_parts(sig, truth)
+                assert wrong, f"{tid} seed {seed}: {mid} predicts exactly the right answer"
+                for key, x in wrong.items():
+                    assert not labels[key].close(x, truth[key]), (
+                        f"{tid} seed {seed}: {mid} predicts {key}={x}, inside the band around the truth {truth[key]}")
+
+
+@pytest.mark.parametrize("tid", NUMERIC_IDS)
+def test_misconceptions_are_distinguishable(tid):
+    t = bank.TEMPLATES[tid]
+    labels = {l.key: l for l in t.labels}
+    for seed in range(300):
+        p = t.gen(random.Random(seed))
+        truth = t.solve(p)
+        preds = [(mid, k, x) for mid, fn in t.traps.items() for sig in fn(p) for k, x in _wrong_parts(sig, truth).items()]
+        for i, (m1, k1, x1) in enumerate(preds):
+            for m2, k2, x2 in preds[i + 1:]:
+                assert not (m1 != m2 and k1 == k2 and labels[k1].close(x1, x2)), (
+                    f"{tid} seed {seed}: {m1} and {m2} both predict {k1}={x1}")
+
+
+def test_generators_rarely_need_resampling():
+    """The resampling guard is a safety net, not the design: ranges themselves should be clean."""
+    for tid in NUMERIC_IDS:
+        t = bank.TEMPLATES[tid]
+        base = getattr(t, "raw_gen", None)
+        if base is None:
+            continue
+        bad = sum(not bank._diagnosable(t, base(random.Random(s))) for s in range(300))
+        assert bad / 300 <= 0.10, f"{tid}: {bad}/300 raw instances undiagnosable"
+
+
+def test_every_group_has_basic_material():
+    for g in bank.GROUPS:
+        if g == "generalist":
+            continue
+        assert any(g in t.groups and t.difficulty == 1 for t in bank.TEMPLATES.values()), g
+
+
+def test_new_templates_hand_worked():
+    assert q("ev_bridge_basic", S=25.0, Q=10.0, D=200.0, C=80.0).values == {"equity_value": 250.0, "ev": 370.0}
+    v = q("acc_asset_sale", B=80.0, P=100.0, t=0.25).values
+    assert v["ni"] == pytest.approx(15) and v["cash"] == pytest.approx(95) and v["ppe"] == -80
+    assert q("ma_synergies_breakeven", P=500.0, NIt=16.0, t=0.4).values["synergies"] == pytest.approx(15)
+    assert q("dcf_unlever_beta", t=0.25, de=0.4, bL=1.04).values["beta_u"] == pytest.approx(0.8)
+    v = q("lbo_levers", m0=10.0, m1=11.0, E1=120.0, D0=400.0, Dp=100.0).values
+    assert v["equity_gain"] == pytest.approx(v["ebitda_growth"] + v["multiple_exp"] + v["paydown"]) == pytest.approx(420)
+    assert q("dcf_pv", X=121.0, r=0.10, n=2.0).values["pv"] == pytest.approx(100)
+
+
+def test_tsm_basic_shares_now_graded_wrong():
+    qq = q("ev_tsm", S=25.0, B=100.0, N=2.0, K=15.0)   # truth 100.8
+    c = {x.label: x for x in bank.check_numbers(qq, {"diluted_shares": 100.0})}["diluted_shares"]
+    assert c.status == "wrong" and "EV_TSM_BASIC" in c.matches
+
+
+def test_offer_premium():
+    v = q("ma_premium", P0=25.0, Offer=30.0, Q=20.0).values
+    assert v["premium"] == pytest.approx(20) and v["purchase_equity"] == pytest.approx(600)
+    c = {x.label: x for x in bank.check_numbers(q("ma_premium", P0=25.0, Offer=30.0, Q=20.0), {"premium": 16.67})}["premium"]
+    assert c.status == "wrong" and "MA_PREMIUM_ON_OFFER" in c.matches

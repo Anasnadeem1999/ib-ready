@@ -1,0 +1,490 @@
+{
+ "app_name": "IB Ready",
+ "tagline": "Your IB interview coach",
+ "primer": {
+  "title": "What are IB technical interviews?",
+  "body": "Investment banks advise companies on big money decisions: buying another company, selling one, or raising money from investors. Before hiring you as an analyst, bankers check that you understand the basics of how companies are measured and valued. That's the \"technical\" part of the interview. Expect four families of questions: accounting (how a change ripples through the three financial statements), valuation (what a company is worth and why), deals (mergers and leveraged buyouts), and you (your story and why banking). Early conversations, such as coffee chats and first rounds, stick to the basics. Final rounds (\"Superdays\") go deeper. Nobody expects you to know everything. They want clear thinking, out loud, and honesty when you're unsure. That's exactly what you'll practise in IB Ready."
+ },
+ "glossary": [
+  {
+   "term": "Investment banking (IB)",
+   "definition": "Advising companies on mergers, acquisitions and raising money."
+  },
+  {
+   "term": "Analyst / Associate / VP / Director / MD",
+   "definition": "The ladder from entry level (Analyst) to senior (Managing Director). Juniors ask more technicals; seniors ask more about you."
+  },
+  {
+   "term": "Coffee chat",
+   "definition": "An informal 15-30 minute call with a banker. Mostly about you, with maybe one or two simple technical questions."
+  },
+  {
+   "term": "First round",
+   "definition": "The first formal interview, usually 30 minutes: your story plus basic technicals."
+  },
+  {
+   "term": "Superday",
+   "definition": "The final round: several back-to-back interviews in one day, including harder technicals."
+  },
+  {
+   "term": "Coverage group",
+   "definition": "A team focused on one industry, for example Healthcare or Technology."
+  },
+  {
+   "term": "Product group",
+   "definition": "A team focused on one type of deal, for example M&A or Leveraged Finance."
+  },
+  {
+   "term": "STAR",
+   "definition": "A way to tell a story: Situation, Task, Action, Result."
+  },
+  {
+   "term": "Pitch book",
+   "definition": "The slide deck bankers use to win or run a deal."
+  },
+  {
+   "term": "Three financial statements",
+   "definition": "The income statement, cash flow statement and balance sheet."
+  },
+  {
+   "term": "Income statement",
+   "definition": "Revenue minus costs over a period, ending in net income (profit)."
+  },
+  {
+   "term": "Cash flow statement (CFS)",
+   "definition": "How much cash actually came in and went out, split into operating, investing and financing."
+  },
+  {
+   "term": "Balance sheet",
+   "definition": "What a company owns (assets) and owes (liabilities), plus the owners' stake (equity), on one date. Assets always equal liabilities plus equity."
+  },
+  {
+   "term": "Net income",
+   "definition": "Profit after all costs, interest and taxes."
+  },
+  {
+   "term": "Revenue",
+   "definition": "Money earned from selling products or services."
+  },
+  {
+   "term": "COGS (cost of goods sold)",
+   "definition": "The direct cost of the products that were sold."
+  },
+  {
+   "term": "SG&A",
+   "definition": "Overhead costs such as salaries, rent and marketing."
+  },
+  {
+   "term": "Gross profit / gross margin",
+   "definition": "Revenue minus COGS, and that amount as a percentage of revenue."
+  },
+  {
+   "term": "EBITDA",
+   "definition": "Earnings before interest, taxes, depreciation and amortization: a rough proxy for operating cash profit."
+  },
+  {
+   "term": "EBIT",
+   "definition": "Earnings before interest and taxes (operating profit)."
+  },
+  {
+   "term": "D&A (depreciation and amortization)",
+   "definition": "Spreading the cost of long-lived assets over their life. A non-cash expense."
+  },
+  {
+   "term": "Non-cash expense",
+   "definition": "An expense that lowers profit without cash leaving this year, such as D&A, write-downs or stock-based pay."
+  },
+  {
+   "term": "Write-down",
+   "definition": "Reducing an asset's value on the balance sheet because it's worth less than recorded."
+  },
+  {
+   "term": "Stock-based compensation (SBC)",
+   "definition": "Paying employees in shares instead of cash."
+  },
+  {
+   "term": "APIC / common stock",
+   "definition": "The equity line that rises when a company issues shares."
+  },
+  {
+   "term": "Retained earnings",
+   "definition": "All past profits kept in the business rather than paid out."
+  },
+  {
+   "term": "Shareholders' equity",
+   "definition": "Assets minus liabilities: the owners' stake."
+  },
+  {
+   "term": "Capex (capital expenditure)",
+   "definition": "Cash spent on long-lived assets like buildings or machines."
+  },
+  {
+   "term": "PP&E",
+   "definition": "Property, plant and equipment: the long-lived physical assets capex buys."
+  },
+  {
+   "term": "Working capital",
+   "definition": "Short-term operating assets minus short-term operating liabilities (receivables + inventory - payables - deferred revenue)."
+  },
+  {
+   "term": "Accounts receivable (AR)",
+   "definition": "Money customers owe you for things already delivered."
+  },
+  {
+   "term": "Accounts payable (AP)",
+   "definition": "Money you owe suppliers."
+  },
+  {
+   "term": "Inventory",
+   "definition": "Products bought or made but not yet sold."
+  },
+  {
+   "term": "Deferred revenue",
+   "definition": "Cash received for work you haven't done yet. A liability until it's delivered."
+  },
+  {
+   "term": "Deferred tax liability (DTL)",
+   "definition": "Tax you'll pay later because tax accounting and book accounting differ."
+  },
+  {
+   "term": "Dividend",
+   "definition": "Cash paid out to shareholders from profits."
+  },
+  {
+   "term": "Tax shield",
+   "definition": "The tax saved because an expense, like interest, is tax-deductible."
+  },
+  {
+   "term": "Equity value / market cap",
+   "definition": "What all the shares are worth: share price x shares."
+  },
+  {
+   "term": "Enterprise value (EV)",
+   "definition": "What the whole business is worth to everyone who funds it: equity value + debt - cash (+ preferred stock and minority interest)."
+  },
+  {
+   "term": "Diluted shares",
+   "definition": "Shares outstanding plus extra shares from options and similar instruments likely to be exercised."
+  },
+  {
+   "term": "Options / strike price",
+   "definition": "The right to buy a share at a fixed price. 'In the money' if the share price is above the strike."
+  },
+  {
+   "term": "Treasury stock method (TSM)",
+   "definition": "Counting option dilution net of the shares the company could buy back with the exercise money."
+  },
+  {
+   "term": "Preferred stock",
+   "definition": "Shares paid before common shareholders, often with a fixed dividend."
+  },
+  {
+   "term": "Noncontrolling interest (NCI)",
+   "definition": "The part of a subsidiary the company doesn't own but still fully reports."
+  },
+  {
+   "term": "Net debt",
+   "definition": "Debt minus cash."
+  },
+  {
+   "term": "Multiple",
+   "definition": "A shortcut valuation ratio such as EV/EBITDA or P/E."
+  },
+  {
+   "term": "EV/EBITDA",
+   "definition": "Enterprise value divided by EBITDA. The most common valuation multiple."
+  },
+  {
+   "term": "P/E (price-to-earnings)",
+   "definition": "Share price divided by earnings per share, or equity value divided by net income."
+  },
+  {
+   "term": "EPS (earnings per share)",
+   "definition": "Net income divided by shares."
+  },
+  {
+   "term": "Comparable companies (comps)",
+   "definition": "Valuing a company using the multiples of similar public companies."
+  },
+  {
+   "term": "Precedent transactions",
+   "definition": "Valuing a company using the multiples paid in past acquisitions."
+  },
+  {
+   "term": "Control premium",
+   "definition": "The extra a buyer pays above the market price to take control."
+  },
+  {
+   "term": "DCF (discounted cash flow)",
+   "definition": "Valuing a company as today's value of its future cash flows."
+  },
+  {
+   "term": "Present value (PV)",
+   "definition": "What future money is worth today."
+  },
+  {
+   "term": "Discount rate",
+   "definition": "The return investors require, used to shrink future cash into today's money."
+  },
+  {
+   "term": "Discount factor",
+   "definition": "The number you multiply a future amount by to get its value today. Always below 1."
+  },
+  {
+   "term": "Unlevered free cash flow (UFCF)",
+   "definition": "Cash the business generates for all investors, before interest: EBIT after tax + D&A - capex - increase in working capital."
+  },
+  {
+   "term": "NOPAT",
+   "definition": "EBIT after tax."
+  },
+  {
+   "term": "WACC",
+   "definition": "Weighted average cost of capital: the blended return lenders and shareholders require."
+  },
+  {
+   "term": "Cost of equity",
+   "definition": "The return shareholders require."
+  },
+  {
+   "term": "CAPM",
+   "definition": "The formula for cost of equity: risk-free rate + beta x equity risk premium."
+  },
+  {
+   "term": "Risk-free rate",
+   "definition": "The return on government bonds, usually the 10-year Treasury."
+  },
+  {
+   "term": "Equity risk premium (ERP)",
+   "definition": "The extra return investors expect from stocks over the risk-free rate."
+  },
+  {
+   "term": "Beta (levered / unlevered)",
+   "definition": "How much a stock moves with the market, with or without the effect of debt."
+  },
+  {
+   "term": "Terminal value (TV)",
+   "definition": "The value of all cash flows after the forecast period."
+  },
+  {
+   "term": "Perpetuity growth method",
+   "definition": "Terminal value = next year's cash flow / (discount rate - growth rate)."
+  },
+  {
+   "term": "Exit multiple method",
+   "definition": "Terminal value = final-year EBITDA x a market multiple."
+  },
+  {
+   "term": "Basis point (bp)",
+   "definition": "One hundredth of a percent: 100bp = 1%."
+  },
+  {
+   "term": "M&A",
+   "definition": "Mergers and acquisitions: one company buying or combining with another."
+  },
+  {
+   "term": "Purchase price / premium",
+   "definition": "What the buyer pays, and how much above the current market value that is."
+  },
+  {
+   "term": "Accretive / dilutive",
+   "definition": "The deal raises / lowers the buyer's earnings per share."
+  },
+  {
+   "term": "Pro forma",
+   "definition": "'As if the deal had happened': the combined numbers."
+  },
+  {
+   "term": "Synergies",
+   "definition": "Extra profit from combining two companies, through cost savings or new revenue."
+  },
+  {
+   "term": "Earnings yield",
+   "definition": "Earnings divided by price: the inverse of P/E."
+  },
+  {
+   "term": "Goodwill",
+   "definition": "The part of a purchase price above the fair value of the target's identifiable assets."
+  },
+  {
+   "term": "Write-up",
+   "definition": "Raising an acquired asset to its fair value."
+  },
+  {
+   "term": "LBO (leveraged buyout)",
+   "definition": "A private equity firm buying a company using mostly borrowed money."
+  },
+  {
+   "term": "Private equity (PE) firm / sponsor",
+   "definition": "An investor that buys companies, improves them and sells them."
+  },
+  {
+   "term": "Equity check",
+   "definition": "The money the sponsor puts in itself."
+  },
+  {
+   "term": "MOIC (multiple of invested capital)",
+   "definition": "Money out divided by money in, for example 2.0x."
+  },
+  {
+   "term": "IRR (internal rate of return)",
+   "definition": "The annual compounded return on an investment."
+  },
+  {
+   "term": "Leverage ratio",
+   "definition": "Debt divided by EBITDA."
+  },
+  {
+   "term": "Interest coverage",
+   "definition": "EBITDA divided by interest expense."
+  },
+  {
+   "term": "Debt paydown",
+   "definition": "Repaying debt over time from the company's cash flow."
+  },
+  {
+   "term": "Exit",
+   "definition": "When the sponsor sells the company, to a buyer or through an IPO."
+  },
+  {
+   "term": "IPO",
+   "definition": "A company's first sale of shares to the public."
+  },
+  {
+   "term": "S-1 / roadshow / greenshoe",
+   "definition": "The IPO filing / investor meetings before pricing / an option to sell 15% extra shares to steady the price."
+  },
+  {
+   "term": "Bond yield / duration",
+   "definition": "The return a bond pays at its current price / how sensitive its price is to interest rates."
+  },
+  {
+   "term": "P/TBV (price to tangible book)",
+   "definition": "A bank's market cap divided by (equity - goodwill - intangibles)."
+  },
+  {
+   "term": "Cap rate / NOI",
+   "definition": "Real estate's yield (NOI / property value) / net operating income (rent minus property costs)."
+  },
+  {
+   "term": "REIT / FFO",
+   "definition": "A company that owns income-producing property / its cash earnings (net income + property depreciation - gains on sales)."
+  },
+  {
+   "term": "ARR",
+   "definition": "Annual recurring revenue: the yearly value of subscription contracts."
+  },
+  {
+   "term": "LTV / CAC / churn",
+   "definition": "Lifetime gross profit per customer / cost to win a customer / share of customers lost each year."
+  },
+  {
+   "term": "rNPV",
+   "definition": "A drug's value weighted by its probability of approval."
+  },
+  {
+   "term": "EBITDAX",
+   "definition": "EBITDA before exploration expense, used for oil and gas producers."
+  },
+  {
+   "term": "Backlog / book-to-bill",
+   "definition": "Orders won but not yet delivered / new orders divided by revenue billed."
+  },
+  {
+   "term": "Same-store sales",
+   "definition": "Sales growth from stores open at least a year."
+  },
+  {
+   "term": "Chapter 11 / absolute priority / recovery",
+   "definition": "US court-supervised restructuring / senior claims are paid first / the share of a claim that gets paid back."
+  },
+  {
+   "term": "DIP financing",
+   "definition": "New loans to a company during bankruptcy."
+  },
+  {
+   "term": "Misconception",
+   "definition": "A specific, named wrong idea behind a wrong answer."
+  },
+  {
+   "term": "Mastery",
+   "definition": "How consistently you've shown a skill recently, from 0 to 100."
+  },
+  {
+   "term": "Level",
+   "definition": "Basic, Intermediate or Advanced. See 'How levels work'."
+  },
+  {
+   "term": "Sub-skill",
+   "definition": "One narrow topic inside a skill, for example 'Working capital' inside Accounting."
+  },
+  {
+   "term": "Drill / mock",
+   "definition": "A short targeted practice set / a full simulated interview."
+  }
+ ],
+ "levels": {
+  "intro": "Every skill has three levels. You'll see each one in a real recruiting season.",
+  "Basic": {
+   "stage": "Coffee chats and first rounds",
+   "explanation": "The questions every candidate is expected to answer cleanly in about a minute: walk a single change through the three statements, get from equity value to enterprise value, explain a DCF. Get these solid first; they decide most first rounds."
+  },
+  "Intermediate": {
+   "stage": "Superdays",
+   "explanation": "Two or three steps, or a well-known trap: working capital, diluted shares, accretion/dilution, a paper LBO."
+  },
+  "Advanced": {
+   "stage": "Specialist and stretch questions",
+   "explanation": "Purchase accounting, rate shocks, deferred taxes, edge cases. Useful for very technical groups, but not where offers are usually won or lost."
+  },
+  "how_you_level_up": "You reach a level once you've shown it on at least two questions (75%+ mastery). IB Ready always starts you at Basic and only moves you up when you're ready."
+ },
+ "misconception_explainer": "A misconception is the specific wrong idea behind a wrong number, like \"forgot that interest is tax-deductible\". Fix the idea once and every question that uses it gets easier.",
+ "empty_states": {
+  "dashboard": {
+   "not_placed": "Let's find your starting point. A 15-minute placement interview shows where you already are and where to focus. There's no pass or fail, just a map.",
+   "not_placed_cta": "Start placement interview",
+   "nothing_due_today": "You're caught up for today. If you have ten spare minutes, one short mock keeps things fresh."
+  },
+  "plan": {
+   "no_plan": "Your plan appears here after the placement interview. It counts back from your interview date and fits the hours you said you have, so you only practise what moves the needle.",
+   "date_passed": "Your interview date has passed. We hope it went well! Set a new date and we'll rebuild the plan around it."
+  },
+  "progress": {
+   "no_skills": "Your skills map fills in as you answer questions. Each skill shows Basic, Intermediate and Advanced. Red sub-skills are where your next drills go.",
+   "no_misconceptions": "No misconceptions spotted yet. When a wrong answer matches a known mistake, it shows up here with your own words as evidence, so you can see it, fix it and beat it twice.",
+   "before_first_answer": "Answer the way you would out loud: the direction (up or down), the number, and why. Each line item gets checked here."
+  }
+ },
+ "encouragement": {
+  "nudge": [
+   "Good structure so far. Take another look at net income: what happens to taxes when pre-tax income falls?",
+   "Direction's right on cash. The size isn't. What actually leaves the building here?",
+   "Close on the method. Before EV, ask yourself: does the buyer keep the cash, or pay for it?",
+   "You've got the income statement. Now walk me through the cash flow statement from the top.",
+   "Nice start. Is interest part of unlevered free cash flow, or does it come later?",
+   "Think about the share count. Does a cash deal create any new shares?",
+   "Your MOIC is right. For IRR, remember the return compounds. Want to try again?",
+   "Take a breath. This one trips up lots of people. Which comes first: the gain, or the proceeds?",
+   "Almost all there. One line item is missing: what happens to the balance sheet?",
+   "Let's slow it down. Say the direction first (up or down), then the number."
+  ],
+  "reveal": [
+   "This is one of the most common slips. The full walk-through is on screen; read it once, then we'll keep going.",
+   "Not this time, and that's useful to know now rather than in the real thing. The worked answer is on screen."
+  ],
+  "level_up": [
+   "Level up: {skill} is now {level}. You've shown it twice in a row. It's yours.",
+   "New level reached: {skill}, {level}.",
+   "Misconception beaten: \"{misconception}\" is cleared. Two correct in a row.",
+   "Placed. Here's your starting map: green is solid, red is where your plan begins."
+  ],
+  "keep_going": [
+   "Hard sessions are where most of the learning happens. Your plan has already adjusted.",
+   "Three questions today still counts. A short session tomorrow beats a long one next week.",
+   "You found gaps today that you didn't know about. That's the point of practising in IB Ready, not in the interview.",
+   "Day {streak} in a row. Small and steady is how this gets easy.",
+   "Your interview is tomorrow. Do a light Basic warm-up, then rest. You've done the work."
+  ]
+ }
+}

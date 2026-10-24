@@ -19,7 +19,11 @@ from . import config  # noqa: E402
 
 # Function tools on gpt-6-luna through the gateway's chat endpoint require
 # reasoning to be off; with it on, the gateway rejects tool calls (HTTP 400).
-SETTINGS = OpenAIChatModelSettings(openai_reasoning_effort="none", temperature=0.2)
+# Timeouts: without them a hung gateway call would hold the session for the SDK default of 600 s.
+# The SDK's own retries are off; llm.run retries transient errors itself.
+SETTINGS = OpenAIChatModelSettings(openai_reasoning_effort="none", temperature=0.2,
+                                   timeout=config.LLM_TIMEOUT_SECONDS,
+                                   request_timeout=config.LLM_TIMEOUT_SECONDS + 15, max_retries=0)
 
 
 class ModelPolicyError(RuntimeError):
@@ -29,7 +33,8 @@ class ModelPolicyError(RuntimeError):
 def _transient(exc: BaseException) -> bool:
     name = type(exc).__name__
     code = getattr(exc, "status_code", None)
-    return name in ("ModelConnectionError", "APIConnectionError", "APITimeoutError", "TimeoutError") or code in (408, 429, 500, 502, 503, 504)
+    return name in ("ModelConnectionError", "APIConnectionError", "APITimeoutError", "TimeoutError",
+                    "ModelRequestTimeout") or code in (408, 429, 500, 502, 503, 504)
 
 
 def is_content_filter(exc: BaseException) -> bool:
@@ -102,7 +107,7 @@ async def run(agent: Agent, agent_name: str, prompt: str, deps=None, session_id:
     for attempt in range(3):  # transient network / rate-limit / 5xx errors get two retries with backoff
         try:
             result = await agent.run(
-                prompt, deps=deps, model_settings=SETTINGS,
+                prompt, deps=deps, model_settings=SETTINGS,  # output caps live on each agent (agents.MAX_TOKENS)
                 usage_limits=UsageLimits(request_limit=config.REQUEST_LIMIT_PER_AGENT),
             )
             break

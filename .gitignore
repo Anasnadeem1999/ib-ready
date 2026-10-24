@@ -23,3 +23,5 @@ data/llm_calls.jsonl
 Thumbs.db
 docs/_demo_data/
 evals/results/_flow/
+data/*.db-wal
+data/*.db-shm

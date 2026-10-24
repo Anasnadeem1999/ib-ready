@@ -1,0 +1,203 @@
+{
+ "run_at": "2026-10-24 01:09",
+ "systems": {
+  "ticktie": {
+   "summary": {
+    "n": 8,
+    "n_correct_answers": 2,
+    "n_wrong_answers": 6,
+    "verdict_accuracy": 1.0,
+    "wrong_answers_caught": 1.0,
+    "exact_misconception_named": 1.0,
+    "false_alarms_on_correct": 0.0,
+    "avg_input_tokens": 6432.25,
+    "avg_cached_tokens": 5518.875,
+    "avg_output_tokens": 178.875,
+    "cost_per_answer_usd": 0.00023596375,
+    "avg_ms": 3528.375
+   },
+   "rows": [
+    {
+     "id": 1,
+     "t": "fig_ptbv",
+     "expect": "NONE",
+     "pred_correct": true,
+     "verdict": "correct",
+     "error_type": "none",
+     "mids": [],
+     "rec": {
+      "agent": "eval",
+      "input_tokens": 6971,
+      "cached_tokens": 6356,
+      "output_tokens": 197,
+      "requests": 2,
+      "tool_calls": 1,
+      "model_resolved": "gpt-6-luna-2026-09-22",
+      "model_ok": true,
+      "ms": 3973,
+      "cost_usd": 0.00022356
+     }
+    },
+    {
+     "id": 2,
+     "t": "re_ffo",
+     "expect": "RE_FFO_GAIN",
+     "pred_correct": false,
+     "verdict": "incorrect",
+     "error_type": "conceptual",
+     "mids": [
+      "RE_FFO_GAIN"
+     ],
+     "rec": {
+      "agent": "eval",
+      "input_tokens": 6779,
+      "cached_tokens": 3225,
+      "output_tokens": 162,
+      "requests": 2,
+      "tool_calls": 1,
+      "model_resolved": "gpt-6-luna-2026-09-22",
+      "model_ok": true,
+      "ms": 3194,
+      "cost_usd": 0.00046865
+     }
+    },
+    {
+     "id": 3,
+     "t": "tmt_ltv",
+     "expect": "TMT_LTV_NO_MARGIN",
+     "pred_correct": false,
+     "verdict": "incorrect",
+     "error_type": "conceptual",
+     "mids": [
+      "TMT_LTV_NO_MARGIN"
+     ],
+     "rec": {
+      "agent": "eval",
+      "input_tokens": 6971,
+      "cached_tokens": 6336,
+      "output_tokens": 254,
+      "requests": 2,
+      "tool_calls": 1,
+      "model_resolved": "gpt-6-luna-2026-09-22",
+      "model_ok": true,
+      "ms": 3316,
+      "cost_usd": 0.00025386
+     }
+    },
+    {
+     "id": 4,
+     "t": "hc_rnpv",
+     "expect": "NONE",
+     "pred_correct": true,
+     "verdict": "correct",
+     "error_type": "none",
+     "mids": [],
+     "rec": {
+      "agent": "eval",
+      "input_tokens": 6869,
+      "cached_tokens": 6319,
+      "output_tokens": 176,
+      "requests": 2,
+      "tool_calls": 1,
+      "model_resolved": "gpt-6-luna-2026-09-22",
+      "model_ok": true,
+      "ms": 4183,
+      "cost_usd": 0.00020619
+     }
+    },
+    {
+     "id": 5,
+     "t": "rx_waterfall",
+     "expect": "RX_PRO_RATA",
+     "pred_correct": false,
+     "verdict": "incorrect",
+     "error_type": "conceptual",
+     "mids": [
+      "RX_PRO_RATA"
+     ],
+     "rec": {
+      "agent": "eval",
+      "input_tokens": 6869,
+      "cached_tokens": 6306,
+      "output_tokens": 175,
+      "requests": 2,
+      "tool_calls": 1,
+      "model_resolved": "gpt-6-luna-2026-09-22",
+      "model_ok": true,
+      "ms": 3115,
+      "cost_usd": 0.00020686
+     }
+    },
+    {
+     "id": 6,
+     "t": "en_ebitdax",
+     "expect": "EN_EBITDA_ONLY",
+     "pred_correct": false,
+     "verdict": "incorrect",
+     "error_type": "conceptual",
+     "mids": [
+      "EN_EBITDA_ONLY"
+     ],
+     "rec": {
+      "agent": "eval",
+      "input_tokens": 6809,
+      "cached_tokens": 6287,
+      "output_tokens": 176,
+      "requests": 2,
+      "tool_calls": 1,
+      "model_resolved": "gpt-6-luna-2026-09-22",
+      "model_ok": true,
+      "ms": 4754,
+      "cost_usd": 0.00020307
+     }
+    },
+    {
+     "id": 7,
+     "t": "re_cap_rate",
+     "expect": "GEN_ARITHMETIC",
+     "pred_correct": false,
+     "verdict": "incorrect",
+     "error_type": "arithmetic",
+     "mids": [
+      "GEN_ARITHMETIC"
+     ],
+     "rec": {
+      "agent": "eval",
+      "input_tokens": 6769,
+      "cached_tokens": 6272,
+      "output_tokens": 169,
+      "requests": 2,
+      "tool_calls": 1,
+      "model_resolved": "gpt-6-luna-2026-09-22",
+      "model_ok": true,
+      "ms": 3697,
+      "cost_usd": 0.00019692
+     }
+    },
+    {
+     "id": 8,
+     "t": "c_fig_no_ev",
+     "expect": "FIG_USES_EV",
+     "pred_correct": false,
+     "verdict": "incorrect",
+     "error_type": "conceptual",
+     "mids": [
+      "FIG_USES_EV"
+     ],
+     "rec": {
+      "agent": "eval",
+      "input_tokens": 3421,
+      "cached_tokens": 3050,
+      "output_tokens": 122,
+      "requests": 1,
+      "tool_calls": 0,
+      "model_resolved": "gpt-6-luna-2026-09-22",
+      "model_ok": true,
+      "ms": 1995,
+      "cost_usd": 0.0001286
+     }
+    }
+   ]
+  }
+ }
+}

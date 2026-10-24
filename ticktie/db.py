@@ -69,23 +69,38 @@ CREATE TABLE IF NOT EXISTS plans (
 CREATE INDEX IF NOT EXISTS ix_history ON history(profile_id, key);
 CREATE INDEX IF NOT EXISTS ix_events_session ON events(session_id);
 CREATE INDEX IF NOT EXISTS ix_turns_session ON turns(session_id);
+CREATE INDEX IF NOT EXISTS ix_events_kind_ts ON events(kind, ts);
+CREATE INDEX IF NOT EXISTS ix_sessions_profile ON sessions(profile_id, started);
+CREATE INDEX IF NOT EXISTS ix_login_failures ON login_failures(name, ts);
+CREATE INDEX IF NOT EXISTS ix_auth_tokens_profile ON auth_tokens(profile_id);
 """
 
 
 @contextmanager
 def conn():
-    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    c = sqlite3.connect(config.DB_PATH)
+    """One short-lived connection per unit of work. WAL (set once in init) lets readers and
+    the single writer overlap; synchronous=NORMAL is safe with WAL and avoids an fsync per commit."""
+    c = sqlite3.connect(config.DB_PATH, timeout=10)
     c.row_factory = sqlite3.Row
+    c.execute("PRAGMA synchronous=NORMAL")
+    c.execute("PRAGMA busy_timeout=10000")
     try:
         yield c
         c.commit()
+    except BaseException:
+        c.rollback()
+        raise
     finally:
         c.close()
 
 
 def init() -> None:
+    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
     with conn() as c:
+        try:
+            c.execute("PRAGMA journal_mode=WAL")  # persistent; falls back silently on filesystems without WAL support
+        except sqlite3.DatabaseError:
+            pass
         c.executescript(SCHEMA)
         cols = {r["name"] for r in c.execute("PRAGMA table_info(profiles)")}
         for col in ("intake", "placement"):
@@ -128,9 +143,12 @@ def sign_in(name: str, password: str) -> tuple[dict, str, bool]:
     if row is None:
         prof = get_or_create_profile(name)
         salt = secrets.token_bytes(16)
-        with conn() as c:
-            c.execute("INSERT INTO credentials VALUES (?,?,?,?)",
-                      (prof["id"], salt.hex(), _hash(password, salt, PBKDF2_ITERATIONS), PBKDF2_ITERATIONS))
+        try:
+            with conn() as c:
+                c.execute("INSERT INTO credentials VALUES (?,?,?,?)",
+                          (prof["id"], salt.hex(), _hash(password, salt, PBKDF2_ITERATIONS), PBKDF2_ITERATIONS))
+        except sqlite3.IntegrityError:  # two sign-ups with the same new name at the same moment
+            raise AuthError("That name was just taken. Try signing in again.")
         created = True
     else:
         prof = dict(row)
@@ -370,15 +388,20 @@ def add_event(sid: str, actor: str, kind: str, summary: str, detail: dict | None
     return ev
 
 
-def events(sid: str) -> list[dict]:
+def events(sid: str, after_id: int = 0) -> list[dict]:
     with conn() as c:
-        rows = c.execute("SELECT * FROM events WHERE session_id=? ORDER BY id", (sid,)).fetchall()
+        rows = c.execute("SELECT * FROM events WHERE session_id=? AND id>? ORDER BY id", (sid, after_id)).fetchall()
     out = []
     for r in rows:
         d = dict(r)
         d["detail"] = json.loads(d["detail"] or "{}")
         out.append(d)
     return out
+
+
+def max_event_id(sid: str) -> int:
+    with conn() as c:
+        return int(c.execute("SELECT COALESCE(MAX(id),0) m FROM events WHERE session_id=?", (sid,)).fetchone()["m"])
 
 
 def session_usage(sid: str) -> dict:
@@ -414,3 +437,79 @@ def club_summary() -> dict:
                                 JOIN profiles p ON p.id=s.profile_id WHERE p.club_opt_in=1 AND t.verdict IS NOT NULL""").fetchone()["n"]
     return {"members": members, "answers": answered,
             "misconceptions": [dict(r) for r in mis], "skills": [dict(r) for r in sk]}
+
+
+# ---------------------------------------------------------------- dashboard / resume helpers
+def answer_timestamps(pid: str) -> list[float]:
+    """When this profile's answers happened (for the streak, computed in the user's time zone)."""
+    with conn() as c:
+        return [r["ts"] for r in c.execute("""SELECT t.ts FROM turns t JOIN sessions s ON s.id=t.session_id
+                                               WHERE s.profile_id=?""", (pid,))]
+
+
+def count_ended_sessions(pid: str) -> int:
+    """Finished sessions with at least one graded answer (an empty session isn't practice)."""
+    with conn() as c:
+        return c.execute("""SELECT COUNT(*) n FROM sessions s WHERE s.profile_id=? AND s.ended IS NOT NULL
+                            AND EXISTS (SELECT 1 FROM turns t WHERE t.session_id=s.id AND t.verdict IS NOT NULL)""",
+                         (pid,)).fetchone()["n"]
+
+
+def open_sessions(pid: str, since: float) -> list[str]:
+    """Ids of this profile's sessions that were never ended, newest first."""
+    with conn() as c:
+        return [r["id"] for r in c.execute("""SELECT id FROM sessions WHERE profile_id=? AND ended IS NULL AND started>?
+                                              ORDER BY started DESC""", (pid, since))]
+
+
+def skill_speed_and_count(pid: str) -> tuple[dict[str, float], int]:
+    """Average seconds per skill and the number of graded answers, without loading every turn."""
+    with conn() as c:
+        rows = c.execute("""SELECT t.skill, AVG(CASE WHEN t.seconds>0 THEN t.seconds END) avg_s
+                            FROM turns t JOIN sessions s ON s.id=t.session_id WHERE s.profile_id=? GROUP BY t.skill""",
+                         (pid,)).fetchall()
+        n = c.execute("""SELECT COUNT(*) n FROM turns t JOIN sessions s ON s.id=t.session_id
+                         WHERE s.profile_id=? AND t.verdict IS NOT NULL""", (pid,)).fetchone()["n"]
+    return {r["skill"]: r["avg_s"] for r in rows if r["avg_s"] is not None}, n
+
+
+def cost_summary() -> dict:
+    with conn() as c:
+        per_agent = [dict(r) for r in c.execute(
+            """SELECT actor, COUNT(*) calls, SUM(input_tokens) input_tokens, SUM(cached_tokens) cached_tokens,
+                      SUM(output_tokens) output_tokens, SUM(cost_usd) cost_usd
+               FROM events WHERE kind='llm' GROUP BY actor ORDER BY cost_usd DESC""")]
+        answers = c.execute("SELECT COUNT(*) n FROM turns").fetchone()["n"]
+        sess = c.execute("SELECT COUNT(DISTINCT session_id) n FROM turns").fetchone()["n"]
+        tot = dict(c.execute("""SELECT COALESCE(SUM(input_tokens),0) i, COALESCE(SUM(cached_tokens),0) cch,
+                                COALESCE(SUM(output_tokens),0) o, COALESCE(SUM(cost_usd),0) usd
+                                FROM events WHERE kind='llm'""").fetchone())
+    return {"per_agent": per_agent, "answers": answers, "sessions": sess, "total": tot}
+
+
+def export_all() -> dict:
+    with conn() as c:
+        sessions = [dict(r) for r in c.execute(
+            """SELECT s.id, p.name, s.mode, s.persona, s.started, s.ended, s.mastery_start, s.debrief
+               FROM sessions s JOIN profiles p ON p.id=s.profile_id ORDER BY s.started""")]
+        turns_ = [dict(r) for r in c.execute(
+            """SELECT t.session_id, t.ts, t.template_id, t.skill, t.question, t.answer, t.seconds, t.verdict,
+                      t.error_type, t.misconceptions, t.interviewer, t.input_tokens, t.cached_tokens,
+                      t.output_tokens, t.cost_usd FROM turns t ORDER BY t.id""")]
+        events_ = [dict(r) for r in c.execute(
+            "SELECT session_id, ts, actor, kind, summary, detail, input_tokens, cached_tokens, output_tokens, cost_usd "
+            "FROM events ORDER BY id")]
+    return {"feedback": all_feedback(), "sessions": sessions, "turns": turns_, "events": events_}
+
+
+def delete_token(token: str) -> None:
+    with conn() as c:
+        c.execute("DELETE FROM auth_tokens WHERE token=?", (token,))
+
+
+def reset_skill(pid: str, skill: str) -> None:
+    """Forget a skill's mastery, level and sub-skill estimates (used when the group-specific skill changes meaning)."""
+    with conn() as c:
+        c.execute("DELETE FROM mastery WHERE profile_id=? AND (skill=? OR skill LIKE ? OR skill LIKE ?)",
+                  (pid, skill, f"lvl:{skill}:%", f"sub:{skill}.%"))
+        c.execute("INSERT INTO mastery VALUES (?,?,?,0)", (pid, skill, P_INIT))

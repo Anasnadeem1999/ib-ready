@@ -153,6 +153,12 @@ def _other(rng: random.Random, choices: list, current):
     return rng.choice(opts)
 
 
+def _an(v: float, dp: int = 1) -> str:
+    """'a 5%' / 'an 8%' / 'an 11%' / 'an 18%': the article that reads right before a percentage."""
+    s = pct(v, dp)
+    return ("an " if s.startswith(("8", "11", "18")) else "a ") + s
+
+
 def _vary_tax(p: Params, rng: random.Random) -> tuple[Params, str]:
     q = dict(p)
     q["t"] = _other(rng, TAXES, p["t"])
@@ -361,8 +367,9 @@ EV_BRIDGE = Template(
                     f"preferred stock and {money(p['N'])}mm of noncontrolling interest. What's its enterprise value?"),
     gen=_ev_gen,
     solve=lambda p: {"equity_value": p["S"] * p["Q"], "ev": _ev(p)},
-    labels=[Label("ev", "Enterprise value ($mm)", "$"),
-            Label("equity_value", "Equity value ($mm)", "$", required=False)],
+    # Integer inputs give an exact answer, so a 1% band would swallow a missing preferred/NCI line.
+    labels=[Label("ev", "Enterprise value ($mm)", "$", tol_abs=0.5, tol_rel=0),
+            Label("equity_value", "Equity value ($mm)", "$", required=False, tol_abs=0.5, tol_rel=0)],
     traps={
         "EV_ADD_CASH": lambda p: [{"ev": _ev(p) + 2 * p["C"]}],
         "EV_MISS_CLAIMS": lambda p: [{"ev": _ev(p) - p["P"] - p["N"]}, {"ev": _ev(p) - p["P"]}, {"ev": _ev(p) - p["N"]}],
@@ -401,12 +408,12 @@ EV_IMPLIED_PRICE = Template(
     gen=_ip_gen,
     solve=lambda p: {"ev": p["E"] * p["m"], "equity_value": p["E"] * p["m"] - p["D"] + p["C"], "price": _a(_ip_price(p))},
     labels=[Label("price", "Implied share price", "$/sh"),
-            Label("ev", "Implied enterprise value ($mm)", "$", required=False),
-            Label("equity_value", "Implied equity value ($mm)", "$", required=False)],
+            Label("ev", "Implied enterprise value ($mm)", "$", required=False, tol_abs=0.5, tol_rel=0),
+            Label("equity_value", "Implied equity value ($mm)", "$", required=False, tol_abs=0.5, tol_rel=0)],
     traps={
         "EV_BRIDGE_SIGN": lambda p: [{"price": _a((p["E"] * p["m"] + p["D"] - p["C"]) / p["Q"]),
-                                       "equity_value": p["E"] * p["m"] + p["D"] - p["C"]},
-                                      {"price": _a(p["E"] * p["m"] / p["Q"]), "equity_value": p["E"] * p["m"]}],
+                                       "equity_value": p["E"] * p["m"] + p["D"] - p["C"]}],
+        "EV_SKIP_BRIDGE": lambda p: [{"price": _a(p["E"] * p["m"] / p["Q"]), "equity_value": p["E"] * p["m"]}],
     },
     explain=lambda p, v: (
         f"Implied EV = {num(p['m'])}x x {money(p['E'])} = {money(v['ev'])}mm. Equity value = EV - debt + cash = "
@@ -417,7 +424,7 @@ EV_IMPLIED_PRICE = Template(
         {**p, "m": float(_other(r, [8, 10, 12, 14], p["m"]))}),
     key_points=["Multiply EBITDA by the EV multiple to get EV", "Subtract debt and add cash to get equity value",
                 "Divide by diluted shares"],
-    misconceptions=["EV_BRIDGE_SIGN"],
+    misconceptions=["EV_BRIDGE_SIGN", "EV_SKIP_BRIDGE"],
 )
 
 EV_DEBT_CASH = Template(
@@ -447,18 +454,28 @@ def _ufcf(p: Params) -> float:
     return p["EBIT"] * (1 - p["t"]) + p["DA"] - p["CX"] - p["NWC"]
 
 
+def _ufcf_gen(r: random.Random) -> Params:
+    # NWC of 12/18/24 keeps 2 x NWC (the sign-error gap) away from every EBIT x t (the no-tax gap),
+    # so the two misconceptions never predict the same number. Resample until UFCF is positive.
+    while True:
+        p = {"EBIT": float(r.choice([100, 200, 400])), "DA": float(r.choice([20, 30, 50])),
+             "CX": float(r.choice([40, 60, 80])), "NWC": float(r.choice([12, 18, 24])),
+             "I": float(r.choice([10, 20, 30])), "t": r.choice(TAXES)}
+        if _ufcf(p) > 0:
+            return p
+
+
 DCF_UFCF = Template(
     id="dcf_ufcf", skill="dcf", difficulty=2, kind="numeric",
     title="Unlevered free cash flow",
     text=lambda p: (f"A company has EBIT of {money(p['EBIT'])}, D&A of {money(p['DA'])}, capex of {money(p['CX'])}, "
                     f"interest expense of {money(p['I'])}, and net working capital increases by {money(p['NWC'])}. "
                     f"Tax rate is {pct(p['t'])}. What's unlevered free cash flow?"),
-    gen=lambda r: {"EBIT": float(r.choice([100, 200, 400])), "DA": float(r.choice([20, 30, 50])),
-                   "CX": float(r.choice([40, 60, 80])), "NWC": float(r.choice([10, 20])),
-                   "I": float(r.choice([10, 20, 30])), "t": r.choice(TAXES)},
+    gen=lambda r: _ufcf_gen(r),
     solve=lambda p: {"ufcf": _a(_ufcf(p)), "nopat": _a(p["EBIT"] * (1 - p["t"]))},
-    labels=[Label("ufcf", "Unlevered free cash flow", "$"),
-            Label("nopat", "NOPAT (EBIT after tax)", "$", required=False)],
+    # Signed: a negative FCF stated as positive is wrong, not a "level".
+    labels=[Label("ufcf", "Unlevered free cash flow", "$", signed=True, tol_abs=0.05, tol_rel=0),
+            Label("nopat", "NOPAT (EBIT after tax)", "$", required=False, tol_abs=0.05, tol_rel=0)],
     traps={
         "DCF_LEVERED": lambda p: [{"ufcf": _a(_ufcf(p) - p["I"] * (1 - p["t"]))}, {"ufcf": _a(_ufcf(p) - p["I"])}],
         "DCF_NO_TAX": lambda p: [{"ufcf": _a(_ufcf(p) + p["EBIT"] * p["t"]), "nopat": p["EBIT"]}],
@@ -495,7 +512,7 @@ DCF_TV = Template(
     },
     explain=lambda p, v: (
         f"TV = FCF x (1 + g) / (WACC - g) = {money(p['F'])} x {num(1 + p['g'], 3)} / ({pct(p['w'])} - {pct(p['g'])}) "
-        f"= {money(p['F'] * (1 + p['g']))} / {pct(p['w'] - p['g'])} = {money(round(v['tv'], 1))}mm. "
+        f"= {money(p['F'] * (1 + p['g']))} / {pct(p['w'] - p['g'])} = {money(round(v['tv']))}mm. "
         f"This is the value at the end of the forecast; discount it back to today."
     ),
     vary=lambda p, r: (lambda q: (q, f"What if WACC were {pct(q['w'])} instead?"))(
@@ -555,10 +572,13 @@ DCF_CAPM = Template(
 
 # =========================================================================== M&A
 def _ma_gen(r: random.Random) -> Params:
-    return {"Pa": float(r.choice([40, 50, 80])), "Sa": float(r.choice([100, 200])),
-            "PEa": float(r.choice([15, 20, 25])), "Mt": float(r.choice([500, 1000, 2000])),
-            "prem": r.choice([0.20, 0.25, 0.50]), "PEt": float(r.choice([10, 12, 20, 30])),
-            "r": r.choice([0.03, 0.04, 0.05]), "rd": r.choice([0.06, 0.08, 0.10]), "t": r.choice(TAXES)}
+    # Round numbers a candidate can work with on paper: acquirer EPS of $2 or $4 (net income $200mm or
+    # $400mm), target net income = market cap / P/E always a whole number.
+    eps = float(r.choice([2, 4]))
+    pea = float(r.choice([10, 15, 20]))
+    return {"Pa": eps * pea, "Sa": 100.0, "PEa": pea, "Mt": float(r.choice([600, 1200])),
+            "prem": r.choice([0.20, 0.25, 0.50]), "PEt": float(r.choice([10, 12, 15, 20, 30])),
+            "r": r.choice([0.04, 0.05]), "rd": r.choice([0.06, 0.08, 0.10]), "t": r.choice([0.20, 0.25, 0.40])}
 
 
 def _ma_base(p: Params) -> tuple[float, float, float, float]:
@@ -590,8 +610,8 @@ MA_STOCK = Template(
     gen=_ma_gen,
     solve=lambda p: _ma_stock_vals(p, _ma_base(p)[2]),
     labels=[Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", tol_abs=0.3, tol_rel=0.02),
-            Label("new_shares", "New shares issued (mm)", "mm", required=False),
-            Label("pf_eps", "Pro forma EPS", "$/sh", required=False)],
+            Label("new_shares", "New shares issued (mm)", "mm", required=False, tol_abs=0.05, tol_rel=0),
+            Label("pf_eps", "Pro forma EPS", "$/sh", required=False, tol_abs=0.01, tol_rel=0)],
     traps={"MA_IGNORE_PREMIUM": lambda p: [_ma_stock_vals(p, p["Mt"])]},
     explain=lambda p, v: (lambda NIa, NIt, price, eps: (
         f"Purchase price = {money(p['Mt'])} x {num(1 + p['prem'])} = {money(price)}mm, so new shares = {money(price)} / "
@@ -626,7 +646,7 @@ MA_CASH = Template(
     gen=_ma_gen,
     solve=lambda p: _ma_cash_vals(p),
     labels=[Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", tol_abs=0.3, tol_rel=0.02),
-            Label("pf_eps", "Pro forma EPS", "$/sh", required=False)],
+            Label("pf_eps", "Pro forma EPS", "$/sh", required=False, tol_abs=0.01, tol_rel=0)],
     traps={"MA_FOREGONE_NO_TAX": lambda p: [_ma_cash_vals(p, after_tax=False)],
            "MA_SHARES_FOR_CASH": lambda p: [_ma_cash_vals(p, issue_shares=True)]},
     explain=lambda p, v: (lambda NIa, NIt, price, eps: (
@@ -766,7 +786,7 @@ LBO_PAPER = Template(
     target_seconds=180,
 )
 
-_IRR_COMBOS = [(2.0, 5.0), (3.0, 5.0), (2.0, 3.0), (2.5, 5.0), (3.0, 3.0), (4.0, 5.0), (1.5, 3.0)]
+_IRR_COMBOS = [(2.0, 5.0), (3.0, 5.0), (2.0, 3.0), (2.5, 5.0), (3.0, 3.0), (4.0, 5.0), (1.5, 2.0)]
 
 LBO_IRR_RULE = Template(
     id="lbo_irr_rule", skill="lbo", difficulty=1, kind="numeric",
@@ -775,7 +795,7 @@ LBO_IRR_RULE = Template(
                     f"with no interim cash flows. Roughly what's the IRR?"),
     gen=lambda r: (lambda c: {"X": float(r.choice([100, 200, 500])), "M": c[0], "n": c[1]})(r.choice(_IRR_COMBOS)),
     solve=lambda p: {"irr": _a((p["M"] ** (1 / p["n"]) - 1) * 100), "moic": p["M"]},
-    labels=[Label("irr", "IRR (%)", "%", tol_abs=2.0, tol_rel=0),
+    labels=[Label("irr", "IRR (%)", "%", tol_abs=1.5, tol_rel=0),
             Label("moic", "MOIC (x)", "x", required=False, tol_abs=0.05, tol_rel=0)],
     traps={"LBO_IRR_SIMPLE": lambda p: [{"irr": _a((p["M"] - 1) / p["n"] * 100)}]},
     explain=lambda p, v: (
@@ -813,8 +833,9 @@ MKT_RATES_WACC = Template(
                     f"does a perpetuity-growth terminal value with {pct(p['g'])} growth change?"),
     gen=_mw_gen,
     solve=lambda p: _mw_vals(p),
-    labels=[Label("wacc_new", "New WACC (%)", "%", tol_abs=0.1, tol_rel=0),
-            Label("tv_change", "Change in terminal value (%)", "%", required=False, tol_abs=0.8, tol_rel=0)],
+    # Answers are exact to 2dp; the pre-tax-debt error is only 4-16bp away, so the band must be tight.
+    labels=[Label("wacc_new", "New WACC (%)", "%", tol_abs=0.02, tol_rel=0),
+            Label("tv_change", "Change in terminal value (%)", "%", required=False, tol_abs=0.3, tol_rel=0)],
     traps={"MKT_RATES_DEBT_ONLY": lambda p: [_mw_vals(p, eq_leg=False)],
            "MKT_RATES_PRETAX": lambda p: [_mw_vals(p, tax=False)],
            "MKT_RATES_NO_EFFECT": lambda p: [{"wacc_new": _a(p["w0"] * 100), "tv_change": 0.0}]},
@@ -846,13 +867,16 @@ MKT_RATES_LBO = Template(
     text=lambda p: (_lbo_text(p) + f" Base case: MOIC {num(_lbo_vals(p)['moic'])}x, IRR about "
                     f"{num(_lbo_vals(p)['irr'], 1)}%. Now the debt is floating, and rates are {num(p['bp'], 0)}bp higher "
                     f"for the whole hold. Assume extra interest is charged on the entry debt balance, is tax-deductible at "
-                    f"{pct(p['t'])}, and reduces debt paydown one-for-one. What's the new IRR?"),
-    gen=_lbo_gen,
+                    f"{pct(p['t'])}, and reduces debt paydown one-for-one. How much debt paydown is lost, and what's the new IRR?"),
+    gen=lambda r: {**_lbo_gen(r), "bp": float(r.choice([200, 300]))},
     solve=lambda p: _rl_vals(p),
-    labels=[Label("irr_new", "New IRR (%)", "%", tol_abs=1.0, tol_rel=0),
-            Label("lost_paydown", "Lost debt paydown ($mm)", "$", required=False),
-            Label("moic_new", "New MOIC (x)", "x", required=False, tol_abs=0.06, tol_rel=0)],
-    traps={"MKT_RATES_PRETAX": lambda p: [_rl_vals(p, tax=False)],
+    # The rate shock moves IRR by well under a point, so the lost paydown is the graded skill;
+    # IRR and MOIC stay optional with bands tight enough to tell "no effect" apart.
+    labels=[Label("lost_paydown", "Lost debt paydown ($mm)", "$", tol_abs=0.5, tol_rel=0),
+            Label("irr_new", "New IRR (%)", "%", required=False, tol_abs=0.3, tol_rel=0),
+            Label("moic_new", "New MOIC (x)", "x", required=False, tol_abs=0.02, tol_rel=0)],
+    # The pre-tax error moves IRR by only a few tenths, so its fingerprint is the lost paydown alone.
+    traps={"MKT_RATES_PRETAX": lambda p: [{"lost_paydown": _rl_vals(p, tax=False)["lost_paydown"]}],
            "MKT_RATES_NO_EFFECT": lambda p: [_rl_vals(p, effect=False)]},
     explain=lambda p, v: (
         f"Extra interest = {money(p['L'] * p['E0'])}mm x {num(p['bp'], 0)}bp x {num(p['n'])} years x (1 - {pct(p['t'])}) = "
@@ -1052,7 +1076,7 @@ ACC_OPEX_CASH = _num(
 
 ACC_INVENTORY = _num(
     "acc_inventory", "accounting", "3-statement walk: buying inventory",
-    lambda p: f"A company buys {money(p['X'])} of inventory with cash. It hasn't sold any of it yet. Walk me through the three statements.",
+    lambda p: f"A company buys {money(p['X'])} of inventory with cash. It hasn't sold any of it yet. Tax rate is {pct(p['t'])}. Walk me through the three statements.",
     lambda r: {"X": float(r.choice([50, 100, 200])), "t": r.choice(TAXES)},
     lambda p: {"ni": 0.0, "cash": -p["X"], "inventory": p["X"]},
     [Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$"),
@@ -1087,13 +1111,12 @@ ACC_AP = Template(
 ACC_DEFREV = Template(
     id="acc_defrev", skill="accounting", difficulty=3, kind="numeric", title="3-statement walk: customer prepays",
     text=lambda p: (f"A software customer pays {money(p['X'])} in cash today for a service that will be delivered next year. "
-                    f"Walk me through the three statements today."),
-    gen=lambda r: {"X": float(r.choice([50, 100, 120, 200]))},
+                    f"Tax rate is {pct(p.get('t', 0.25))}. Walk me through the three statements today."),
+    gen=lambda r: {"X": float(r.choice([50, 100, 120, 200])), "t": r.choice(TAXES)},
     solve=lambda p: {"ni": 0.0, "cash": p["X"], "deferred_revenue": p["X"]},
     labels=[Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$"),
             Label("deferred_revenue", "Change in deferred revenue", "$", required=False)],
-    traps={"ACC_DEFREV_AS_REVENUE": lambda p: [{"ni": _a(p["X"] * 0.75)}, {"ni": _a(p["X"] * 0.8)}, {"ni": _a(p["X"] * 0.7)},
-                                               {"ni": _a(p["X"] * 0.6)}, {"ni": p["X"]}]},
+    traps={"ACC_DEFREV_AS_REVENUE": lambda p: [{"ni": _a(p["X"] * (1 - p.get("t", 0.25)))}, {"ni": p["X"]}]},
     explain=lambda p, v: (f"No revenue yet: the service hasn't been delivered, so net income is unchanged. On the CFS, the {money(p['X'])} "
                           f"increase in deferred revenue (a liability) is a source of cash, so cash is up {money(p['X'])}. Balance sheet: "
                           f"cash up {money(p['X'])}, deferred revenue up {money(p['X'])}."),
@@ -1109,7 +1132,7 @@ def _tsm(p: Params) -> float:
 
 def _tsm_gen(r: random.Random) -> Params:
     S = float(r.choice([20, 25, 40, 50]))
-    return {"S": S, "B": float(r.choice([50, 100, 200])), "N": float(r.choice([2, 4, 5, 10])),
+    return {"S": S, "B": float(r.choice([20, 40, 50, 100])), "N": float(r.choice([2, 4, 5, 10])),
             "K": float(r.choice([k for k in (10, 15, 20, 30) if k < S]))}
 
 
@@ -1119,8 +1142,9 @@ EV_TSM = Template(
                     f"options with an exercise price of {money(p['K'])}. What's the diluted share count, and its equity value?"),
     gen=_tsm_gen,
     solve=lambda p: {"diluted_shares": _a(_tsm(p)), "equity_value": _a(_tsm(p) * p["S"])},
-    labels=[Label("diluted_shares", "Diluted shares (mm)", "mm"),
-            Label("equity_value", "Equity value ($mm)", "$", required=False)],
+    # Exact answers: a 1% band was wider than the dilution itself, so basic shares passed as correct.
+    labels=[Label("diluted_shares", "Diluted shares (mm)", "mm", tol_abs=0.05, tol_rel=0),
+            Label("equity_value", "Equity value ($mm)", "$", required=False, tol_abs=1.0, tol_rel=0)],
     traps={"EV_TSM_BASIC": lambda p: [{"diluted_shares": p["B"], "equity_value": p["B"] * p["S"]}],
            "EV_TSM_ALL_OPTIONS": lambda p: [{"diluted_shares": p["B"] + p["N"], "equity_value": (p["B"] + p["N"]) * p["S"]}]},
     explain=lambda p, v: (f"The options are in the money ({money(p['K'])} strike vs {money(p['S'])} price), so all {num(p['N'])}mm are "
@@ -1137,12 +1161,17 @@ def _pv(p: Params) -> float:
     return p["X"] / (1 + p["r"]) ** p["n"]
 
 
+# Paired so the present value is a round number (121 / 1.1^2 = 100) and simple discounting lands
+# clearly outside tolerance (121 / 1.2 = 100.83).
+_PV_SETS = [(121, 0.10, 2), (242, 0.10, 2), (605, 0.10, 2), (144, 0.20, 2), (1331, 0.10, 3), (288, 0.20, 2)]
+
+
 DCF_PV = _num(
     "dcf_pv", "dcf", "Present value",
     lambda p: f"What's the present value of {money(p['X'])} received {num(p['n'])} years from now, at a {pct(p['r'])} discount rate?",
-    lambda r: {"X": float(r.choice([100, 121, 1000])), "r": r.choice([0.05, 0.10]), "n": float(r.choice([2, 3]))},
+    lambda r: (lambda s: {"X": float(s[0]), "r": s[1], "n": float(s[2])})(r.choice(_PV_SETS)),
     lambda p: {"pv": _a(_pv(p))},
-    [Label("pv", "Present value", "$", tol_rel=0.015)],
+    [Label("pv", "Present value", "$", tol_abs=0.5, tol_rel=0.003)],
     {"DCF_SIMPLE_DISCOUNT": lambda p: [{"pv": _a(p["X"] / (1 + p["r"] * p["n"]))}]},
     lambda p, v: (f"PV = {money(p['X'])} / (1 + {pct(p['r'])})^{num(p['n'])} = {money(p['X'])} / {num((1 + p['r']) ** p['n'], 4)} = "
                   f"{money(round(v['pv'], 2))}. A dollar later is worth less than a dollar today, and the discount compounds each year."),
@@ -1186,14 +1215,14 @@ FIG_PTBV = Template(
 
 RE_CAP_RATE = _num(
     "re_cap_rate", "industry", "Property value from a cap rate",
-    lambda p: f"An office building produces {money(p['NOI'])}mm of net operating income a year. Comparable buildings trade at a {pct(p['c'])} cap rate. What's it worth?",
+    lambda p: f"An office building produces {money(p['NOI'])}mm of net operating income a year. Comparable buildings trade at {_an(p['c'])} cap rate. What's it worth?",
     lambda r: {"NOI": float(r.choice([5, 8, 10, 12])), "c": r.choice([0.05, 0.06, 0.08])},
     lambda p: {"value": _a(p["NOI"] / p["c"])},
     [Label("value", "Property value ($mm)", "$")],
     {},
     lambda p, v: (f"Value = NOI / cap rate = {money(p['NOI'])} / {pct(p['c'])} = {money(round(v['value'], 1))}mm. A cap rate is like an "
-                  f"inverted EV/EBITDA multiple: a {pct(p['c'])} cap rate is about {num(1 / p['c'], 1)}x NOI."),
-    ["Value = NOI / cap rate", "A lower cap rate means a higher value (like a higher multiple)"],
+                  f"inverted EV/EBITDA multiple: {_an(p['c'])} cap rate is about {num(1 / p['c'], 1)}x NOI."),
+    ["Value = NOI / cap rate", "A lower cap rate means a higher price (like a higher multiple)"],
 )
 
 RE_FFO = Template(
@@ -1221,7 +1250,7 @@ TMT_LTV = Template(
     labels=[Label("ltv", "Customer lifetime value", "$"), Label("ratio", "LTV/CAC (x)", "x", required=False, tol_abs=0.05, tol_rel=0)],
     traps={"TMT_LTV_NO_MARGIN": lambda p: [{"ltv": _a(p["A"] / p["ch"]), "ratio": _a(p["A"] / p["ch"] / p["C"])}]},
     explain=lambda p, v: (f"Gross profit per year = {money(p['A'])} x {pct(p['gm'], 0)} = {money(p['A'] * p['gm'])}. Average lifetime = 1 / "
-                          f"{pct(p['ch'], 0)} = {num(1 / p['ch'])} years. LTV = {money(round(v['ltv']))}; LTV/CAC = {num(v['ratio'], 1)}x "
+                          f"{pct(p['ch'], 0)} = {num(1 / p['ch'])} years. LTV = {money(round(v['ltv']))}; LTV/CAC = {num(v['ratio'], 2)}x "
                           f"(3x+ is usually considered healthy)."),
     key_points=["LTV uses gross profit, not revenue", "Customer lifetime = 1 / churn", "LTV/CAC above about 3x is healthy"],
     misconceptions=["TMT_LTV_NO_MARGIN"], groups=["tmt"], target_seconds=75,
@@ -1253,7 +1282,7 @@ RX_WATERFALL = Template(
     id="rx_waterfall", skill="industry", difficulty=3, kind="numeric", title="Restructuring: recovery waterfall",
     text=lambda p: (f"A bankrupt company is worth {money(p['X'])}mm. It has {money(p['S'])}mm of senior secured debt and "
                     f"{money(p['U'])}mm of unsecured bonds. Under absolute priority, what percentage do the unsecured bondholders recover?"),
-    gen=lambda r: {"X": float(r.choice([600, 700, 800])), "S": float(r.choice([400, 500])), "U": float(r.choice([400, 600]))},
+    gen=lambda r: {"X": float(r.choice([500, 600, 700])), "S": float(r.choice([400, 500])), "U": float(r.choice([400, 600]))},
     solve=lambda p: {"unsecured_recovery": _a(_rx(p)[1]), "senior_recovery": _a(_rx(p)[0])},
     labels=[Label("unsecured_recovery", "Unsecured recovery (%)", "%", tol_abs=1.0, tol_rel=0),
             Label("senior_recovery", "Senior recovery (%)", "%", required=False, tol_abs=1.0, tol_rel=0)],
@@ -1333,7 +1362,7 @@ MORE_CONCEPTUAL = [
              "often overestimated, so they're usually haircut."),
     _concept("c_lbo_what", "lbo", 1, "What an LBO is",
              "What is a leveraged buyout?",
-             ["A private equity firm buys a company using a lot of debt", "The company's own cash flow pays the interest and down the debt",
+             ["A private equity firm buys a company using a lot of debt", "The company's own cash flow pays the interest and pays down the debt",
               "The sponsor sells after about 3-7 years", "Returns come from paydown, EBITDA growth and multiple expansion"],
              ["LBO_NO_LEVER_LOGIC"],
              "A private equity firm buys a company using mostly borrowed money, with the company's own cash flows servicing and paying down the debt. "
@@ -1498,14 +1527,497 @@ BEHAVIORAL = [
          "and finish with catalysts and the main risk."),
 ]
 
+# =========================================================================== COVERAGE ADDITIONS (learning-design spec, Oct 2026)
+# Mostly coffee-chat / first-round items, plus the most common Superday gaps. Every range below was simulated
+# so no misconception lands inside the grading band and no two misconceptions predict the same number.
+_EXACT = {"tol_abs": 0.5, "tol_rel": 0}      # integer inputs give exact answers
+_MULT = {"tol_abs": 0.05, "tol_rel": 0}      # multiples quoted to 2dp
+
+EV_BRIDGE_BASIC = _num(
+    "ev_bridge_basic", "ev", "Equity value to EV (the basics)",
+    lambda p: (f"A company's shares trade at {money(p['S'])} and it has {num(p['Q'])} million shares outstanding. It has "
+               f"{money(p['D'])}mm of debt and {money(p['C'])}mm of cash. What are its equity value and enterprise value?"),
+    # Debt always exceeds cash, so a backwards bridge never lands on the right answer by accident.
+    lambda r: {"S": float(r.choice([10, 20, 25, 50])), "Q": float(r.choice([10, 20, 40])),
+               "D": float(r.choice([100, 200, 300])), "C": float(r.choice([20, 50, 80]))},
+    lambda p: {"equity_value": p["S"] * p["Q"], "ev": p["S"] * p["Q"] + p["D"] - p["C"]},
+    [Label("ev", "Enterprise value ($mm)", "$", **_EXACT), Label("equity_value", "Equity value ($mm)", "$", **_EXACT)],
+    {"EV_ADD_CASH": lambda p: [{"ev": p["S"] * p["Q"] + p["D"] + p["C"]}],
+     "EV_BRIDGE_SIGN": lambda p: [{"ev": p["S"] * p["Q"] - p["D"] + p["C"]}],
+     "EV_SKIP_BRIDGE": lambda p: [{"ev": p["S"] * p["Q"]}]},
+    lambda p, v: (f"Equity value = {money(p['S'])} x {num(p['Q'])}mm = {money(v['equity_value'])}mm: what the shares are worth. "
+                  f"EV adds the lenders' claim and takes out the cash a buyer effectively gets back: {money(v['equity_value'])} + "
+                  f"{money(p['D'])} - {money(p['C'])} = {money(v['ev'])}mm."),
+    ["Equity value = share price x shares", "EV = equity value + debt - cash",
+     "Cash is subtracted because it isn't part of the operating business"],
+    secs=40,
+    vary=lambda p, r: (lambda q: (q, f"Same company, but it now holds {money(q['C'])}mm of cash. What's EV?"))(
+        {**p, "C": float(_other(r, [20, 50, 80], p["C"]))}),
+)
+
+
+def _mult_gen(r: random.Random) -> Params:
+    s, q = r.choice([(50, 20), (25, 40), (20, 50)])          # equity value is always $1,000mm
+    d, c = r.choice([(300, 100), (500, 100), (600, 100)])     # EV of $1,200 / 1,400 / 1,500mm
+    return {"S": float(s), "Q": float(q), "D": float(d), "C": float(c),
+            "E": float(r.choice([100, 200])), "NI": float(r.choice([40, 50, 80, 100]))}
+
+
+EV_MULTIPLES_CALC = _num(
+    "ev_multiples_calc", "ev", "Calculating EV/EBITDA and P/E",
+    lambda p: (f"A company's share price is {money(p['S'])} with {num(p['Q'])} million shares, {money(p['D'])}mm of debt and "
+               f"{money(p['C'])}mm of cash. EBITDA is {money(p['E'])}mm and net income is {money(p['NI'])}mm. "
+               f"What are its EV/EBITDA and P/E multiples?"),
+    _mult_gen,
+    lambda p: {"ev_ebitda": _a((p["S"] * p["Q"] + p["D"] - p["C"]) / p["E"]), "pe": _a(p["S"] * p["Q"] / p["NI"])},
+    [Label("ev_ebitda", "EV/EBITDA (x)", "x", **_MULT), Label("pe", "P/E (x)", "x", **_MULT)],
+    {"EV_MULTIPLE_MISMATCH": lambda p: [{"ev_ebitda": _a(p["S"] * p["Q"] / p["E"])},
+                                         {"pe": _a((p["S"] * p["Q"] + p["D"] - p["C"]) / p["NI"])}],
+     "EV_ADD_CASH": lambda p: [{"ev_ebitda": _a((p["S"] * p["Q"] + p["D"] + p["C"]) / p["E"])}]},
+    lambda p, v: (lambda eq, ev: (
+        f"Equity value = {money(p['S'])} x {num(p['Q'])}mm = {money(eq)}mm; EV = {money(eq)} + {money(p['D'])} - {money(p['C'])} = "
+        f"{money(ev)}mm. EV/EBITDA = {money(ev)} / {money(p['E'])} = {num(v['ev_ebitda'])}x. P/E uses equity value, because net "
+        f"income is what's left for shareholders: {money(eq)} / {money(p['NI'])} = {num(v['pe'])}x."
+    ))(p["S"] * p["Q"], p["S"] * p["Q"] + p["D"] - p["C"]),
+    ["EV pairs with EBITDA (before interest, all investors)",
+     "Equity value pairs with net income (after interest, shareholders only)", "P/E = equity value / net income = price / EPS"],
+    secs=60,
+)
+
+
+def _ebitda_gen(r: random.Random) -> Params:
+    R = float(r.choice([500, 1000]))
+    return {"R": R, "COGS": R * r.choice([0.4, 0.5]), "SGA": float(r.choice([100, 150])), "DA": float(r.choice([20, 50])),
+            "I": float(r.choice([10, 20])), "t": r.choice([0.20, 0.25])}
+
+
+def _ebitda_vals(p: Params) -> Values:
+    ebitda = p["R"] - p["COGS"] - p["SGA"]
+    ebit = ebitda - p["DA"]
+    return {"ebitda": _a(ebitda), "ebit": _a(ebit), "ni": _a((ebit - p["I"]) * (1 - p["t"]))}
+
+
+ACC_EBITDA_BUILD = _num(
+    "acc_ebitda_build", "accounting", "From revenue to net income",
+    lambda p: (f"Revenue is {money(p['R'])}, cost of goods sold is {money(p['COGS'])}, SG&A is {money(p['SGA'])}, and D&A, shown on "
+               f"its own line, is {money(p['DA'])}. Interest expense is {money(p['I'])} and the tax rate is {pct(p['t'])}. "
+               f"What are EBITDA, EBIT and net income?"),
+    _ebitda_gen, _ebitda_vals,
+    [Label("ebitda", "EBITDA", "$", **_EXACT), Label("ebit", "EBIT", "$", **_EXACT),
+     Label("ni", "Net income", "$", required=False, **_EXACT)],
+    {"ACC_EBITDA_AFTER_DA": lambda p: [{"ebitda": _ebitda_vals(p)["ebit"]}],
+     "ACC_INTEREST_IN_EBIT": lambda p: [{"ebit": _a(_ebitda_vals(p)["ebit"] - p["I"])}],
+     "ACC_NO_TAX": lambda p: [{"ni": _a(_ebitda_vals(p)["ebit"] - p["I"])}]},
+    lambda p, v: (f"Gross profit = {money(p['R'])} - {money(p['COGS'])} = {money(p['R'] - p['COGS'])}. EBITDA = gross profit - SG&A = "
+                  f"{money(v['ebitda'])}. EBIT subtracts D&A: {money(v['ebit'])}. Pre-tax income subtracts interest: "
+                  f"{money(v['ebit'] - p['I'])}; after {pct(p['t'])} tax, net income is {money(v['ni'])}. EBIT comes before interest "
+                  f"because it measures the business, not how it's financed."),
+    ["EBITDA is before D&A", "EBIT = EBITDA - D&A, before interest", "Net income is after interest and taxes"],
+    secs=60,
+)
+
+ACC_DIVIDEND = _num(
+    "acc_dividend", "accounting", "3-statement walk: paying a dividend",
+    lambda p: f"A company pays a {money(p['X'])} cash dividend to its shareholders. Tax rate is {pct(p['t'])}. Walk me through the three statements.",
+    lambda r: {"X": float(r.choice(AMTS)), "t": r.choice([0.20, 0.25, 0.40])},
+    lambda p: {"ni": 0.0, "cash": -p["X"], "equity": -p["X"]},
+    [Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$"),
+     Label("equity", "Change in shareholders' equity", "$", required=False)],
+    {"ACC_DIVIDEND_EXPENSED": lambda p: [{"ni": _a(-p["X"] * (1 - p["t"])), "cash": _a(-p["X"] * (1 - p["t"]))}, {"ni": -p["X"]}]},
+    lambda p, v: (f"Nothing on the income statement: a dividend is a distribution of profit to owners, not an expense, so it isn't "
+                  f"tax-deductible and the {pct(p['t'])} tax rate doesn't matter. On the cash flow statement it's a financing outflow of "
+                  f"{money(p['X'])}. Balance sheet: cash down {money(p['X'])}, retained earnings down {money(p['X'])}."),
+    ["Dividends never hit the income statement", "They're a financing cash outflow",
+     "Cash and retained earnings fall by the same amount"],
+    secs=45,
+)
+
+ACC_DEBT_REPAY = _num(
+    "acc_debt_repay", "accounting", "3-statement walk: repaying debt",
+    lambda p: f"A company repays {money(p['X'])} of debt principal with cash. Tax rate is {pct(p['t'])}. Walk me through the three statements.",
+    lambda r: {"X": float(r.choice([50, 100, 200])), "t": r.choice([0.20, 0.25, 0.40])},
+    lambda p: {"ni": 0.0, "cash": -p["X"], "debt": -p["X"]},
+    [Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$"),
+     Label("debt", "Change in debt", "$", required=False)],
+    {"ACC_PRINCIPAL_EXPENSED": lambda p: [{"ni": _a(-p["X"] * (1 - p["t"])), "cash": _a(-p["X"] * (1 - p["t"]))}, {"ni": -p["X"]}]},
+    lambda p, v: (f"Repaying principal isn't an expense; only interest is. So nothing changes on the income statement. Financing cash "
+                  f"flow shows -{money(p['X'])}. Balance sheet: cash down {money(p['X'])}, debt down {money(p['X'])}, so both sides "
+                  f"fall equally."),
+    ["Principal isn't an expense, interest is", "Repayment is a financing outflow", "Cash and debt fall together"],
+    secs=40,
+)
+
+DCF_EXIT_TV = _num(
+    "dcf_exit_tv", "dcf", "Terminal value with an exit multiple",
+    lambda p: (f"In the final forecast year, year 5, EBITDA is {money(p['E'])}mm. Similar companies trade at {num(p['m'])}x EBITDA. "
+               f"The year-5 discount factor is {num(p['df'])}, meaning $1 in year 5 is worth {money(p['df'])} today. What's the "
+               f"terminal value, and what is it worth today?"),
+    lambda r: {"E": float(r.choice([50, 80, 100, 120])), "m": float(r.choice([8, 10, 12])), "df": r.choice([0.5, 0.6, 0.75])},
+    lambda p: {"tv": p["E"] * p["m"], "pv_tv": _a(p["E"] * p["m"] * p["df"])},
+    [Label("tv", "Terminal value ($mm)", "$", **_EXACT), Label("pv_tv", "Present value of the terminal value ($mm)", "$", **_EXACT)],
+    {"DCF_TV_NOT_DISCOUNTED": lambda p: [{"pv_tv": p["E"] * p["m"]}],
+     "DCF_DF_INVERTED": lambda p: [{"pv_tv": _a(p["E"] * p["m"] / p["df"])}]},
+    lambda p, v: (f"TV = {num(p['m'])}x x {money(p['E'])} = {money(v['tv'])}mm, the value at the end of year 5. Bring it back to "
+                  f"today by multiplying by the discount factor: {money(v['tv'])} x {num(p['df'])} = {money(v['pv_tv'])}mm."),
+    ["Exit multiple x final-year EBITDA", "The TV is a future value, so discount it", "Multiply by the discount factor (don't divide)"],
+    secs=45,
+)
+
+EV_EQUITY_ISSUE = Template(
+    id="ev_equity_issue", skill="ev", difficulty=2, kind="numeric", title="Does issuing stock change EV?",
+    text=lambda p: (f"A company issues {money(p['X'])}mm of new shares at its current share price and keeps the cash. "
+                    f"What happens to its equity value and its enterprise value?"),
+    gen=lambda r: {"X": float(r.choice([100, 200, 500]))},
+    solve=lambda p: {"equity_value": p["X"], "ev": 0.0},
+    labels=[Label("equity_value", "Change in equity value ($mm)", "$"), Label("ev", "Change in enterprise value ($mm)", "$")],
+    traps={"EV_FINANCING_MOVES_EV": lambda p: [{"ev": p["X"]}, {"equity_value": 0.0}]},
+    explain=lambda p, v: (f"Equity value rises by {money(p['X'])}mm: there are more shares at the same price. EV = equity value + debt "
+                          f"- cash: equity value is up {money(p['X'])} and cash is up {money(p['X'])}, so EV doesn't change. The "
+                          f"business itself is the same."),
+    key_points=["Equity value rises by the amount raised", "Cash rises by the same amount",
+                "EV is unchanged because the operations are unchanged"],
+    misconceptions=["EV_FINANCING_MOVES_EV"], target_seconds=40,
+)
+
+
+def _sale_vals(p: Params) -> Values:
+    g = p["P"] - p["B"]
+    return {"ni": _a(g * (1 - p["t"])), "cash": _a(p["P"] - g * p["t"]), "ppe": -p["B"]}
+
+
+ACC_ASSET_SALE = Template(
+    id="acc_asset_sale", skill="accounting", difficulty=2, kind="numeric", title="3-statement walk: selling an asset at a gain",
+    text=lambda p: (f"A company sells equipment with a book value of {money(p['B'])} for {money(p['P'])} in cash. The gain is taxed at "
+                    f"{pct(p['t'])}, paid in cash. Walk me through the three statements."),
+    gen=lambda r: {"B": float(r.choice([60, 80])), "P": float(r.choice([100, 120])), "t": r.choice([0.20, 0.25])},
+    solve=_sale_vals,
+    labels=[Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$"),
+            Label("ppe", "Change in PP&E", "$", required=False)],
+    traps={"ACC_GAIN_DOUBLE_COUNT": lambda p: [{"cash": _a(p["P"] + (p["P"] - p["B"]) * (1 - p["t"]))}],
+           "ACC_NO_TAX": lambda p: [{"ni": p["P"] - p["B"], "cash": p["P"]}],
+           "ACC_PROCEEDS_AS_REVENUE": lambda p: [{"ni": _a(p["P"] * (1 - p["t"]))}]},
+    explain=lambda p, v: (lambda g: (
+        f"Income statement: a {money(g)} gain, taxed at {pct(p['t'])}, raises net income by {money(v['ni'])}. Cash flow statement: start "
+        f"with {money(v['ni'])}, subtract the {money(g)} gain in operations (it's already inside the proceeds), then add the "
+        f"{money(p['P'])} proceeds in investing: cash is {chg(v['cash'])}, the proceeds minus the tax on the gain. Balance sheet: PP&E "
+        f"down {money(p['B'])}, cash up {money(v['cash'])}, so assets rise {money(v['ni'])}, matching retained earnings."
+    ))(p["P"] - p["B"]),
+    vary=_vary_tax,
+    key_points=["Only the gain hits net income", "Remove the gain from operating cash flow; show full proceeds in investing",
+                "Cash rises by the proceeds minus the tax on the gain"],
+    misconceptions=["ACC_GAIN_DOUBLE_COUNT", "ACC_NO_TAX", "ACC_PROCEEDS_AS_REVENUE"], target_seconds=75,
+)
+
+
+def _syn_gen(r: random.Random) -> Params:
+    P = float(r.choice([400, 500, 600]))
+    s = float(r.choice([6, 9, 12, 15]))          # EPS shortfall in $mm; multiples of 3 keep s / (1 - t) round
+    return {"P": P, "NIt": P / 20 - s, "t": r.choice([0.25, 0.40])}
+
+
+def _syn_vals(p: Params) -> Values:
+    shares = 100 + p["P"] / 20
+    shortfall = shares * 1.0 - 100 - p["NIt"]
+    return {"synergies": _a(shortfall / (1 - p["t"])), "accretion": _a(((100 + p["NIt"]) / shares - 1) * 100)}
+
+
+MA_SYNERGIES = Template(
+    id="ma_synergies_breakeven", skill="ma", difficulty=2, kind="numeric", title="Synergies needed to break even",
+    text=lambda p: (f"An acquirer has 100mm shares at $20 and net income of $100mm (EPS $1.00). It buys a target with net income of "
+                    f"{money(p['NIt'])}mm for {money(p['P'])}mm, paid entirely in new acquirer shares issued at $20. Tax rate is "
+                    f"{pct(p['t'])}. Ignore fees. Is the deal accretive or dilutive, and how much in pre-tax annual synergies would "
+                    f"make it break even?"),
+    gen=_syn_gen, solve=_syn_vals,
+    labels=[Label("synergies", "Break-even pre-tax synergies ($mm)", "$", tol_abs=0.3, tol_rel=0),
+            Label("accretion", "EPS accretion (+) / dilution (-) (%)", "%", required=False, tol_abs=0.3, tol_rel=0)],
+    traps={"MA_SYNERGY_NO_GROSSUP": lambda p: [{"synergies": _a(p["P"] / 20 - p["NIt"])},
+                                               {"synergies": _a((p["P"] / 20 - p["NIt"]) * (1 - p["t"]))}],
+           "MA_IGNORE_NEW_SHARES": lambda p: [{"accretion": _a(p["NIt"]), "synergies": 0.0}]},
+    explain=lambda p, v: (lambda n: (
+        f"New shares = {money(p['P'])} / $20 = {num(n)}mm, so pro forma shares are {num(100 + n)}mm. Pro forma EPS = "
+        f"({money(100)} + {money(p['NIt'])}) / {num(100 + n)} = {money(round((100 + p['NIt']) / (100 + n), 3))}, so the deal is "
+        f"{num(abs(v['accretion']), 1)}% dilutive. To keep EPS at $1.00, combined net income must be {money(100 + n)}mm; it's "
+        f"{money(100 + p['NIt'])}mm, a {money(n - p['NIt'])}mm shortfall. Synergies are taxed, so pre-tax synergies = "
+        f"{money(n - p['NIt'])} / (1 - {pct(p['t'])}) = {money(v['synergies'])}mm a year."
+    ))(p["P"] / 20),
+    key_points=["Pro forma shares include the new shares issued", "Break-even net income = standalone EPS x pro forma shares",
+                "Gross the after-tax shortfall up for taxes: shortfall / (1 - t)"],
+    misconceptions=["MA_SYNERGY_NO_GROSSUP", "MA_IGNORE_NEW_SHARES"], target_seconds=120,
+)
+
+_BETA_SETS = [(0.20, 0.25), (0.20, 0.5), (0.25, 0.4), (0.20, 1.0)]   # 1 + (1 - t) D/E = 1.2, 1.4, 1.3, 1.8
+
+
+def _beta_gen(r: random.Random) -> Params:
+    t, de = r.choice(_BETA_SETS)
+    bu = r.choice([0.8, 0.9, 1.0, 1.1, 1.2])
+    return {"t": t, "de": de, "bL": round(bu * (1 + (1 - t) * de), 2)}
+
+
+def _beta_u(p: Params) -> float:
+    return p["bL"] / (1 + (1 - p["t"]) * p["de"])
+
+
+DCF_UNLEVER_BETA = Template(
+    id="dcf_unlever_beta", skill="dcf", difficulty=2, kind="numeric", title="Unlevering beta",
+    text=lambda p: (f"A comparable company has a levered beta of {num(p['bL'])}, a debt-to-equity ratio of {num(p['de'])} and a "
+                    f"{pct(p['t'])} tax rate. What's its unlevered beta?"),
+    gen=_beta_gen,
+    solve=lambda p: {"beta_u": _a(_beta_u(p))},
+    labels=[Label("beta_u", "Unlevered beta", "x", tol_abs=0.02, tol_rel=0)],
+    traps={"DCF_BETA_NO_TAX": lambda p: [{"beta_u": _a(p["bL"] / (1 + p["de"]))}],
+           "DCF_BETA_DIRECTION": lambda p: [{"beta_u": _a(p["bL"] * (1 + (1 - p["t"]) * p["de"]))}]},
+    explain=lambda p, v: (lambda f: (
+        f"Unlevering strips out financial risk: beta_u = beta_L / (1 + (1 - t) x D/E) = {num(p['bL'])} / (1 + {num(1 - p['t'])} x "
+        f"{num(p['de'])}) = {num(p['bL'])} / {num(f)} = {num(v['beta_u'])}. The unlevered beta is always the smaller one, because "
+        f"debt adds risk for shareholders."
+    ))(1 + (1 - p["t"]) * p["de"]),
+    key_points=["Unlevered beta is below levered beta", "beta_u = beta_L / (1 + (1 - t) x D/E)",
+                "Unlever the peers' betas, then relever at the target's capital structure"],
+    misconceptions=["DCF_BETA_NO_TAX", "DCF_BETA_DIRECTION"], target_seconds=60,
+)
+
+
+def _levers_gen(r: random.Random) -> Params:
+    m0 = float(r.choice([8, 10]))
+    return {"m0": m0, "m1": m0 + r.choice([0, 1, 2]), "E1": float(r.choice([120, 150])),
+            "D0": float(r.choice([400, 500])), "Dp": float(r.choice([100, 200]))}
+
+
+def _levers_vals(p: Params, paydown: bool = True) -> Values:
+    dp = p["Dp"] if paydown else 0.0
+    ein = 100 * p["m0"] - p["D0"]
+    eout = p["E1"] * p["m1"] - (p["D0"] - dp)
+    return {"equity_gain": _a(eout - ein), "ebitda_growth": _a((p["E1"] - 100) * p["m0"]),
+            "multiple_exp": _a((p["m1"] - p["m0"]) * p["E1"]), "paydown": dp, "moic": _a(eout / ein)}
+
+
+LBO_LEVERS = Template(
+    id="lbo_levers", skill="lbo", difficulty=2, kind="numeric", title="Where did the LBO return come from?",
+    text=lambda p: (f"A sponsor buys a company with $100mm of EBITDA at {num(p['m0'])}x using {money(p['D0'])}mm of debt. At exit, "
+                    f"EBITDA is {money(p['E1'])}mm, the exit multiple is {num(p['m1'])}x, and {money(p['Dp'])}mm of debt has been "
+                    f"repaid. How much equity value did the sponsor gain, and how much came from EBITDA growth (valued at the entry "
+                    f"multiple), multiple expansion, and debt paydown?"),
+    gen=_levers_gen, solve=_levers_vals,
+    labels=[Label("equity_gain", "Sponsor equity gain ($mm)", "$", **_EXACT),
+            Label("ebitda_growth", "Gain from EBITDA growth ($mm)", "$", required=False, **_EXACT),
+            Label("multiple_exp", "Gain from multiple expansion ($mm)", "$", required=False, **_EXACT),
+            Label("paydown", "Gain from debt paydown ($mm)", "$", required=False, **_EXACT),
+            Label("moic", "MOIC (x)", "x", required=False, **_MULT)],
+    traps={"LBO_NO_PAYDOWN": lambda p: [{k: v for k, v in _levers_vals(p, paydown=False).items() if k in ("equity_gain", "moic")}],
+           "LBO_MOIC_ON_EV": lambda p: [{"moic": _a(p["E1"] * p["m1"] / (100 * p["m0"]))}]},
+    explain=lambda p, v: (lambda ein: (
+        f"Equity in = {num(p['m0'])}x x $100 - {money(p['D0'])} = {money(ein)}mm. Equity out = {num(p['m1'])}x x {money(p['E1'])} - "
+        f"({money(p['D0'])} - {money(p['Dp'])}) = {money(ein + v['equity_gain'])}mm, a gain of {money(v['equity_gain'])}mm "
+        f"(MOIC {num(v['moic'])}x). EBITDA growth {money(p['E1'] - 100)} x {num(p['m0'])}x = {money(v['ebitda_growth'])}mm; multiple "
+        f"expansion {num(p['m1'] - p['m0'])}x x {money(p['E1'])} = {money(v['multiple_exp'])}mm; debt paydown {money(p['Dp'])}mm. "
+        f"The three add up to the gain."
+    ))(100 * p["m0"] - p["D0"]),
+    key_points=["Three levers: EBITDA growth, multiple expansion, debt paydown", "Together they add up to the equity gain",
+                "Paydown moves value from lenders to the sponsor"],
+    misconceptions=["LBO_NO_PAYDOWN", "LBO_MOIC_ON_EV"], target_seconds=120,
+)
+
+_CREDIT_SETS = [(4, 0.05), (5, 0.05), (5, 0.08), (4, 0.10), (5, 0.10), (2.5, 0.08)]   # coverage 5, 4, 2.5, 2.5, 2, 5x
+
+LEV_CREDIT_STATS = _num(
+    "lev_credit_stats", "industry", "Leverage and interest coverage",
+    lambda p: (f"A company has {money(p['E'])}mm of EBITDA and {money(p['D'])}mm of debt at {_an(p['r'], 0)} interest rate. "
+               f"What are its leverage ratio and interest coverage?"),
+    lambda r: (lambda e, s: {"E": e, "D": e * s[0], "r": s[1]})(float(r.choice([100, 200])), r.choice(_CREDIT_SETS)),
+    lambda p: {"leverage": _a(p["D"] / p["E"]), "coverage": _a(p["E"] / (p["D"] * p["r"]))},
+    [Label("leverage", "Leverage, debt / EBITDA (x)", "x", **_MULT), Label("coverage", "Interest coverage, EBITDA / interest (x)", "x", **_MULT)],
+    {"CR_RATIO_INVERTED": lambda p: [{"leverage": _a(p["E"] / p["D"])}, {"coverage": _a(p["D"] * p["r"] / p["E"])}]},
+    lambda p, v: (f"Leverage = debt / EBITDA = {money(p['D'])} / {money(p['E'])} = {num(v['leverage'])}x: years of EBITDA the debt "
+                  f"equals. Interest = {money(p['D'])} x {pct(p['r'])} = {money(p['D'] * p['r'])}mm, so coverage = EBITDA / interest = "
+                  f"{num(v['coverage'])}x: how many times over the company can pay its interest."),
+    ["Leverage = debt / EBITDA (lower is safer)", "Coverage = EBITDA / interest (higher is safer)"],
+    secs=40,
+)
+
+def _prem_gen(r: random.Random) -> Params:
+    p0 = float(r.choice([20, 25, 40, 50]))
+    return {"P0": p0, "Offer": round(p0 * (1 + r.choice([0.2, 0.25, 0.3, 0.4, 0.5])), 2), "Q": float(r.choice([10, 20, 50]))}
+
+
+MA_PREMIUM = _num(
+    "ma_premium", "ma", "Offer premium",
+    lambda p: (f"A target's shares trade at {money(p['P0'])} and it has {num(p['Q'])} million shares. A buyer offers "
+               f"{money(p['Offer'])} per share. What premium is the buyer paying, and what's the purchase equity value?"),
+    _prem_gen,
+    lambda p: {"premium": _a((p["Offer"] / p["P0"] - 1) * 100), "purchase_equity": _a(p["Offer"] * p["Q"])},
+    [Label("premium", "Offer premium (%)", "%", tol_abs=0.1, tol_rel=0),
+     Label("purchase_equity", "Purchase equity value ($mm)", "$", **_EXACT)],
+    {"MA_PREMIUM_ON_OFFER": lambda p: [{"premium": _a((p["Offer"] - p["P0"]) / p["Offer"] * 100)}],
+     "MA_IGNORE_PREMIUM": lambda p: [{"purchase_equity": _a(p["P0"] * p["Q"])}]},
+    lambda p, v: (f"Premium = offer / current price - 1 = {money(p['Offer'])} / {money(p['P0'])} - 1 = {num(v['premium'], 1)}%: it's "
+                  f"measured against today's price, what shareholders would get without the deal. Purchase equity value = "
+                  f"{money(p['Offer'])} x {num(p['Q'])}mm shares = {money(v['purchase_equity'])}mm."),
+    ["Premium is measured against the current (undisturbed) share price", "Premium = offer / current price - 1",
+     "Purchase equity value = offer price x shares"],
+    secs=40,
+)
+
+SPEC_NUMERIC = [MA_PREMIUM, EV_BRIDGE_BASIC, EV_MULTIPLES_CALC, ACC_EBITDA_BUILD, ACC_DIVIDEND, ACC_DEBT_REPAY, DCF_EXIT_TV,
+                EV_EQUITY_ISSUE, ACC_ASSET_SALE, MA_SYNERGIES, DCF_UNLEVER_BETA, LBO_LEVERS, LEV_CREDIT_STATS]
+
+SPEC_CONCEPTUAL = [
+    _concept("c_acc_most_important", "accounting", 1, "The most important statement",
+             "If you could see only one financial statement, which would you pick, and why?",
+             ["Usually the cash flow statement", "It shows real cash generation, which pays debt, dividends and investment",
+              "Net income can look healthy while cash drains through working capital or capex",
+              "A strong alternative: with the balance sheet and income statement you can rebuild the cash flow statement"],
+             ["ACC_NONCASH_AS_CASH"],
+             "The cash flow statement, because cash is what pays debt, dividends and investment, and accounting profit can look "
+             "healthy while cash drains through working capital or capex. If I could have two, I'd take the balance sheet and "
+             "income statement, because together they let you rebuild the cash flow statement."),
+    _concept("c_dcf_tv_methods", "dcf", 1, "Two ways to get terminal value",
+             "What are the two ways to calculate terminal value, and when would you prefer each?",
+             ["Perpetuity growth: final-year FCF x (1 + g) / (WACC - g)", "Exit multiple: final-year EBITDA x a market multiple",
+              "The exit multiple is anchored in the market; perpetuity growth is more theoretical",
+              "Cross-check each with the other's implied number (implied growth or implied multiple)"],
+             ["DCF_TV_PLUS_G"],
+             "Perpetuity growth assumes cash flows grow at a modest rate forever; the exit multiple assumes the company is sold at a "
+             "multiple like its peers. Bankers often lead with the exit multiple because it's anchored in the market, then check the "
+             "growth rate it implies. The growth method suits stable businesses without good comparables."),
+    _concept("c_dcf_equity_cost", "dcf", 1, "Why equity costs more than debt",
+             "Why is equity more expensive than debt?",
+             ["Shareholders are paid last", "Their returns aren't fixed or promised", "Interest is tax-deductible, lowering debt's cost further"],
+             ["DCF_WACC_NO_SHIELD"],
+             "Shareholders are paid last and have no promised return, so they need a higher expected return for the extra risk. "
+             "Lenders get fixed interest and are paid first, and interest is tax-deductible, so the after-tax cost of debt is lower still."),
+    _concept("c_ma_accretion_what", "ma", 1, "Accretive vs dilutive",
+             "What does it mean for a deal to be accretive or dilutive, and why do buyers care?",
+             ["Accretive: the buyer's earnings per share go up after the deal", "Dilutive: EPS goes down",
+              "It depends on what the target earns versus what it costs to pay for it (new shares, lost interest, new debt)",
+              "Public buyers care because investors watch EPS, but a dilutive deal can still create value"],
+             ["MA_PE_RULE"],
+             "A deal is accretive if the buyer's earnings per share rise once the target's profits are added and the cost of paying "
+             "for it (new shares, lost interest on cash, or new interest on debt) is taken off; dilutive if EPS falls. Public buyers "
+             "watch it because investors focus on EPS, but it's a short-term test: a dilutive deal can still create value through "
+             "growth or synergies."),
+    _concept("c_ma_consideration", "ma", 1, "Cash vs stock",
+             "How does a buyer decide whether to pay with cash, debt or stock?",
+             ["Cost: after-tax cost of cash or debt versus the cost of stock (the inverse of the buyer's P/E)",
+              "Availability: cash on hand and how much debt the buyer can carry",
+              "Stock shares risk with the seller's shareholders and dilutes the buyer's ownership and control",
+              "Signalling: paying in stock can suggest the buyer thinks its shares are richly valued"],
+             ["MA_SHARES_FOR_CASH"],
+             "Mostly on cost and capacity. Cash is usually cheapest (it only loses interest income), then debt (after-tax interest), "
+             "then stock, whose cost is roughly the buyer's earnings yield. A buyer with a high P/E finds stock cheap. Stock also "
+             "shares the deal's risk with the seller and dilutes existing owners' control, and paying in stock can signal that the "
+             "buyer thinks its shares are fully valued, while cash signals confidence."),
+]
+
+# Basic (coffee-chat level) group questions, so every group has something to drill at every level it needs.
+GROUP_BASICS = [
+    _concept("c_fig_basics", "industry", 1, "What makes banks different",
+             "What makes a bank different from a normal company when you analyze it?",
+             ["Its balance sheet is the business: deposits and loans are its raw material",
+              "Interest is an operating cost, not a financing cost", "Regulators require it to hold capital against its loans",
+              "So bankers use equity metrics: P/E, P/TBV, ROE"],
+             ["FIG_USES_EV"],
+             "A bank makes money by borrowing (deposits) and lending at a higher rate, so its debt and interest are part of how it "
+             "operates, not how it's financed. Regulators also require it to hold capital against its loans. That's why bankers skip "
+             "EV and EBITDA and look at equity metrics like P/E, price to tangible book and return on equity."),
+    _concept("c_tmt_arr", "industry", 1, "ARR and why software trades on revenue",
+             "What is ARR, and why are software companies often valued on revenue?",
+             ["ARR = annual recurring revenue from subscriptions", "Recurring revenue is predictable, so investors pay up for it",
+              "Many fast-growing software companies aren't profitable yet, so earnings multiples don't work",
+              "EV/Revenue or EV/ARR, driven by growth and gross margin"],
+             ["TMT_LTV_NO_MARGIN"],
+             "ARR is the yearly value of a company's subscription contracts: revenue it can expect to repeat. Because it's predictable "
+             "and many growing software companies aren't profitable yet, investors value them on EV/Revenue or EV/ARR, paying higher "
+             "multiples for faster growth and higher gross margins."),
+    _concept("c_hc_basics", "industry", 1, "What drives a pharma company's value",
+             "What are the main things that drive the value of a pharmaceutical company?",
+             ["Its pipeline of drugs in development and their odds of approval", "Patents: protection, and the cliff when they expire",
+              "Sales of its approved drugs and their growth", "Regulation and pricing pressure"],
+             ["HC_RNPV_UNWEIGHTED"],
+             "A pharma company is worth the cash its drugs will earn: today's approved products, how long their patents protect them "
+             "from generics, and the pipeline of drugs in trials weighted by their chances of approval. Regulation and drug-pricing "
+             "pressure shape all of it."),
+    _concept("c_en_ebitdax", "industry", 1, "What EBITDAX is",
+             "What is EBITDAX, and why do oil and gas companies use it?",
+             ["EBITDA before exploration expense", "Some producers expense exploration costs, others capitalize them",
+              "Adding exploration back makes companies comparable", "Used in EV/EBITDAX multiples"],
+             ["EN_EBITDA_ONLY"],
+             "EBITDAX is EBITDA before exploration expense. Oil and gas producers account for exploration differently: some expense "
+             "it right away, some capitalize it. Adding it back puts everyone on the same footing, so peers are compared on EV/EBITDAX."),
+    _concept("c_ind_backlog", "industry", 1, "Backlog",
+             "What is backlog, and why do bankers covering industrials care about it?",
+             ["Orders signed but not yet delivered or billed", "It gives visibility into future revenue",
+              "Growing backlog signals demand ahead of reported revenue", "Book-to-bill above 1 means backlog is growing"],
+             [],
+             "Backlog is the value of orders a company has won but not yet delivered. For industrial businesses with long lead times "
+             "it shows future revenue before it appears on the income statement, so bankers watch its size and growth, often through "
+             "the book-to-bill ratio: new orders divided by revenue billed."),
+    _concept("c_cons_sss", "industry", 1, "Same-store sales",
+             "What are same-store sales, and why do they matter for a retailer?",
+             ["Sales growth from stores open at least a year", "Strips out growth that comes only from opening new stores",
+              "Shows whether existing stores are getting healthier", "Driven by traffic and average ticket"],
+             [],
+             "Same-store (comparable) sales measure revenue growth only from stores open for at least a year. They strip out growth "
+             "that just comes from opening new locations, so they show whether the existing business is getting healthier, through "
+             "more customer traffic or bigger average purchases."),
+    _concept("c_rx_role", "industry", 1, "What a restructuring banker does",
+             "What does a restructuring banker do?",
+             ["Advises companies in or near financial distress, or their creditors", "Fixes a capital structure the business can't support",
+              "Tools: amend-and-extend, debt-for-equity swaps, new money, Chapter 11", "Value is split by priority: secured, unsecured, then equity"],
+             ["RX_PRO_RATA"],
+             "Restructuring bankers advise companies that can't support their debt, or the creditors owed money. They work out how much "
+             "debt the business can really carry and negotiate a fix: extending maturities, swapping debt for equity, raising new money, "
+             "or a Chapter 11 process, with value shared out by priority."),
+    _concept("c_ma_group_role", "industry", 1, "What an M&A group does",
+             "What does an M&A group at a bank do, compared with an industry group?",
+             ["Advises on buying, selling and merging companies", "Owns valuation, deal process and negotiation execution",
+              "Industry groups own the client relationships and sector knowledge", "They staff deals together"],
+             [],
+             "The M&A group is the product specialist for buying, selling and merging companies: it runs the valuation work, the sale "
+             "or purchase process and the negotiation. Industry groups own the client relationships and sector knowledge, and the two "
+             "teams usually staff a deal together."),
+    _concept("c_sponsors_role", "industry", 1, "What a sponsors group does",
+             "What does a financial sponsors group do?",
+             ["Covers private equity firms as clients", "Pitches buyout ideas and sale opportunities to them",
+              "Arranges acquisition financing (often leveraged loans and bonds)", "Advises on exits: sales and IPOs of portfolio companies"],
+             ["LBO_NO_LEVER_LOGIC"],
+             "A financial sponsors group covers private equity firms as clients. It brings them companies to buy, helps arrange the "
+             "debt for their buyouts with the leveraged finance team, and advises on selling or taking public the companies they own."),
+]
+
+SPEC_FIT = [
+    _fit("c_ib_role", 1, "What an analyst does", "What do you think an investment banking analyst actually does day to day?",
+         ["Builds financial models and valuation analyses", "Makes pitch books and client materials",
+          "Supports live deals: diligence, data rooms, process work", "Accuracy and fast turnaround matter most",
+          "Learns from Associates and VPs on the team"],
+         ["FIT_GENERIC"],
+         "Most of the week goes into financial models, valuation work and presentation decks for pitches and live deals, plus "
+         "process work like diligence lists and data rooms. The analyst is the team's engine: accuracy and turnaround matter most, "
+         "and the payoff is a steep learning curve from seeing how senior bankers advise clients.", secs=90),
+    _fit("b_failure", 1, "A time you failed", "Tell me about a time you failed.",
+         ["A real failure you owned", "What you did right after", "A concrete lesson", "Evidence you applied it later"],
+         ["FIT_FAKE_WEAKNESS", "FIT_NO_EVIDENCE"],
+         "Pick a genuine setback where your choices mattered, own it in one sentence without blaming others, spend most of the "
+         "answer on what you changed, and finish with a later example showing the lesson stuck."),
+    _fit("c_ma_sellside", 2, "Sell-side M&A process", "Walk me through a sell-side M&A process.",
+         ["Prep: teaser, information memorandum and buyer list", "First round: NDAs and non-binding indications of interest",
+          "Second round: management meetings, data-room diligence, final bids", "Negotiate the purchase agreement, sign and close"],
+         [],
+         "The bank prepares marketing materials (a short teaser and a detailed information memorandum) and a buyer list. "
+         "Interested buyers sign NDAs and submit non-binding first-round bids. A shortlist gets management meetings and data-room "
+         "diligence, then submits final bids with a markup of the purchase agreement. The seller negotiates with the winner, signs, "
+         "and closes after approvals."),
+]
+
 NEW_NUMERIC = [ACC_REV_CASH, ACC_OPEX_CASH, ACC_INVENTORY, ACC_AP, ACC_DEFREV, EV_TSM, DCF_PV, LBO_BASIC,
-               FIG_PTBV, RE_CAP_RATE, RE_FFO, TMT_LTV, HC_RNPV, RX_WATERFALL, EN_EBITDAX]
+               FIG_PTBV, RE_CAP_RATE, RE_FFO, TMT_LTV, HC_RNPV, RX_WATERFALL, EN_EBITDAX] + SPEC_NUMERIC
 
 NUMERIC = [ACC_DA, ACC_WRITEDOWN, ACC_SBC, ACC_CAPEX, ACC_AR, ACC_DEBT, EV_BRIDGE, EV_IMPLIED_PRICE,
            EV_DEBT_CASH, DCF_UFCF, DCF_TV, DCF_WACC, DCF_CAPM, MA_STOCK, MA_CASH, MA_DEBT, MA_GOODWILL,
            LBO_PAPER, LBO_IRR_RULE, MKT_RATES_WACC, MKT_RATES_LBO, MKT_RATES_MA] + NEW_NUMERIC
 
-TEMPLATES: dict[str, Template] = {t.id: t for t in NUMERIC + CONCEPTUAL + MORE_CONCEPTUAL + BEHAVIORAL}
+TEMPLATES: dict[str, Template] = {t.id: t for t in NUMERIC + CONCEPTUAL + MORE_CONCEPTUAL + SPEC_CONCEPTUAL + GROUP_BASICS
+                                   + BEHAVIORAL + SPEC_FIT}
 
 SKILLS = {
     "accounting": "Accounting",
@@ -1580,6 +2092,8 @@ SUBSKILLS: dict[str, tuple[str, str]] = {
     "fit.story": ("fit", "Your story"), "fit.motivation": ("fit", "Why banking, group and firm"),
     "fit.deal": ("fit", "Deal discussion"), "fit.experiences": ("fit", "Teamwork and leadership stories"),
     "fit.self_awareness": ("fit", "Strengths and weaknesses"), "fit.markets_view": ("fit", "Market views and pitches"),
+    "fit.understanding_banking": ("fit", "Understanding the job"),
+    "industry.ma": ("industry", "The M&A group"), "industry.sponsors": ("industry", "Financial sponsors"),
 }
 
 META: dict[str, tuple[int, str, list[str]]] = {
@@ -1591,17 +2105,17 @@ META: dict[str, tuple[int, str, list[str]]] = {
     "acc_writedown": (2, "accounting.noncash", []), "acc_sbc": (2, "accounting.noncash", []),
     "acc_ar": (2, "accounting.working_capital", []), "acc_ap": (2, "accounting.working_capital", []),
     "acc_debt": (2, "accounting.debt", []),
-    "acc_defrev": (3, "accounting.working_capital", []), "c_acc_dtl": (3, "accounting.taxes", []),
+    "acc_defrev": (2, "accounting.working_capital", []), "c_acc_dtl": (3, "accounting.taxes", []),
     # EV & valuation
-    "c_ev_vs_equity": (1, "ev.concepts", []), "c_val_methods": (1, "ev.multiples", []), "ev_bridge": (1, "ev.bridge", []),
+    "c_ev_vs_equity": (1, "ev.concepts", []), "c_val_methods": (1, "ev.multiples", []), "ev_bridge": (2, "ev.bridge", []),
     "ev_debt_cash": (1, "ev.bridge", []), "c_ev_cash": (1, "ev.bridge", []),
     "ev_implied_price": (2, "ev.multiples", []), "ev_tsm": (2, "ev.diluted_shares", []), "c_ev_multiples": (2, "ev.multiples", []),
     "c_ev_negative": (3, "ev.concepts", []),
     # DCF
     "dcf_pv": (1, "dcf.time_value", []), "c_dcf_walk": (1, "dcf.process", []), "c_wacc_what": (1, "dcf.discount_rate", []),
     "dcf_capm": (1, "dcf.discount_rate", []),
-    "dcf_ufcf": (2, "dcf.fcf", []), "dcf_wacc": (2, "dcf.discount_rate", []), "dcf_tv": (2, "dcf.terminal_value", []),
-    "c_dcf_wacc": (2, "dcf.terminal_value", []),
+    "dcf_ufcf": (1, "dcf.fcf", []), "dcf_wacc": (2, "dcf.discount_rate", []), "dcf_tv": (2, "dcf.terminal_value", []),
+    "c_dcf_wacc": (1, "dcf.terminal_value", []),
     "mkt_rates_wacc": (3, "dcf.rates", []), "c_mkt_duration": (3, "dcf.rates", []),
     # M&A
     "c_ma_why": (1, "ma.rationale", []), "c_ma_synergies": (2, "ma.rationale", []), "c_ma_pe": (2, "ma.accretion", []),
@@ -1611,7 +2125,7 @@ META: dict[str, tuple[int, str, list[str]]] = {
     # LBO
     "c_lbo_what": (1, "lbo.concepts", []), "c_lbo_candidate": (1, "lbo.concepts", []), "lbo_irr_rule": (1, "lbo.returns", []),
     "lbo_basic": (1, "lbo.returns", []),
-    "c_lbo_leverage": (2, "lbo.concepts", []), "lbo_paper": (2, "lbo.paper", []),
+    "c_lbo_leverage": (1, "lbo.concepts", []), "lbo_paper": (2, "lbo.paper", []),
     "mkt_rates_lbo": (3, "lbo.rates", []),
     # group specifics
     "fig_ptbv": (2, "industry.fig", ["fig"]), "c_fig_no_ev": (2, "industry.fig", ["fig"]),
@@ -1620,14 +2134,34 @@ META: dict[str, tuple[int, str, list[str]]] = {
     "tmt_ltv": (2, "industry.tmt", ["tmt"]), "c_tmt_saas": (2, "industry.tmt", ["tmt"]),
     "hc_rnpv": (2, "industry.healthcare", ["healthcare"]), "c_hc_biotech": (2, "industry.healthcare", ["healthcare"]),
     "en_ebitdax": (2, "industry.energy", ["energy"]), "c_en_ep": (2, "industry.energy", ["energy"]),
-    "rx_waterfall": (3, "industry.restructuring", ["restructuring", "levfin"]), "c_rx_ch11": (3, "industry.restructuring", ["restructuring"]),
+    "rx_waterfall": (2, "industry.restructuring", ["restructuring", "levfin"]), "c_rx_ch11": (3, "industry.restructuring", ["restructuring"]),
     "c_ind_cyclical": (2, "industry.industrials", ["industrials"]), "c_consumer_metrics": (2, "industry.consumer", ["consumer"]),
     "c_levfin_credit": (2, "industry.credit", ["levfin", "sponsors", "restructuring"]),
     "c_ecm_ipo": (1, "industry.capital_markets", ["ecm"]), "c_dcm_rates": (1, "industry.capital_markets", ["levfin", "ecm"]),
     # fit
     "b_resume": (1, "fit.story", []), "b_why_ib": (1, "fit.motivation", []), "b_team": (1, "fit.experiences", []),
-    "b_weakness": (1, "fit.self_awareness", []), "b_why_group": (2, "fit.motivation", []), "b_why_firm": (2, "fit.motivation", []),
+    "b_weakness": (1, "fit.self_awareness", []), "b_why_group": (1, "fit.motivation", []), "b_why_firm": (1, "fit.motivation", []),
     "b_deal": (2, "fit.deal", []), "b_leadership": (2, "fit.experiences", []), "b_pitch": (3, "fit.markets_view", []),
+    # ---- learning-design additions (Oct 2026)
+    "ma_premium": (1, "ma.accretion", []), "c_ma_accretion_what": (1, "ma.accretion", []),
+    "c_ma_consideration": (1, "ma.rationale", []),
+    "ev_bridge_basic": (1, "ev.bridge", []), "ev_multiples_calc": (1, "ev.multiples", []),
+    "acc_ebitda_build": (1, "accounting.is_basics", []), "acc_dividend": (1, "accounting.links", []),
+    "acc_debt_repay": (1, "accounting.debt", []), "dcf_exit_tv": (1, "dcf.terminal_value", []),
+    "ev_equity_issue": (2, "ev.bridge", []), "acc_asset_sale": (2, "accounting.capex", []),
+    "ma_synergies_breakeven": (2, "ma.accretion", []), "dcf_unlever_beta": (2, "dcf.discount_rate", []),
+    "lbo_levers": (2, "lbo.returns", []),
+    "lev_credit_stats": (1, "industry.credit", ["levfin", "sponsors", "restructuring"]),
+    "c_acc_most_important": (1, "accounting.links", []), "c_dcf_tv_methods": (1, "dcf.terminal_value", []),
+    "c_dcf_equity_cost": (1, "dcf.discount_rate", []),
+    "c_ib_role": (1, "fit.understanding_banking", []), "b_failure": (1, "fit.experiences", []),
+    "c_ma_sellside": (2, "fit.understanding_banking", []),
+    # Basic group questions: every group now has coffee-chat-level material
+    "c_fig_basics": (1, "industry.fig", ["fig"]), "c_tmt_arr": (1, "industry.tmt", ["tmt"]),
+    "c_hc_basics": (1, "industry.healthcare", ["healthcare"]), "c_en_ebitdax": (1, "industry.energy", ["energy"]),
+    "c_ind_backlog": (1, "industry.industrials", ["industrials"]), "c_cons_sss": (1, "industry.consumer", ["consumer"]),
+    "c_rx_role": (1, "industry.restructuring", ["restructuring"]), "c_ma_group_role": (1, "industry.ma", ["ma"]),
+    "c_sponsors_role": (1, "industry.sponsors", ["sponsors"]),
 }
 
 _SKILL_FOR_PREFIX = {"accounting": "accounting", "ev": "ev", "dcf": "dcf", "ma": "ma", "lbo": "lbo", "industry": "industry", "fit": "fit"}
@@ -1640,6 +2174,44 @@ for _tid, (_lvl, _sub, _groups) in META.items():
     _t.subskill = _sub
     _t.groups = _groups
 assert set(META) == set(TEMPLATES), sorted(set(TEMPLATES) ^ set(META))
+
+
+def _diagnosable(t: Template, p: Params) -> bool:
+    """True if every misconception's wrong number sits outside the grading band around the truth, and no two
+    misconceptions predict the same wrong number for the same line item. Signature entries equal to the truth
+    are the parts of a fingerprint the candidate still gets right, so they are ignored."""
+    labels = {l.key: l for l in t.labels}
+    truth = t.solve(p)
+    preds: list[tuple[str, str, float]] = []
+    for mid, fn in t.traps.items():
+        for sig in fn(p):
+            wrong = {k: x for k, x in sig.items() if abs(x - truth[k]) > 1e-9}
+            if not wrong or any(labels[k].close(x, truth[k]) for k, x in wrong.items()):
+                return False
+            preds += [(mid, k, x) for k, x in wrong.items()]
+    return not any(m1 != m2 and k1 == k2 and labels[k1].close(x1, x2)
+                   for i, (m1, k1, x1) in enumerate(preds) for m2, k2, x2 in preds[i + 1:])
+
+
+def _resample_until_diagnosable(t: Template) -> None:
+    """Wrap gen so a candidate never sees an instance whose mistakes the calculator can't tell apart
+    (e.g. a backwards EV bridge that happens to land on the right number)."""
+    base = t.gen
+
+    def gen(rng: random.Random) -> Params:
+        for _ in range(60):
+            p = base(rng)
+            if _diagnosable(t, p):
+                return p
+        return p
+
+    t.raw_gen = base  # kept for tests: how often the ranges themselves produce a bad instance
+    t.gen = gen
+
+
+for _t in TEMPLATES.values():
+    if _t.kind == "numeric" and _t.traps:
+        _resample_until_diagnosable(_t)
 
 
 def eligible(t: Template, group: str | None) -> bool:

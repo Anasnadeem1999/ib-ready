@@ -1,0 +1,102 @@
+"""Shared fixtures: a throwaway database per test and an offline stand-in for the model.
+
+`engine` calls the model only through `llm.run(...)` (a module attribute), so replacing it with
+FakeLLM intercepts every specialist, interviewer, coach and planner call. The agents themselves are
+built on pydantic-ai's TestModel so no API key or network is needed.
+"""
+
+import pytest
+from pydantic_ai.models.test import TestModel
+
+from ticktie import agents, config, db, engine, llm
+
+
+class _Res:
+    def __init__(self, out):
+        self.output = out
+
+
+def _rec(name: str) -> llm.CallRecord:
+    return llm.CallRecord(name, 100, 0, 20, 1, 0, "gpt-6-luna", True, 1, 0.0)
+
+
+class FakeLLM:
+    """Scriptable stand-in for llm.run.
+
+    verdict: "right" states every answer-key number and hits every key point; "wrong" states numbers
+    that match nothing and hits no key point. fail: agent-name substrings that raise a gateway error.
+    """
+
+    def __init__(self):
+        self.verdict = "right"
+        self.fail: set[str] = set()
+        self.calls: list[str] = []
+        self.coach_text = {"headline": "Solid work today.", "went_well": ["Clear structure."], "work_on": [],
+                           "next_step": "Run a drill on your weakest skill.", "encouragement": "Keep going."}
+
+    async def __call__(self, agent, agent_name, prompt, deps=None, session_id=None):
+        self.calls.append(agent_name)
+        if any(f in agent_name for f in self.fail):
+            raise RuntimeError("simulated gateway failure")
+        if deps is not None:  # a specialist diagnostician
+            q, ok = deps.question, self.verdict == "right"
+            sv = ([agents.StatedValue(label=l.key, value=(q.values[l.key] if ok else q.values[l.key] * 3 + 7777))
+                   for l in q.labels] if q.kind == "numeric" else [])
+            return _Res(agents.Diagnosis(
+                stated_values=sv, key_points_hit=list(range(len(q.key_points))) if ok else [],
+                reasoning_quality="strong" if ok else "none", rationale="ok", evidence_quote="x")), _rec(agent_name)
+        if agent_name == "Interviewer":
+            return _Res(agents.InterviewerMsg(message="Good. Next one.")), _rec(agent_name)
+        if agent_name == "Coach":
+            return _Res(agents.Debrief.model_validate(self.coach_text)), _rec(agent_name)
+        if agent_name == "Planner":
+            return _Res(agents.PlanSummary(headline="Your plan.", why="Weakest areas first.",
+                                           first_step="Start today.")), _rec(agent_name)
+        raise AssertionError(f"unexpected agent {agent_name}")
+
+
+def _clear_agent_caches():
+    for fn in (agents.specialist, agents.interviewer, agents.coach, agents.planner):
+        clear = getattr(fn, "cache_clear", None)
+        if clear:
+            clear()
+
+
+@pytest.fixture
+def tmp_db(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(config, "DB_PATH", tmp_path / "t.db")
+    monkeypatch.setattr(config, "LOG_PATH", tmp_path / "llm_calls.jsonl")
+    db.init()
+    return tmp_path
+
+
+@pytest.fixture
+def fake_llm(tmp_db, monkeypatch):
+    f = FakeLLM()
+    monkeypatch.setattr(llm, "run", f)
+    monkeypatch.setattr(llm, "_model", TestModel())
+    monkeypatch.setattr(config, "MIN_SECONDS_BETWEEN_TURNS", 0.0)  # no sleeping between answers in tests
+    _clear_agent_caches()
+    engine._INFLIGHT.clear()
+    engine._ENDING.clear()
+    yield f
+    _clear_agent_caches()
+
+
+@pytest.fixture
+def pid(fake_llm):
+    prof, _, _ = db.sign_in("Tester", "secret123")
+    return prof["id"]
+
+
+@pytest.fixture
+def client(fake_llm):
+    from fastapi.testclient import TestClient
+
+    from ticktie.server import app
+
+    with TestClient(app) as c:  # runs the lifespan hook -> db.init() on the temp database
+        r = c.post("/api/signin", json={"name": "Api Tester", "password": "secret123"})
+        c.headers["X-Auth-Token"] = r.json()["token"]
+        yield c
