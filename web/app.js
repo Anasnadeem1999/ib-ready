@@ -439,7 +439,9 @@ $("#signin").addEventListener("submit", async (e) => {
 function optButton(v, label, sub, sel) {
   return `<button type="button" class="opt" aria-pressed="${sel ? "true" : "false"}" data-v="${esc(v)}"><b>${esc(label)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</button>`;
 }
-function selectOpt(scope, v) { $$(`${scope} .opt`).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v))); }
+// scope may list several containers ("#a, #b"): look for .opt inside each one, not just the last
+const optsIn = (scope) => scope.split(",").map((s) => `${s.trim()} .opt`).join(", ");
+function selectOpt(scope, v) { $$(optsIn(scope)).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v))); }
 function wireChoice(scope, key) {
   $(scope.split(",")[0].trim()).closest("fieldset, .card").addEventListener("click", (e) => {
     const b = e.target.closest(".opt"); if (!b || !b.closest(scope.split(",").map((s) => s.trim()).join(","))) return;
