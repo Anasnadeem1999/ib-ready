@@ -119,7 +119,7 @@ def main() -> None:
             pg.evaluate("""() => { const d = new Date(Date.now() + 21*864e5); const el = document.querySelector('#interview-date');
                 el.value = d.toISOString().slice(0,10); el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }""")
             pg.click("#persona-choice [data-v=vp]")
-            shot("02_intake", full=True)
+            shot("02_intake")
 
             # ---- 2. placement: right on Coffee-chat questions, wrong above that
             pg.click("#intake-btn")

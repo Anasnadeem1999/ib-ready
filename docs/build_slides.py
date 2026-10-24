@@ -23,7 +23,8 @@ def pic(name: str, style: str = "") -> str:
     p = R.SHOTS / f"{name}.png"
     if not p.exists():
         return f'<div class="pending">PENDING screenshot {name}</div>'
-    return f'<img class="shot" src="data:image/png;base64,{base64.b64encode(p.read_bytes()).decode()}" style="{style}">'
+    kind, b64 = R._image_data(p)
+    return f'<img class="shot" src="data:image/{kind};base64,{b64}" style="{style}">'
 
 
 def build() -> str:
@@ -183,13 +184,13 @@ def build() -> str:
 <section>
   <h2>Impact: real users</h2>
   <div class="kpis">
-    <div><b>{len(people)}</b><span>pilot users (MBA recruits)</span></div>
+    <div><b>{len(people)}</b><span>pilot users recruiting for IB</span></div>
     <div><b>{sum(a['verdict'] == 'correct' for a in v_drill)}/{len(v_drill)}</b><span>right in the drill after the placement named the mistake</span></div>
     <div><b>{F['n_long_correct']}/{len(F['long_correct'])}</b><span>correct answers that were too long: now flagged</span></div>
     <div><b>2 h → 1 answer</b><span>to find a weak spot (pilot notes; logs)</span></div>
   </div>
   {quote_html}
-  <p class="small">For a finance club: unlimited diagnosed mocks for 100 recruiters at about {usd(F['club_total_year'], 0)} a year, and an anonymised view of the most common mistakes to target workshops.</p>
+  <p class="small">For a finance club: unlimited diagnosed mocks for 100 recruiters at about {usd(F['club_total_year'], 0)} a year, and an anonymized view of the most common mistakes to target workshops.</p>
 </section>
 
 <section>

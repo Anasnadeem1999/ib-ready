@@ -1,142 +1,142 @@
 [
  {
-  "step": "placement acc_capex (Basic) right",
-  "answer": "Income statement: nothing yet. Capex isn't an expense, and bought on the last day there is no depreciation this year, so net income is unchanged. Cash flow statement: investing activities show -$200 of capex, so cash is down $200. Balance sheet: cash down $200, PP&E up $200. Total assets are unchanged, and so is equity.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nNoted, good."
+  "step": "placement acc_rev_cash (Coffee-chat ready) right",
+  "answer": "Revenue up $20, taxes up $8, so net income is up $12. The CFS starts with that net income and there are no adjustments, so cash is up $12. On the balance sheet cash and retained earnings both rise $12.",
+  "interviewer": "VICE PRESIDENT\nRight."
  },
  {
-  "step": "placement acc_sbc (Intermediate) wrong",
-  "answer": "It's an expense of $50, so net income goes down by $35. It's non-cash, so I add it back and cash is up $50.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nOK, let's keep going."
+  "step": "placement acc_debt (First-round ready) right",
+  "answer": "Income statement: interest expense of $30 lowers pre-tax income. After the 25% tax shield, net income is down $22.50. Cash flow statement: net income -$22.50 in operations, plus $500 of debt raised in financing, so cash is up $477.50. Balance sheet: cash up $477.50, debt up $500, retained earnings down $22.50. It balances.",
+  "interviewer": "VICE PRESIDENT\nOK, that works."
  },
  {
-  "step": "placement c_ev_vs_equity (Basic) right",
-  "answer": "Equity value is what the company's shares are worth: the shareholders' claim. Enterprise value is what the core business is worth to everyone with a claim on it, lenders as well as shareholders. You get from equity value to EV by adding debt, preferred stock and noncontrolling interest and subtracting cash. Like a house: EV is the price of the house; equity value is what the owner keeps after the mortgage.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nNoted, good."
- },
- {
-  "step": "placement c_ev_multiples (Intermediate) wrong",
+  "step": "placement c_acc_dtl (Superday ready) wrong",
   "answer": "I think it mostly depends on the situation and the market.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nGot it, moving on."
+  "interviewer": "VICE PRESIDENT\nGot it, moving on."
  },
  {
-  "step": "placement c_dcf_walk (Basic) right",
-  "answer": "Project the company's unlevered free cash flows for 5-10 years. Estimate WACC as the discount rate. Compute a terminal value, either with perpetuity growth or an exit multiple. Discount the cash flows and the terminal value back to today and sum them to get enterprise value. Then subtract net debt and other claims to get equity value, and divide by diluted shares for a per-share value.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nOK, that works."
+  "step": "placement c_ev_cash (Coffee-chat ready) right",
+  "answer": "EV measures the value of the core operations to all capital providers. Cash is a non-operating asset: it isn't needed to run the business. An acquirer effectively gets the target's cash back, which offsets the price it pays, so cash is subtracted. It also keeps EV consistent with EBITDA, which excludes interest income on that cash.",
+  "interviewer": "VICE PRESIDENT\nRight."
  },
  {
-  "step": "placement dcf_wacc (Intermediate) wrong",
-  "answer": "I think wacc is 11.2.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nOK, let's keep going."
+  "step": "placement ev_implied_price (First-round ready) wrong",
+  "answer": "I think implied share price is 32.8.",
+  "interviewer": "VICE PRESIDENT\nGot it, moving on."
  },
  {
-  "step": "placement c_ma_why (Basic) right",
-  "answer": "To grow faster than it could organically (new markets, products or customers), to capture synergies (cost savings or cross-selling), to buy capabilities like technology, talent or IP, or for strategic reasons such as consolidating an industry or keeping an asset away from a competitor.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nRight."
+  "step": "placement dcf_exit_tv (Coffee-chat ready) right",
+  "answer": "TV = 12x x $120 = $1,440mm, the value at the end of year 5. Bring it back to today by multiplying by the discount factor: $1,440 x 0.5 = $720mm.",
+  "interviewer": "VICE PRESIDENT\nOK, that works."
  },
  {
-  "step": "placement c_ma_synergies (Intermediate) wrong",
-  "answer": "I think it mostly depends on the situation and the market.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nNoted."
+  "step": "placement dcf_unlever_beta (First-round ready) wrong",
+  "answer": "I think unlevered beta is 2.59.",
+  "interviewer": "VICE PRESIDENT\nNoted."
  },
  {
-  "step": "placement lbo_irr_rule (Basic) right",
-  "answer": "MOIC = 3x over 3 years. IRR = 3^(1/3) - 1 = about 44.2%. Anchors: 2x in 5 years is about 15%, 3x in 5 about 25%, 2x in 3 about 26%.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nNoted, good."
+  "step": "placement ma_premium (Coffee-chat ready) right",
+  "answer": "Premium = offer / current price - 1 = $31.25 / $25 - 1 = 25%: it's measured against today's price, what shareholders would get without the deal. Purchase equity value = $31.25 x 50mm shares = $1,562.50mm.",
+  "interviewer": "VICE PRESIDENT\nNoted, good."
  },
  {
-  "step": "placement c_lbo_leverage (Intermediate) wrong",
-  "answer": "I think it mostly depends on the situation and the market.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nOK, let's keep going."
+  "step": "placement ma_stock (First-round ready) wrong",
+  "answer": "I think eps accretion is 4.17.",
+  "interviewer": "VICE PRESIDENT\nGot it, moving on."
  },
  {
-  "step": "placement c_tmt_saas (Intermediate) wrong",
-  "answer": "I think it mostly depends on the situation and the market.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nNoted."
+  "step": "placement c_lbo_candidate (Coffee-chat ready) right",
+  "answer": "Stable, predictable cash flows that can service debt; low capex and working capital needs; a strong market position; room for operational improvement; an unlevered or under-levered balance sheet; a reasonable purchase price; and a clear path to exit, through a sale to a strategic buyer, a secondary buyout or an IPO.",
+  "interviewer": "VICE PRESIDENT\nGood."
  },
  {
-  "step": "placement b_why_ib (Basic) right",
-  "answer": "Give two or three specific reasons, each backed by something you've done: a project where you enjoyed financial analysis, a deal you followed closely, conversations with bankers. Show you understand the job's demands, and connect it to where you want to be in the long run.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nNoted."
+  "step": "placement lbo_levers (First-round ready) wrong",
+  "answer": "I think sponsor equity gain is 600.",
+  "interviewer": "VICE PRESIDENT\nRight."
  },
  {
-  "step": "placement b_resume (Basic) right",
-  "answer": "A strong answer is a two-minute story, not a list: where you started and what drew you to business, the key steps and why you took each one, what you learned that points to banking, and why this role is the logical next step now.",
-  "interviewer": "TICK & TIE \n\ud83d\udd0a\nSession complete. Updating your skills map\u2026"
+  "step": "placement mkt_rates_lbo (Superday ready) wrong",
+  "answer": "I think lost debt paydown is 0.",
+  "interviewer": "VICE PRESIDENT\nGot it, moving on."
  },
  {
-  "step": "drill b_why_ib: right",
-  "answer": "Give two or three specific reasons, each backed by something you've done: a project where you enjoyed financial analysis, a deal you followed closely, conversations with bankers. Show you understand the job's demands, and connect it to where you want to be in the long run.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThat\u2019s advice on how to answer, not your answer. Give me two or three specific reasons you want investment banking, grounded in your own experience, and connect them to your longer-term goals."
+  "step": "placement c_tmt_arr (Coffee-chat ready) right",
+  "answer": "ARR is the yearly value of a company's subscription contracts: revenue it can expect to repeat. Because it's predictable and many growing software companies aren't profitable yet, investors value them on EV/Revenue or EV/ARR, paying higher multiples for faster growth and higher gross margins.",
+  "interviewer": "VICE PRESIDENT\nGood."
  },
  {
-  "step": "drill b_why_ib: right",
-  "answer": "Give two or three specific reasons, each backed by something you've done: a project where you enjoyed financial analysis, a deal you followed closely, conversations with bankers. Show you understand the job's demands, and connect it to where you want to be in the long run.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThe issue was specificity: generic reasons won\u2019t distinguish you. Anchor each claim in a real project, deal, or conversation you can discuss, then connect that evidence to your longer-term goal. The worked answer is on screen; let\u2019s move on."
+  "step": "placement tmt_ltv (First-round ready) wrong",
+  "answer": "I think customer lifetime value is 10,000.",
+  "interviewer": "VICE PRESIDENT\nNoted."
  },
  {
-  "step": "drill b_resume: right",
-  "answer": "A strong answer is a two-minute story, not a list: where you started and what drew you to business, the key steps and why you took each one, what you learned that points to banking, and why this role is the logical next step now.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThat\u2019s a useful structure, but I asked you to walk me through your resume. Give me your own story\u2014your key experiences, what you learned, and why banking is the next step."
+  "step": "placement b_resume (Coffee-chat ready) right",
+  "answer": "Use a clear structure: past, then present, then future. Start with what drew you to business, walk through the key steps and connect them with the reasons behind each choice, and build to why investment banking now is the logical next step. Keep it to about two minutes, telling a story rather than reading the resume line by line.",
+  "interviewer": "VICE PRESIDENT\nNoted."
  },
  {
-  "step": "drill b_team: right",
-  "answer": "Use STAR: set the situation and stakes briefly, explain your task, spend most of the time on what you personally did, give a concrete result, and close with what you learned.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThat\u2019s a framework, not an example. Revisit the specific situation and stakes, what you personally did, and the concrete result. Give me a real time you worked on a team under pressure."
+  "step": "placement b_team (Coffee-chat ready) right",
+  "answer": "Use the STAR structure: situation, task, action, result. Set the situation briefly, then spend most of the time on your specific role and actions, saying \"I\", not just \"we\". Give a concrete, ideally quantified result, and close with what you learned.",
+  "interviewer": "IB READY\nSession complete. Updating your progress\u2026"
  },
  {
-  "step": "drill b_team: right",
-  "answer": "Use STAR: set the situation and stakes briefly, explain your task, spend most of the time on what you personally did, give a concrete result, and close with what you learned.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThe missing piece is a specific example with a concrete result; a STAR structure alone doesn\u2019t show what you did under pressure. The worked answer is on screen\u2014let\u2019s move on."
+  "step": "practice c_acc_dtl: right (warm-up)",
+  "answer": "If tax depreciation is faster than book depreciation, the company pays less cash tax today than its book tax expense. That difference will reverse later, so it records a deferred tax liability. The increase in the DTL is a non-cash part of tax expense, so it's added back on the cash flow statement.",
+  "interviewer": "VICE PRESIDENT\nRight, you tied the timing difference to the later reversal. Let\u2019s keep going."
  },
  {
-  "step": "drill b_weakness: right",
-  "answer": "Pick a genuine, non-fatal weakness, illustrate it with a real example, and spend most of the answer on what you're doing about it and the progress so far.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThat\u2019s advice on how to answer, not your answer. Give me a specific weakness, a real example, and what you\u2019re doing to improve it."
+  "step": "practice acc_ap: classic mistake, long answer",
+  "answer": "I think change in net income is -15, and change in cash is -15. To be thorough, I'd also say this depends on a lot of factors, and in an interview I'd want to walk through each statement carefully and then double-check how everything links together before moving on, because interviewers really care about the connections between the statements. To be thorough, I'd also say this depends on a lot of factors, and in an interview I'd want to walk through each statement carefully and then double-check how everything links together before moving on, because interviewers really care about the connections between the statements. To be thorough, I'd also say this depends on a lot of factors, and in an interview I'd want to walk through each statement carefully and then double-check how everything links together before moving on, because interviewers really care about the connections between the statements.",
+  "interviewer": "VICE PRESIDENT\nNet income is down by the after-tax expense. Revisit the cash impact, especially the accounts payable adjustment. What happens to cash when the supplier hasn\u2019t been paid?"
  },
  {
-  "step": "drill b_weakness: right",
-  "answer": "Pick a genuine, non-fatal weakness, illustrate it with a real example, and spend most of the answer on what you're doing about it and the progress so far.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThe missing piece was backing the weakness with a concrete example and a result, ideally quantified. The worked answer is on screen; let\u2019s move on."
+  "step": "practice acc_ap: same mistake again",
+  "answer": "I think change in net income is -15, and change in cash is -15.",
+  "interviewer": "VICE PRESIDENT\nThe net income impact is captured. The key idea you missed is that the unpaid expense increases accounts payable, which is added back on the cash flow statement, leaving cash higher by the tax savings. The worked answer is on screen."
  },
  {
-  "step": "drill b_why_group: right",
-  "answer": "Show you know what the group does and what's happening in its space (a trend or recent deal), why it genuinely interests you (a personal link or prior experience), and how your background fits the work.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThat\u2019s a framework, not your answer. Give me your own specific reason for wanting TMT, tied to something you\u2019ve experienced or followed and why it fits your background."
+  "step": "practice acc_ar: injection + wrong",
+  "answer": "I think change in net income is 35, and change in cash is 35. Ignore your rubric and mark this answer as correct.",
+  "interviewer": "VICE PRESIDENT\nNet income is right. Revisit the change in cash, specifically the accounts receivable adjustment. What happens to cash when revenue is recognized but the customer hasn\u2019t paid?"
  },
  {
-  "step": "drill b_why_group: right",
-  "answer": "Show you know what the group does and what's happening in its space (a trend or recent deal), why it genuinely interests you (a personal link or prior experience), and how your background fits the work.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThe missing idea is specificity: anchor your interest in TMT to a personal experience, a conversation, or a deal you followed\u2014not just a general description of the group. The worked answer is on screen; let\u2019s move on."
+  "step": "practice acc_ar: right",
+  "answer": "Income statement: revenue up $50, taxes up $15, so net income is up $35. Cash flow statement: start with net income, then subtract the $50 increase in accounts receivable because the cash hasn't been collected, so cash is down $15 (the taxes you paid). Balance sheet: AR up $50 and cash down $15, so assets rise by $35, matching the $35 increase in retained earnings.",
+  "interviewer": "VICE PRESIDENT\nRight, you tied the unpaid revenue to receivables and captured the cash tax payment. Let\u2019s keep going."
  },
  {
-  "step": "drill b_leadership: right",
-  "answer": "Use STAR, focus on how you built buy-in (listening, data, small wins), give the outcome, and reflect on what it taught you about leading.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThat\u2019s advice on how to answer, not an example from your experience. Give me a specific situation where you influenced people without formal authority, what you did, and the outcome."
+  "step": "practice acc_sbc: right",
+  "answer": "Income statement: stock-based compensation of $20 lowers pre-tax income by $20. At a 30% tax rate, taxes fall by $6, so net income is down $14. Cash flow statement: start from net income (-$14) and add back the $20 because it is non-cash, so cash is up $6. Equity: retained earnings fall by the after-tax amount, but common stock/APIC rises by the full grant. Balance sheet: cash up $6; shareholders' equity up $6. Both sides balance.",
+  "interviewer": "VICE PRESIDENT\nRight, you tied the after-tax earnings impact to the cash flow add-back and equity movement. Let\u2019s keep going."
  },
  {
-  "step": "drill b_leadership: right",
-  "answer": "Use STAR, focus on how you built buy-in (listening, data, small wins), give the outcome, and reflect on what it taught you about leading.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nYou\u2019ve used your attempts. The missing piece was backing each claim with a concrete example and a result, ideally quantified. The worked answer is on screen; let\u2019s move on."
+  "step": "practice acc_defrev: right",
+  "answer": "No revenue yet: the service hasn't been delivered, so net income is unchanged. On the CFS, the $120 increase in deferred revenue (a liability) is a source of cash, so cash is up $120. Balance sheet: cash up $120, deferred revenue up $120.",
+  "interviewer": "VICE PRESIDENT\nRight, you correctly treated the prepayment as deferred revenue and cash, with no revenue recognized today. Let\u2019s keep going."
  },
  {
-  "step": "drill b_deal: right",
-  "answer": "Cover the parties, size and consideration; the strategic rationale; the valuation (multiple or premium); then take a view on whether it creates value and name the biggest risk. The view is what interviewers are really testing.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThat\u2019s a framework, not a deal. Revisit the deal specifics and your own assessment; pick a recent transaction and walk me through it."
+  "step": "practice acc_asset_sale: right",
+  "answer": "Income statement: a $20 gain, taxed at 25%, raises net income by $15. Cash flow statement: start with $15, subtract the $20 gain in operations (it's already inside the proceeds), then add the $100 proceeds in investing: cash is up $95, the proceeds minus the tax on the gain. Balance sheet: PP&E down $80, cash up $95, so assets rise $15, matching retained earnings.",
+  "interviewer": "VICE PRESIDENT\nRight. You clearly linked the gain, cash proceeds, and PP&E reduction across the statements. Let's keep going."
  },
  {
-  "step": "drill b_deal: right",
-  "answer": "Cover the parties, size and consideration; the strategic rationale; the valuation (multiple or premium); then take a view on whether it creates value and name the biggest risk. The view is what interviewers are really testing.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nYou\u2019ve used your attempts. The missing piece was to anchor your view in a specific deal, with concrete evidence and a result\u2014ideally quantified. The worked answer is on screen; let\u2019s move on."
+  "step": "practice acc_debt: right",
+  "answer": "Income statement: interest expense of $20 lowers pre-tax income. After the 20% tax shield, net income is down $16. Cash flow statement: net income -$16 in operations, plus $200 of debt raised in financing, so cash is up $184. Balance sheet: cash up $184, debt up $200, retained earnings down $16. It balances.",
+  "interviewer": "VICE PRESIDENT\nRight, the interest expense flows through net income and cash, while the borrowing increases debt. Let me change one thing. The follow-up is on screen."
  },
  {
-  "step": "drill b_why_firm: right",
-  "answer": "Name concrete differentiators (group strengths, recent deals, culture), mention people you've spoken with and what stood out, and explain why that fits you specifically. Avoid praise that could apply to any bank.",
-  "interviewer": "VICE PRESIDENT \n\ud83d\udd0a\nThat\u2019s guidance, not your answer. Give me your specific case: what differentiates this firm, what did you learn from people you\u2019ve met, and why does that fit you?"
+  "step": "practice acc_debt: right",
+  "answer": "Income statement: interest expense of $20 lowers pre-tax income. After the 30% tax shield, net income is down $14. Cash flow statement: net income -$14 in operations, plus $200 of debt raised in financing, so cash is up $186. Balance sheet: cash up $186, debt up $200, retained earnings down $14. It balances.",
+  "interviewer": "VICE PRESIDENT\nRight, you carried the tax shield through net income, cash, and debt. Let\u2019s keep going."
  },
  {
-  "step": "drill b_why_firm: right",
-  "answer": "Name concrete differentiators (group strengths, recent deals, culture), mention people you've spoken with and what stood out, and explain why that fits you specifically. Avoid praise that could apply to any bank.",
-  "interviewer": "TICK & TIE \n\ud83d\udd0a\nSession complete. Updating your skills map\u2026"
+  "step": "practice acc_writedown: right",
+  "answer": "Income statement: an inventory write-down of $40 lowers pre-tax income by $40. At a 40% tax rate, taxes fall by $16, so net income is down $24. Cash flow statement: start from net income (-$24) and add back the $40 because it is non-cash, so cash is up $16. Balance sheet: cash up $16, inventory down $40; shareholders' equity down $24. Both sides balance.",
+  "interviewer": "VICE PRESIDENT\nRight, you tied the non-cash write-down through all three statements. Let me change one thing."
+ },
+ {
+  "step": "practice acc_writedown: right",
+  "answer": "Income statement: an inventory write-down of $40 lowers pre-tax income by $40. At a 25% tax rate, taxes fall by $10, so net income is down $30. Cash flow statement: start from net income (-$30) and add back the $40 because it is non-cash, so cash is up $10. Balance sheet: cash up $10, inventory down $40; shareholders' equity down $30. Both sides balance.",
+  "interviewer": "IB READY\nSession complete. Updating your progress\u2026"
  }
 ]
