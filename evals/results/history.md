@@ -1,6 +1,6 @@
 # Evaluation history
 
-Each run uses the same labeled answers. Plain gpt-6-luna is not deterministic, so its numbers vary from run to run. Tick & Tie's numbers didn't change, because code makes the grading call.
+Each run uses the same labeled answers. Plain gpt-6-luna is not deterministic, so its numbers vary from run to run. IB Ready's numbers barely move, because code makes the grading call. (IB Ready was called Tick & Tie in runs 1 and 2.)
 
 | Run | Set | System | Verdict accuracy | Wrong caught | Misconception named | False alarms on correct |
 |---|---|---|---|---|---|---|
@@ -12,7 +12,11 @@ Each run uses the same labeled answers. Plain gpt-6-luna is not deterministic, s
 | 2 | Held-out (30) | Plain gpt-6-luna | 77% | 93% | 93% | 40% |
 | 2 | Development (65) | Tick & Tie | 100% | 100% | 100% | 0% |
 | 2 | Development (65) | Plain gpt-6-luna | 89% | 100% | 98% | 28% |
+| 3 (v2, final code, 2026-10-24) | Held-out (30) | IB Ready | 100% | 100% | 100% | 0% |
+| 3 | Held-out (30) | Plain gpt-6-luna | 73% | 93% | 87% | 47% |
+| 3 | Development (65) | IB Ready | 100% | 100% | 98% | 0% |
+| 3 | Development (65) | Plain gpt-6-luna | 86% | 98% | 90% | 32% |
 
-Across both runs, the plain model marked **20–40%** of correct answers wrong. Tick & Tie marked **0%** wrong.
+Across all three runs, the plain model marked **20–47%** of correct answers wrong. IB Ready marked **0%** wrong.
 
-The red-team suite stopped 14 of 14 attacks on both runs.
+The red-team suite stopped 14 of 14 attacks on every run.

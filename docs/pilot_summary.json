@@ -1,0 +1,329 @@
+{
+ "source": [
+  "ticktie.db"
+ ],
+ "people": {
+  "Anas": {
+   "sessions": [
+    {
+     "mode": "diagnostic",
+     "persona": "associate",
+     "started": 1792811232.224121,
+     "ended": null,
+     "graded": 0
+    }
+   ],
+   "answers": []
+  },
+  "Vishal": {
+   "sessions": [
+    {
+     "mode": "diagnostic",
+     "persona": "vp",
+     "started": 1792811352.605718,
+     "ended": 1792811494.3290281,
+     "graded": 1
+    },
+    {
+     "mode": "diagnostic",
+     "persona": "vp",
+     "started": 1792811530.975116,
+     "ended": 1792811565.5686631,
+     "graded": 0
+    },
+    {
+     "mode": "diagnostic",
+     "persona": "associate",
+     "started": 1792817257.6599014,
+     "ended": 1792818558.790593,
+     "graded": 1
+    },
+    {
+     "mode": "drill",
+     "persona": "associate",
+     "started": 1792818603.8889828,
+     "ended": 1792818617.0269315,
+     "graded": 0
+    },
+    {
+     "mode": "drill",
+     "persona": "associate",
+     "started": 1792818624.4375832,
+     "ended": 1792818628.7410421,
+     "graded": 0
+    },
+    {
+     "mode": "drill",
+     "persona": "associate",
+     "started": 1792818674.2887619,
+     "ended": null,
+     "graded": 0
+    },
+    {
+     "mode": "drill",
+     "persona": "associate",
+     "started": 1792818840.8075445,
+     "ended": 1792819461.7649984,
+     "graded": 6
+    }
+   ],
+   "answers": [
+    {
+     "session_mode": "diagnostic",
+     "template_id": "mkt_rates_lbo",
+     "skill": "markets",
+     "kind": "numeric",
+     "verdict": "incorrect",
+     "error_type": "conceptual",
+     "misconceptions": [
+      "MKT_RATES_NO_EFFECT"
+     ],
+     "seconds": 88,
+     "words": 153,
+     "ts": 1792811447.4399567
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_acc_addback",
+     "skill": "accounting",
+     "kind": "conceptual",
+     "verdict": "incorrect",
+     "error_type": "conceptual",
+     "misconceptions": [
+      "ACC_NONCASH_AS_CASH"
+     ],
+     "seconds": 1110,
+     "words": 42,
+     "ts": 1792818370.9082744
+    },
+    {
+     "session_mode": "drill",
+     "template_id": "c_acc_addback",
+     "skill": "accounting",
+     "kind": "conceptual",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 39,
+     "words": 80,
+     "ts": 1792818883.4699242
+    },
+    {
+     "session_mode": "drill",
+     "template_id": "acc_da",
+     "skill": "accounting",
+     "kind": "numeric",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 114,
+     "words": 197,
+     "ts": 1792819003.3607316
+    },
+    {
+     "session_mode": "drill",
+     "template_id": "acc_da",
+     "skill": "accounting",
+     "kind": "numeric",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 91,
+     "words": 147,
+     "ts": 1792819099.3949091
+    },
+    {
+     "session_mode": "drill",
+     "template_id": "c_acc_link",
+     "skill": "accounting",
+     "kind": "conceptual",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 92,
+     "words": 213,
+     "ts": 1792819197.1889992
+    },
+    {
+     "session_mode": "drill",
+     "template_id": "acc_da",
+     "skill": "accounting",
+     "kind": "numeric",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 78,
+     "words": 122,
+     "ts": 1792819279.7388873
+    },
+    {
+     "session_mode": "drill",
+     "template_id": "acc_opex_cash",
+     "skill": "accounting",
+     "kind": "numeric",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 149,
+     "words": 132,
+     "ts": 1792819433.9538143
+    }
+   ]
+  }
+ },
+ "llm_calls": [
+  {
+   "person": "Vishal",
+   "actor": "Markets specialist",
+   "input_tokens": 6927,
+   "cached_tokens": 3261,
+   "output_tokens": 236,
+   "cost_usd": 0.00051721
+  },
+  {
+   "person": "Vishal",
+   "actor": "Interviewer",
+   "input_tokens": 1219,
+   "cached_tokens": 0,
+   "output_tokens": 60,
+   "cost_usd": 0.0001519
+  },
+  {
+   "person": "Vishal",
+   "actor": "Coach",
+   "input_tokens": 662,
+   "cached_tokens": 0,
+   "output_tokens": 174,
+   "cost_usd": 0.0001532
+  },
+  {
+   "person": "Vishal",
+   "actor": "Accounting specialist",
+   "input_tokens": 2890,
+   "cached_tokens": 2527,
+   "output_tokens": 132,
+   "cost_usd": 0.00012757
+  },
+  {
+   "person": "Vishal",
+   "actor": "Planner",
+   "input_tokens": 827,
+   "cached_tokens": 0,
+   "output_tokens": 137,
+   "cost_usd": 0.0001512
+  },
+  {
+   "person": "Vishal",
+   "actor": "Coach",
+   "input_tokens": 745,
+   "cached_tokens": 0,
+   "output_tokens": 167,
+   "cost_usd": 0.000158
+  },
+  {
+   "person": "Vishal",
+   "actor": "Accounting specialist",
+   "input_tokens": 2928,
+   "cached_tokens": 2527,
+   "output_tokens": 111,
+   "cost_usd": 0.00012087
+  },
+  {
+   "person": "Vishal",
+   "actor": "Interviewer",
+   "input_tokens": 968,
+   "cached_tokens": 0,
+   "output_tokens": 39,
+   "cost_usd": 0.0001163
+  },
+  {
+   "person": "Vishal",
+   "actor": "Accounting specialist",
+   "input_tokens": 6420,
+   "cached_tokens": 5512,
+   "output_tokens": 295,
+   "cost_usd": 0.00029342
+  },
+  {
+   "person": "Vishal",
+   "actor": "Interviewer",
+   "input_tokens": 1171,
+   "cached_tokens": 0,
+   "output_tokens": 43,
+   "cost_usd": 0.0001386
+  },
+  {
+   "person": "Vishal",
+   "actor": "Accounting specialist",
+   "input_tokens": 6297,
+   "cached_tokens": 5446,
+   "output_tokens": 306,
+   "cost_usd": 0.00029256
+  },
+  {
+   "person": "Vishal",
+   "actor": "Interviewer",
+   "input_tokens": 1088,
+   "cached_tokens": 0,
+   "output_tokens": 39,
+   "cost_usd": 0.0001283
+  },
+  {
+   "person": "Vishal",
+   "actor": "Accounting specialist",
+   "input_tokens": 3157,
+   "cached_tokens": 2527,
+   "output_tokens": 135,
+   "cost_usd": 0.00015577
+  },
+  {
+   "person": "Vishal",
+   "actor": "Interviewer",
+   "input_tokens": 1127,
+   "cached_tokens": 0,
+   "output_tokens": 38,
+   "cost_usd": 0.0001317
+  },
+  {
+   "person": "Vishal",
+   "actor": "Accounting specialist",
+   "input_tokens": 6242,
+   "cached_tokens": 5421,
+   "output_tokens": 298,
+   "cost_usd": 0.00028531
+  },
+  {
+   "person": "Vishal",
+   "actor": "Interviewer",
+   "input_tokens": 1063,
+   "cached_tokens": 0,
+   "output_tokens": 42,
+   "cost_usd": 0.0001273
+  },
+  {
+   "person": "Vishal",
+   "actor": "Accounting specialist",
+   "input_tokens": 6085,
+   "cached_tokens": 5384,
+   "output_tokens": 227,
+   "cost_usd": 0.00023744
+  },
+  {
+   "person": "Vishal",
+   "actor": "Interviewer",
+   "input_tokens": 1060,
+   "cached_tokens": 0,
+   "output_tokens": 33,
+   "cost_usd": 0.0001225
+  },
+  {
+   "person": "Vishal",
+   "actor": "Coach",
+   "input_tokens": 1112,
+   "cached_tokens": 0,
+   "output_tokens": 118,
+   "cost_usd": 0.0001702
+  }
+ ],
+ "feedback": []
+}
