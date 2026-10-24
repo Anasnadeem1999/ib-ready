@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS feedback (
   rating INTEGER, vs_current TEXT, found_new TEXT, time_to_find TEXT, prep_today TEXT,
   quote TEXT, consent INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS history (
+  profile_id TEXT NOT NULL, ts REAL NOT NULL, key TEXT NOT NULL, p REAL NOT NULL, level INTEGER
+);
+CREATE TABLE IF NOT EXISTS plans (
+  profile_id TEXT PRIMARY KEY, created REAL NOT NULL, plan TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_history ON history(profile_id, key);
 CREATE INDEX IF NOT EXISTS ix_events_session ON events(session_id);
 CREATE INDEX IF NOT EXISTS ix_turns_session ON turns(session_id);
 """
@@ -80,6 +87,10 @@ def conn():
 def init() -> None:
     with conn() as c:
         c.executescript(SCHEMA)
+        cols = {r["name"] for r in c.execute("PRAGMA table_info(profiles)")}
+        for col in ("intake", "placement"):
+            if col not in cols:  # migrate databases created before these columns existed
+                c.execute(f"ALTER TABLE profiles ADD COLUMN {col} TEXT")
 
 
 def new_id() -> str:
@@ -189,8 +200,65 @@ def mastery(pid: str) -> dict[str, dict]:
         rows = c.execute("SELECT skill, p, n FROM mastery WHERE profile_id=?", (pid,)).fetchall()
     out = {s: {"p": P_INIT, "n": 0} for s in bank.SKILLS}
     for r in rows:
-        out[r["skill"]] = {"p": r["p"], "n": r["n"]}
+        if r["skill"] in out:  # skill-level keys only; levels and sub-skills live in mastery_all()
+            out[r["skill"]] = {"p": r["p"], "n": r["n"]}
     return out
+
+
+def mastery_all(pid: str) -> dict[str, dict]:
+    """Every mastery key: skills, 'lvl:skill:L' and 'sub:skill.sub'."""
+    with conn() as c:
+        rows = c.execute("SELECT skill, p, n FROM mastery WHERE profile_id=?", (pid,)).fetchall()
+    return {r["skill"]: {"p": r["p"], "n": r["n"]} for r in rows}
+
+
+def get_key(pid: str, key: str, default: float = P_INIT) -> float:
+    with conn() as c:
+        r = c.execute("SELECT p FROM mastery WHERE profile_id=? AND skill=?", (pid, key)).fetchone()
+    return r["p"] if r else default
+
+
+def set_key(pid: str, key: str, p: float, n_inc: int = 1) -> None:
+    with conn() as c:
+        c.execute("""INSERT INTO mastery VALUES (?,?,?,?)
+                     ON CONFLICT(profile_id, skill) DO UPDATE SET p=excluded.p, n=n+?""", (pid, key, p, n_inc, n_inc))
+
+
+def snapshot(pid: str, levels: dict[str, int]) -> None:
+    """Record every skill's mastery and level, for the progress-over-time charts."""
+    m = mastery(pid)
+    now = time.time()
+    with conn() as c:
+        for k, v in m.items():
+            c.execute("INSERT INTO history VALUES (?,?,?,?,?)", (pid, now, k, v["p"], levels.get(k)))
+
+
+def history(pid: str) -> list[dict]:
+    with conn() as c:
+        return [dict(r) for r in c.execute("SELECT ts, key, p, level FROM history WHERE profile_id=? ORDER BY ts", (pid,))]
+
+
+def get_profile_json(pid: str, col: str) -> dict:
+    with conn() as c:
+        r = c.execute(f"SELECT {col} FROM profiles WHERE id=?", (pid,)).fetchone()
+    return json.loads(r[col]) if r and r[col] else {}
+
+
+def set_profile_json(pid: str, col: str, value: dict) -> None:
+    with conn() as c:
+        c.execute(f"UPDATE profiles SET {col}=? WHERE id=?", (json.dumps(value), pid))
+
+
+def get_plan(pid: str) -> dict | None:
+    with conn() as c:
+        r = c.execute("SELECT plan FROM plans WHERE profile_id=?", (pid,)).fetchone()
+    return json.loads(r["plan"]) if r else None
+
+
+def save_plan(pid: str, plan: dict) -> None:
+    with conn() as c:
+        c.execute("""INSERT INTO plans VALUES (?,?,?) ON CONFLICT(profile_id) DO UPDATE SET plan=excluded.plan""",
+                  (pid, time.time(), json.dumps(plan)))
 
 
 def set_mastery(pid: str, skill: str, p: float) -> None:

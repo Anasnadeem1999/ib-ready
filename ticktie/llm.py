@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import time
@@ -23,6 +24,12 @@ SETTINGS = OpenAIChatModelSettings(openai_reasoning_effort="none", temperature=0
 
 class ModelPolicyError(RuntimeError):
     pass
+
+
+def _transient(exc: BaseException) -> bool:
+    name = type(exc).__name__
+    code = getattr(exc, "status_code", None)
+    return name in ("ModelConnectionError", "APIConnectionError", "APITimeoutError", "TimeoutError") or code in (408, 429, 500, 502, 503, 504)
 
 
 def is_content_filter(exc: BaseException) -> bool:
@@ -92,10 +99,17 @@ def model_ok(name: str | None) -> bool:
 async def run(agent: Agent, agent_name: str, prompt: str, deps=None, session_id: str | None = None):
     """Run one agent, enforce the request cap, and record exact token usage."""
     t0 = time.perf_counter()
-    result = await agent.run(
-        prompt, deps=deps, model_settings=SETTINGS,
-        usage_limits=UsageLimits(request_limit=config.REQUEST_LIMIT_PER_AGENT),
-    )
+    for attempt in range(3):  # transient network / rate-limit / 5xx errors get two retries with backoff
+        try:
+            result = await agent.run(
+                prompt, deps=deps, model_settings=SETTINGS,
+                usage_limits=UsageLimits(request_limit=config.REQUEST_LIMIT_PER_AGENT),
+            )
+            break
+        except Exception as e:
+            if attempt == 2 or not _transient(e):
+                raise
+            await asyncio.sleep(1.5 * (attempt + 1))
     u = result.usage
     cached = int(getattr(u, "cache_read_tokens", 0) or 0)
     resolved = _resolved(result)

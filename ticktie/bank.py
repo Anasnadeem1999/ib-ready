@@ -91,6 +91,9 @@ class Template:
     explain: Callable[[Params, Values], str] = lambda p, v: ""
     vary: Callable[[Params, random.Random], tuple[Params, str]] | None = None
     target_seconds: int = 60
+    subskill: str = ""              # e.g. "accounting.noncash"; set from META below
+    groups: list[str] = field(default_factory=list)  # empty = core question for every group
+    specialist: str | None = None   # override which specialist grades it
 
 
 @dataclass
@@ -111,6 +114,7 @@ class Question:
     misconceptions: list[str]
     solution: str
     target_seconds: int
+    subskill: str = ""
 
     def to_public(self) -> dict:
         """What the browser may see before the answer is revealed: no answer key."""
@@ -118,6 +122,9 @@ class Question:
             "template_id": self.template_id,
             "skill": self.skill,
             "difficulty": self.difficulty,
+            "level": LEVELS.get(self.difficulty, ""),
+            "subskill": self.subskill,
+            "subskill_name": SUBSKILLS.get(self.subskill, ("", ""))[1],
             "kind": self.kind,
             "title": self.title,
             "text": self.text,
@@ -1006,25 +1013,638 @@ CONCEPTUAL = [
              "stocks with near-term cash flows."),
 ]
 
+# =========================================================================== BASIC-LEVEL NUMERIC (coffee-chat / first-round level)
+def _num(tid, skill, title, text, gen, solve, labels, traps, explain, key_points, secs=45, vary=None) -> Template:
+    return Template(id=tid, skill=skill, difficulty=1, kind="numeric", title=title, text=text, gen=gen, solve=solve,
+                    labels=labels, traps=traps, explain=explain, key_points=key_points,
+                    misconceptions=list(traps.keys()), target_seconds=secs, vary=vary)
+
+
+ACC_REV_CASH = _num(
+    "acc_rev_cash", "accounting", "3-statement walk: a cash sale",
+    lambda p: f"A company sells {money(p['X'])} of product for cash, with no associated costs. Tax rate is {pct(p['t'])}. Walk me through the three statements.",
+    lambda r: {"X": float(r.choice(AMTS)), "t": r.choice(TAXES)},
+    lambda p: {"ni": _a(p["X"] * (1 - p["t"])), "cash": _a(p["X"] * (1 - p["t"]))},
+    [Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$")],
+    {"ACC_NO_TAX": lambda p: [{"ni": p["X"], "cash": p["X"]}]},
+    lambda p, v: (f"Revenue up {money(p['X'])}, taxes up {money(p['X'] * p['t'])}, so net income is {chg(v['ni'])}. The CFS starts "
+                  f"with that net income and there are no adjustments, so cash is {chg(v['cash'])}. On the balance sheet cash and "
+                  f"retained earnings both rise {money(v['ni'])}."),
+    ["Net income rises by the after-tax amount", "Cash rises by the same amount (it was a cash sale)",
+     "Cash and retained earnings both rise, so the balance sheet balances"],
+    vary=_vary_tax,
+)
+
+ACC_OPEX_CASH = _num(
+    "acc_opex_cash", "accounting", "3-statement walk: hiring an employee",
+    lambda p: f"A company hires an employee and pays {money(p['X'])} of salary in cash this year. Tax rate is {pct(p['t'])}. Walk me through the three statements.",
+    lambda r: {"X": float(r.choice([50, 100, 200])), "t": r.choice(TAXES)},
+    lambda p: {"ni": _a(-p["X"] * (1 - p["t"])), "cash": _a(-p["X"] * (1 - p["t"]))},
+    [Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$")],
+    {"ACC_NO_TAX": lambda p: [{"ni": -p["X"], "cash": -p["X"]}]},
+    lambda p, v: (f"Operating expenses up {money(p['X'])}; taxes fall {money(p['X'] * p['t'])}, so net income is {chg(v['ni'])}. "
+                  f"It's a cash expense, so nothing to add back: cash is {chg(v['cash'])}. Cash and retained earnings both fall "
+                  f"{money(abs(v['ni']))}."),
+    ["Pre-tax income falls by the salary", "Taxes fall, so net income falls by the after-tax amount",
+     "No add-back because salary is a cash expense", "Cash and retained earnings fall equally"],
+    vary=_vary_tax,
+)
+
+ACC_INVENTORY = _num(
+    "acc_inventory", "accounting", "3-statement walk: buying inventory",
+    lambda p: f"A company buys {money(p['X'])} of inventory with cash. It hasn't sold any of it yet. Walk me through the three statements.",
+    lambda r: {"X": float(r.choice([50, 100, 200])), "t": r.choice(TAXES)},
+    lambda p: {"ni": 0.0, "cash": -p["X"], "inventory": p["X"]},
+    [Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$"),
+     Label("inventory", "Change in inventory", "$", required=False)],
+    {"ACC_CAPEX_EXPENSED": lambda p: [{"ni": _a(-p["X"] * (1 - p["t"]))}, {"ni": -p["X"]}]},
+    lambda p, v: (f"No income statement effect: inventory only hits COGS when it's sold. On the CFS the {money(p['X'])} increase in "
+                  f"inventory is a use of cash in working capital, so cash is {chg(v['cash'])}. Balance sheet: inventory up "
+                  f"{money(p['X'])}, cash down {money(p['X'])}; total assets unchanged."),
+    ["No income statement impact until the inventory is sold", "The inventory increase is a use of cash in working capital",
+     "Cash down and inventory up by the same amount"],
+)
+
+ACC_AP = Template(
+    id="acc_ap", skill="accounting", difficulty=2, kind="numeric", title="3-statement walk: an unpaid expense",
+    text=lambda p: (f"A company records {money(p['X'])} of operating expenses but hasn't paid the supplier yet. "
+                    f"Tax rate is {pct(p['t'])}. Walk me through the three statements."),
+    gen=lambda r: {"X": float(r.choice(AMTS)), "t": r.choice(TAXES)},
+    solve=lambda p: {"ni": _a(-p["X"] * (1 - p["t"])), "cash": _a(p["X"] * p["t"]), "ap": p["X"]},
+    labels=[Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$"),
+            Label("ap", "Change in accounts payable", "$", required=False)],
+    traps={"ACC_AP_IGNORED": lambda p: [{"cash": _a(-p["X"] * (1 - p["t"]))}, {"cash": -p["X"]}],
+           "ACC_NO_TAX": lambda p: [{"ni": -p["X"], "cash": 0.0}]},
+    explain=lambda p, v: (f"Net income falls {money(abs(v['ni']))} after the tax saving. On the CFS, start from that and add back the "
+                          f"{money(p['X'])} increase in accounts payable (cash hasn't gone out yet), so cash is {chg(v['cash'])}, which "
+                          f"is the tax saving. Balance sheet: cash up {money(v['cash'])}; AP up {money(p['X'])}, retained earnings down "
+                          f"{money(abs(v['ni']))}."),
+    key_points=["Net income falls by the after-tax expense", "The AP increase is added back on the CFS",
+                "Cash rises by the tax saving", "AP up, retained earnings down"],
+    misconceptions=["ACC_AP_IGNORED", "ACC_NO_TAX"], vary=_vary_tax,
+)
+
+ACC_DEFREV = Template(
+    id="acc_defrev", skill="accounting", difficulty=3, kind="numeric", title="3-statement walk: customer prepays",
+    text=lambda p: (f"A software customer pays {money(p['X'])} in cash today for a service that will be delivered next year. "
+                    f"Walk me through the three statements today."),
+    gen=lambda r: {"X": float(r.choice([50, 100, 120, 200]))},
+    solve=lambda p: {"ni": 0.0, "cash": p["X"], "deferred_revenue": p["X"]},
+    labels=[Label("ni", "Change in net income", "$"), Label("cash", "Change in cash", "$"),
+            Label("deferred_revenue", "Change in deferred revenue", "$", required=False)],
+    traps={"ACC_DEFREV_AS_REVENUE": lambda p: [{"ni": _a(p["X"] * 0.75)}, {"ni": _a(p["X"] * 0.8)}, {"ni": _a(p["X"] * 0.7)},
+                                               {"ni": _a(p["X"] * 0.6)}, {"ni": p["X"]}]},
+    explain=lambda p, v: (f"No revenue yet: the service hasn't been delivered, so net income is unchanged. On the CFS, the {money(p['X'])} "
+                          f"increase in deferred revenue (a liability) is a source of cash, so cash is up {money(p['X'])}. Balance sheet: "
+                          f"cash up {money(p['X'])}, deferred revenue up {money(p['X'])}."),
+    key_points=["No revenue until the service is delivered", "Deferred revenue is a liability",
+                "The deferred revenue increase is a source of cash on the CFS"],
+    misconceptions=["ACC_DEFREV_AS_REVENUE"], target_seconds=60,
+)
+
+
+def _tsm(p: Params) -> float:
+    return p["B"] + p["N"] - p["N"] * p["K"] / p["S"]
+
+
+def _tsm_gen(r: random.Random) -> Params:
+    S = float(r.choice([20, 25, 40, 50]))
+    return {"S": S, "B": float(r.choice([50, 100, 200])), "N": float(r.choice([2, 4, 5, 10])),
+            "K": float(r.choice([k for k in (10, 15, 20, 30) if k < S]))}
+
+
+EV_TSM = Template(
+    id="ev_tsm", skill="ev", difficulty=2, kind="numeric", title="Diluted shares (treasury stock method)",
+    text=lambda p: (f"A company's share price is {money(p['S'])}. It has {num(p['B'])} million basic shares and {num(p['N'])} million "
+                    f"options with an exercise price of {money(p['K'])}. What's the diluted share count, and its equity value?"),
+    gen=_tsm_gen,
+    solve=lambda p: {"diluted_shares": _a(_tsm(p)), "equity_value": _a(_tsm(p) * p["S"])},
+    labels=[Label("diluted_shares", "Diluted shares (mm)", "mm"),
+            Label("equity_value", "Equity value ($mm)", "$", required=False)],
+    traps={"EV_TSM_BASIC": lambda p: [{"diluted_shares": p["B"], "equity_value": p["B"] * p["S"]}],
+           "EV_TSM_ALL_OPTIONS": lambda p: [{"diluted_shares": p["B"] + p["N"], "equity_value": (p["B"] + p["N"]) * p["S"]}]},
+    explain=lambda p, v: (f"The options are in the money ({money(p['K'])} strike vs {money(p['S'])} price), so all {num(p['N'])}mm are "
+                          f"exercised, raising {money(p['N'] * p['K'])}mm. That buys back {money(p['N'] * p['K'])} / {money(p['S'])} = "
+                          f"{num(p['N'] * p['K'] / p['S'])}mm shares. Net new shares {num(p['N'] - p['N'] * p['K'] / p['S'])}mm, so diluted "
+                          f"shares = {num(v['diluted_shares'])}mm and equity value = {money(round(v['equity_value'], 2))}mm."),
+    key_points=["Only in-the-money options count", "Exercise proceeds are used to buy back shares at the current price",
+                "Diluted shares = basic + options - buyback shares"],
+    misconceptions=["EV_TSM_BASIC", "EV_TSM_ALL_OPTIONS"], target_seconds=75,
+)
+
+
+def _pv(p: Params) -> float:
+    return p["X"] / (1 + p["r"]) ** p["n"]
+
+
+DCF_PV = _num(
+    "dcf_pv", "dcf", "Present value",
+    lambda p: f"What's the present value of {money(p['X'])} received {num(p['n'])} years from now, at a {pct(p['r'])} discount rate?",
+    lambda r: {"X": float(r.choice([100, 121, 1000])), "r": r.choice([0.05, 0.10]), "n": float(r.choice([2, 3]))},
+    lambda p: {"pv": _a(_pv(p))},
+    [Label("pv", "Present value", "$", tol_rel=0.015)],
+    {"DCF_SIMPLE_DISCOUNT": lambda p: [{"pv": _a(p["X"] / (1 + p["r"] * p["n"]))}]},
+    lambda p, v: (f"PV = {money(p['X'])} / (1 + {pct(p['r'])})^{num(p['n'])} = {money(p['X'])} / {num((1 + p['r']) ** p['n'], 4)} = "
+                  f"{money(round(v['pv'], 2))}. A dollar later is worth less than a dollar today, and the discount compounds each year."),
+    ["Discount compounds: divide by (1 + r)^n", "Money in the future is worth less than money today"],
+)
+
+LBO_BASIC = _num(
+    "lbo_basic", "lbo", "Simple LBO returns",
+    lambda p: (f"A private equity firm buys a company for {money(p['EV'])}mm, using {money(p['D'])}mm of debt and the rest equity. "
+               f"Five years later it sells the company for {money(p['EV2'])}mm, with the debt still at {money(p['D'])}mm. "
+               f"What's the money-on-money multiple?"),
+    lambda r: (lambda ev: {"EV": ev, "D": ev * r.choice([0.5, 0.6]), "EV2": ev * r.choice([1.3, 1.5])})(float(r.choice([500, 1000]))),
+    lambda p: {"moic": _a((p["EV2"] - p["D"]) / (p["EV"] - p["D"])), "equity_in": p["EV"] - p["D"], "equity_out": p["EV2"] - p["D"]},
+    [Label("moic", "MOIC (x)", "x", tol_abs=0.06, tol_rel=0), Label("equity_in", "Equity in ($mm)", "$", required=False),
+     Label("equity_out", "Equity out ($mm)", "$", required=False)],
+    {"LBO_MOIC_ON_EV": lambda p: [{"moic": _a(p["EV2"] / p["EV"])}]},
+    lambda p, v: (f"Equity in = {money(p['EV'])} - {money(p['D'])} = {money(v['equity_in'])}mm. Equity out = {money(p['EV2'])} - "
+                  f"{money(p['D'])} = {money(v['equity_out'])}mm. MOIC = {num(v['moic'])}x, higher than the "
+                  f"{num(p['EV2'] / p['EV'])}x rise in the company's value because the debt amplifies the equity return."),
+    ["Equity in = purchase price - debt", "Equity out = sale price - debt", "MOIC is on equity, not on the company's value",
+     "Leverage makes the equity return bigger than the value increase"],
+    secs=60,
+)
+
+# =========================================================================== GROUP-SPECIFIC NUMERIC
+FIG_PTBV = Template(
+    id="fig_ptbv", skill="industry", difficulty=2, kind="numeric", title="Bank valuation: P/TBV",
+    text=lambda p: (f"A bank has a market cap of {money(p['M'])}mm, shareholders' equity of {money(p['E'])}mm, and {money(p['G'])}mm "
+                    f"of goodwill and intangibles. What's its price-to-tangible-book multiple?"),
+    gen=lambda r: {"M": float(r.choice([1200, 1500, 1800])), "E": float(r.choice([1000, 1200])), "G": float(r.choice([200, 300]))},
+    solve=lambda p: {"ptbv": _a(p["M"] / (p["E"] - p["G"])), "pbv": _a(p["M"] / p["E"])},
+    labels=[Label("ptbv", "P/TBV (x)", "x", tol_abs=0.03, tol_rel=0), Label("pbv", "P/BV (x)", "x", required=False, tol_abs=0.03, tol_rel=0)],
+    traps={"FIG_PTBV_NO_GW": lambda p: [{"ptbv": _a(p["M"] / p["E"])}]},
+    explain=lambda p, v: (f"Tangible book = {money(p['E'])} - {money(p['G'])} = {money(p['E'] - p['G'])}mm. P/TBV = {money(p['M'])} / "
+                          f"{money(p['E'] - p['G'])} = {num(v['ptbv'])}x (P/BV is {num(v['pbv'])}x). Banks are valued on equity metrics "
+                          f"because debt and interest are part of the business, not financing."),
+    key_points=["Tangible book = equity - goodwill - intangibles", "P/TBV = market cap / tangible book",
+                "Banks use equity-value metrics, not EV"],
+    misconceptions=["FIG_PTBV_NO_GW", "FIG_USES_EV"], groups=["fig"], target_seconds=60,
+)
+
+RE_CAP_RATE = _num(
+    "re_cap_rate", "industry", "Property value from a cap rate",
+    lambda p: f"An office building produces {money(p['NOI'])}mm of net operating income a year. Comparable buildings trade at a {pct(p['c'])} cap rate. What's it worth?",
+    lambda r: {"NOI": float(r.choice([5, 8, 10, 12])), "c": r.choice([0.05, 0.06, 0.08])},
+    lambda p: {"value": _a(p["NOI"] / p["c"])},
+    [Label("value", "Property value ($mm)", "$")],
+    {},
+    lambda p, v: (f"Value = NOI / cap rate = {money(p['NOI'])} / {pct(p['c'])} = {money(round(v['value'], 1))}mm. A cap rate is like an "
+                  f"inverted EV/EBITDA multiple: a {pct(p['c'])} cap rate is about {num(1 / p['c'], 1)}x NOI."),
+    ["Value = NOI / cap rate", "A lower cap rate means a higher value (like a higher multiple)"],
+)
+
+RE_FFO = Template(
+    id="re_ffo", skill="industry", difficulty=2, kind="numeric", title="REIT funds from operations (FFO)",
+    text=lambda p: (f"A REIT reports net income of {money(p['NI'])}mm, real-estate depreciation of {money(p['DA'])}mm, and a "
+                    f"{money(p['G'])}mm gain on selling a property. What's its FFO?"),
+    gen=lambda r: {"NI": float(r.choice([100, 150, 200])), "DA": float(r.choice([60, 80, 100])), "G": float(r.choice([20, 30]))},
+    solve=lambda p: {"ffo": p["NI"] + p["DA"] - p["G"]},
+    labels=[Label("ffo", "FFO ($mm)", "$")],
+    traps={"RE_FFO_GAIN": lambda p: [{"ffo": p["NI"] + p["DA"]}]},
+    explain=lambda p, v: (f"FFO = net income + real-estate depreciation - gains on property sales = {money(p['NI'])} + {money(p['DA'])} - "
+                          f"{money(p['G'])} = {money(v['ffo'])}mm. Depreciation is added back because buildings often hold their value; "
+                          f"gains are removed because they don't recur."),
+    key_points=["Add back real-estate depreciation", "Subtract gains on property sales", "FFO approximates recurring cash earnings"],
+    misconceptions=["RE_FFO_GAIN"], groups=["real_estate"], target_seconds=50,
+)
+
+TMT_LTV = Template(
+    id="tmt_ltv", skill="industry", difficulty=2, kind="numeric", title="SaaS unit economics: LTV/CAC",
+    text=lambda p: (f"A SaaS customer pays {money(p['A'])} a year. Gross margin is {pct(p['gm'], 0)}, annual churn is {pct(p['ch'], 0)}, "
+                    f"and it costs {money(p['C'])} to acquire a customer. What are the lifetime value and the LTV/CAC ratio?"),
+    gen=lambda r: {"A": float(r.choice([1000, 1200, 2000])), "gm": r.choice([0.75, 0.8]), "ch": r.choice([0.1, 0.2]),
+                   "C": float(r.choice([1500, 2000, 3000]))},
+    solve=lambda p: {"ltv": _a(p["A"] * p["gm"] / p["ch"]), "ratio": _a(p["A"] * p["gm"] / p["ch"] / p["C"])},
+    labels=[Label("ltv", "Customer lifetime value", "$"), Label("ratio", "LTV/CAC (x)", "x", required=False, tol_abs=0.05, tol_rel=0)],
+    traps={"TMT_LTV_NO_MARGIN": lambda p: [{"ltv": _a(p["A"] / p["ch"]), "ratio": _a(p["A"] / p["ch"] / p["C"])}]},
+    explain=lambda p, v: (f"Gross profit per year = {money(p['A'])} x {pct(p['gm'], 0)} = {money(p['A'] * p['gm'])}. Average lifetime = 1 / "
+                          f"{pct(p['ch'], 0)} = {num(1 / p['ch'])} years. LTV = {money(round(v['ltv']))}; LTV/CAC = {num(v['ratio'], 1)}x "
+                          f"(3x+ is usually considered healthy)."),
+    key_points=["LTV uses gross profit, not revenue", "Customer lifetime = 1 / churn", "LTV/CAC above about 3x is healthy"],
+    misconceptions=["TMT_LTV_NO_MARGIN"], groups=["tmt"], target_seconds=75,
+)
+
+HC_RNPV = Template(
+    id="hc_rnpv", skill="industry", difficulty=2, kind="numeric", title="Biotech: risk-adjusted NPV",
+    text=lambda p: (f"A biotech's only drug would be worth {money(p['V'])}mm (NPV) if approved. It has a {pct(p['pr'], 0)} chance of "
+                    f"approval, and {money(p['Cd'])}mm (present value) of trial costs must be spent either way. What's the risk-adjusted NPV?"),
+    gen=lambda r: {"V": float(r.choice([1000, 1500, 2000])), "pr": r.choice([0.2, 0.3, 0.5]), "Cd": float(r.choice([100, 150, 200]))},
+    solve=lambda p: {"rnpv": _a(p["pr"] * p["V"] - p["Cd"])},
+    labels=[Label("rnpv", "Risk-adjusted NPV ($mm)", "$")],
+    traps={"HC_RNPV_UNWEIGHTED": lambda p: [{"rnpv": p["V"] - p["Cd"]}, {"rnpv": _a(p["pr"] * (p["V"] - p["Cd"]))}]},
+    explain=lambda p, v: (f"Weight the approved-case value by the probability: {pct(p['pr'], 0)} x {money(p['V'])} = "
+                          f"{money(p['pr'] * p['V'])}mm, then subtract the {money(p['Cd'])}mm of costs that are spent regardless: "
+                          f"rNPV = {money(v['rnpv'])}mm."),
+    key_points=["Weight the success-case value by the probability of approval", "Costs spent regardless are not probability-weighted"],
+    misconceptions=["HC_RNPV_UNWEIGHTED"], groups=["healthcare"], target_seconds=60,
+)
+
+
+def _rx(p: Params) -> tuple[float, float]:
+    senior = min(p["S"], p["X"])
+    unsec = max(min(p["U"], p["X"] - senior), 0)
+    return senior / p["S"] * 100, unsec / p["U"] * 100
+
+
+RX_WATERFALL = Template(
+    id="rx_waterfall", skill="industry", difficulty=3, kind="numeric", title="Restructuring: recovery waterfall",
+    text=lambda p: (f"A bankrupt company is worth {money(p['X'])}mm. It has {money(p['S'])}mm of senior secured debt and "
+                    f"{money(p['U'])}mm of unsecured bonds. Under absolute priority, what percentage do the unsecured bondholders recover?"),
+    gen=lambda r: {"X": float(r.choice([600, 700, 800])), "S": float(r.choice([400, 500])), "U": float(r.choice([400, 600]))},
+    solve=lambda p: {"unsecured_recovery": _a(_rx(p)[1]), "senior_recovery": _a(_rx(p)[0])},
+    labels=[Label("unsecured_recovery", "Unsecured recovery (%)", "%", tol_abs=1.0, tol_rel=0),
+            Label("senior_recovery", "Senior recovery (%)", "%", required=False, tol_abs=1.0, tol_rel=0)],
+    traps={"RX_PRO_RATA": lambda p: [{"unsecured_recovery": _a(min(p["X"] / (p["S"] + p["U"]), 1) * 100),
+                                      "senior_recovery": _a(min(p["X"] / (p["S"] + p["U"]), 1) * 100)}]},
+    explain=lambda p, v: (f"Senior secured is paid first: {money(min(p['S'], p['X']))}mm, a {num(v['senior_recovery'], 0)}% recovery. "
+                          f"What's left, {money(max(p['X'] - p['S'], 0))}mm, goes to the {money(p['U'])}mm of unsecured bonds: "
+                          f"{num(v['unsecured_recovery'], 1)}%. Equity gets nothing."),
+    key_points=["Absolute priority: secured claims are paid first", "Unsecured creditors get only the remaining value",
+                "Equity is wiped out if creditors aren't paid in full"],
+    misconceptions=["RX_PRO_RATA"], groups=["restructuring", "levfin"], target_seconds=75,
+)
+
+EN_EBITDAX = Template(
+    id="en_ebitdax", skill="industry", difficulty=2, kind="numeric", title="E&P valuation: EV/EBITDAX",
+    text=lambda p: (f"An oil & gas producer has an enterprise value of {money(p['V'])}mm, EBITDA of {money(p['E'])}mm and "
+                    f"{money(p['X'])}mm of exploration expense. Peers are quoted on EV/EBITDAX. What's its multiple?"),
+    gen=lambda r: {"V": float(r.choice([3000, 4000, 6000])), "E": float(r.choice([400, 500, 600])), "X": float(r.choice([50, 100]))},
+    solve=lambda p: {"multiple": _a(p["V"] / (p["E"] + p["X"]))},
+    labels=[Label("multiple", "EV/EBITDAX (x)", "x", tol_abs=0.1, tol_rel=0)],
+    traps={"EN_EBITDA_ONLY": lambda p: [{"multiple": _a(p["V"] / p["E"])}]},
+    explain=lambda p, v: (f"EBITDAX = EBITDA + exploration expense = {money(p['E'] + p['X'])}mm. EV/EBITDAX = {money(p['V'])} / "
+                          f"{money(p['E'] + p['X'])} = {num(v['multiple'], 1)}x. Adding back exploration makes successful-efforts and "
+                          f"full-cost companies comparable."),
+    key_points=["EBITDAX adds exploration expense back to EBITDA", "It makes companies with different accounting methods comparable"],
+    misconceptions=["EN_EBITDA_ONLY"], groups=["energy"], target_seconds=50,
+)
+
+# =========================================================================== MORE CONCEPTUAL (incl. basics + groups)
+MORE_CONCEPTUAL = [
+    _concept("c_ev_vs_equity", "ev", 1, "EV vs equity value",
+             "What's the difference between enterprise value and equity value?",
+             ["Equity value is the value of the shareholders' claim (market cap)", "Enterprise value is the value of the whole operating business to all investors",
+              "Bridge: EV = equity value + debt + preferred + NCI - cash", "A house analogy: the house price (EV) vs the owner's equity after the mortgage"],
+             ["EV_ADD_CASH"],
+             "Equity value is what the company's shares are worth: the shareholders' claim. Enterprise value is what the core business is worth to "
+             "everyone with a claim on it, lenders as well as shareholders. You get from equity value to EV by adding debt, preferred stock and "
+             "noncontrolling interest and subtracting cash. Like a house: EV is the price of the house; equity value is what the owner keeps after the mortgage."),
+    _concept("c_val_methods", "ev", 1, "The three valuation methods",
+             "What are the main ways to value a company, and which usually gives the highest value?",
+             ["Comparable companies (trading multiples)", "Precedent transactions (multiples paid in past deals)",
+              "DCF (intrinsic value of future cash flows)", "Precedents are often highest because they include a control premium"],
+             [],
+             "Comparable companies apply peers' trading multiples; precedent transactions apply multiples paid in past acquisitions; a DCF values the "
+             "company's future cash flows. Precedents often give the highest value because acquirers pay a control premium; a DCF can be highest "
+             "or lowest depending on its assumptions."),
+    _concept("c_wacc_what", "dcf", 1, "What WACC is",
+             "What is WACC, and why do we use it in a DCF?",
+             ["The blended required return of all capital providers (debt and equity)", "Weights by market value, with the after-tax cost of debt",
+              "It discounts unlevered free cash flow, which belongs to all capital providers"],
+             ["DCF_WACC_NO_SHIELD"],
+             "WACC is the weighted average cost of capital: the blended return that debt and equity investors require, weighted by market values, "
+             "with debt on an after-tax basis. It's the discount rate for unlevered free cash flow because that cash flow is available to all "
+             "capital providers."),
+    _concept("c_wc_what", "accounting", 1, "Working capital",
+             "What is working capital, and what does an increase in it do to cash flow?",
+             ["Operating current assets minus operating current liabilities", "Examples: receivables, inventory, payables, deferred revenue",
+              "An increase uses cash (money tied up in the business)", "A decrease is a source of cash"],
+             ["ACC_AR_IGNORED"],
+             "Working capital is operating current assets (receivables, inventory) minus operating current liabilities (payables, deferred revenue). "
+             "An increase means more cash is tied up in the business, so it reduces cash flow; a decrease frees cash up."),
+    _concept("c_ma_why", "ma", 1, "Why companies acquire",
+             "Why would one company want to acquire another?",
+             ["Growth: new markets, products or customers", "Synergies: cost savings and revenue opportunities",
+              "Capabilities: technology, talent or IP faster than building it", "Strategic or defensive reasons (consolidation, blocking competitors)"],
+             [],
+             "To grow faster than it could organically (new markets, products or customers), to capture synergies (cost savings or cross-selling), "
+             "to buy capabilities like technology, talent or IP, or for strategic reasons such as consolidating an industry or keeping an asset away "
+             "from a competitor."),
+    _concept("c_ma_synergies", "ma", 2, "Revenue vs cost synergies",
+             "What's the difference between revenue and cost synergies, and which do bankers trust more?",
+             ["Cost synergies: overlapping costs removed (headcount, facilities, procurement)", "Revenue synergies: cross-selling, pricing, new markets",
+              "Cost synergies are more reliable because they're more within management's control", "Synergies are often overestimated, so they're usually haircut"],
+             [],
+             "Cost synergies come from removing overlapping costs: headcount, facilities, procurement. Revenue synergies come from cross-selling, "
+             "pricing or new markets. Cost synergies are trusted more because management controls them; revenue synergies depend on customers and are "
+             "often overestimated, so they're usually haircut."),
+    _concept("c_lbo_what", "lbo", 1, "What an LBO is",
+             "What is a leveraged buyout?",
+             ["A private equity firm buys a company using a lot of debt", "The company's own cash flow pays the interest and down the debt",
+              "The sponsor sells after about 3-7 years", "Returns come from paydown, EBITDA growth and multiple expansion"],
+             ["LBO_NO_LEVER_LOGIC"],
+             "A private equity firm buys a company using mostly borrowed money, with the company's own cash flows servicing and paying down the debt. "
+             "After a few years it sells, and the equity return comes from debt paydown, EBITDA growth and any multiple expansion. The debt "
+             "magnifies the return on the sponsor's smaller equity check."),
+    _concept("c_acc_dtl", "accounting", 3, "Deferred tax liabilities",
+             "Where does a deferred tax liability come from, for example with accelerated depreciation?",
+             ["Book and tax depreciation differ", "More tax depreciation now means lower cash taxes now than book taxes",
+              "The difference reverses later, so a liability is recorded", "On the CFS the DTL increase is added back (a non-cash expense)"],
+             [],
+             "If tax depreciation is faster than book depreciation, the company pays less cash tax today than its book tax expense. That difference "
+             "will reverse later, so it records a deferred tax liability. The increase in the DTL is a non-cash part of tax expense, so it's added "
+             "back on the cash flow statement."),
+    _concept("c_ev_negative", "ev", 3, "Negative enterprise value",
+             "Can a company's enterprise value be negative? What would that mean?",
+             ["Yes, when cash exceeds market cap plus debt", "The market values the operating business below zero",
+              "Often signals expected cash burn, liabilities or distrust of management", "Can be a value opportunity or a warning sign"],
+             [],
+             "Yes. If a company holds more cash than its market cap plus debt, EV is negative: the market is valuing the operating business below zero, "
+             "usually because it expects cash burn, hidden liabilities or poor capital allocation. It can be a bargain or a warning sign."),
+    # group-specific conceptual
+    _concept("c_fig_no_ev", "industry", 2, "Why banks aren't valued on EV",
+             "Why don't we use enterprise value or EBITDA to value a bank?",
+             ["Debt and deposits are the raw material of a bank's business, not financing", "Interest is an operating cost, so EBITDA is meaningless",
+              "Use equity metrics: P/E, P/BV, P/TBV, ROE", "Dividend discount models replace DCFs"],
+             ["FIG_USES_EV"],
+             "For a bank, deposits and debt are the inputs it lends out, and interest is its main operating cost, so EV and EBITDA don't separate "
+             "operations from financing. Banks are valued on equity metrics: P/E, P/BV and P/TBV (linked to ROE), with dividend discount models in place of DCFs."),
+    _concept("c_re_reit", "industry", 2, "Valuing a REIT",
+             "What metrics would you use to value a REIT?",
+             ["FFO and AFFO instead of net income (P/FFO multiples)", "NAV: properties valued at cap rates, less debt",
+              "Cap rates and NOI", "Dividend yield matters because REITs must distribute most income"],
+             ["RE_FFO_GAIN"],
+             "REITs are valued on FFO and AFFO (price/FFO) rather than net income, because real-estate depreciation distorts earnings. Analysts also build a "
+             "NAV by valuing the properties at market cap rates on NOI and subtracting debt, and they watch dividend yield because REITs must pay out most income."),
+    _concept("c_tmt_saas", "industry", 2, "Valuing high-growth software",
+             "How would you value an unprofitable, high-growth software company?",
+             ["EV/Revenue or EV/ARR multiples instead of earnings multiples", "Growth rate and gross margin drive the multiple",
+              "Unit economics: LTV/CAC, net revenue retention, churn", "DCF with a long horizon until margins mature"],
+             ["TMT_LTV_NO_MARGIN"],
+             "With no earnings, use EV/Revenue or EV/ARR, where the multiple depends on growth and gross margin (the Rule of 40 is a common check). "
+             "Unit economics like LTV/CAC, net revenue retention and churn show whether growth is profitable, and a long-horizon DCF can show value "
+             "once margins mature."),
+    _concept("c_hc_biotech", "industry", 2, "Valuing a pre-revenue biotech",
+             "How would you value a biotech that has no revenue yet?",
+             ["Risk-adjusted NPV (rNPV) by drug", "Probability of success by clinical phase", "Sum-of-the-parts across the pipeline",
+              "Comparable deals and peer valuations by phase"],
+             ["HC_RNPV_UNWEIGHTED"],
+             "Value each drug with a risk-adjusted NPV: forecast its cash flows if approved and weight them by the probability of success at its clinical "
+             "phase, then sum across the pipeline. Cross-check with peer and transaction valuations for companies at the same phase."),
+    _concept("c_en_ep", "industry", 2, "Valuing oil & gas producers",
+             "What's different about valuing an oil & gas exploration and production company?",
+             ["NAV based on proved reserves and commodity price decks", "EV/EBITDAX multiples", "Production and reserves multiples (EV per flowing barrel, per proved reserve)",
+              "Commodity prices drive everything"],
+             ["EN_EBITDA_ONLY"],
+             "E&P companies are valued with a NAV model of their reserves under commodity price assumptions, plus EV/EBITDAX (to neutralise exploration "
+             "accounting) and operating multiples like EV per flowing barrel or per proved reserve. Commodity price assumptions drive the answer."),
+    _concept("c_rx_ch11", "industry", 3, "Chapter 11",
+             "What happens to a company in a Chapter 11 restructuring?",
+             ["The company keeps operating under court protection", "Creditors are paid by priority (absolute priority rule)",
+              "DIP financing funds operations during the case", "A plan of reorganization swaps debt for equity or new debt; Chapter 7 is liquidation"],
+             ["RX_PRO_RATA"],
+             "In Chapter 11 the company keeps operating under court protection, often funded by DIP financing, while it negotiates a plan of reorganization. "
+             "Claims are settled by priority: secured creditors first, then unsecured, then equity, often by swapping debt for new debt or equity. "
+             "Chapter 7, by contrast, is liquidation."),
+    _concept("c_ind_cyclical", "industry", 2, "Cyclical industrials",
+             "How do you value a cyclical industrial company?",
+             ["Use normalized or mid-cycle earnings, not peak or trough", "EV/EBITDA on mid-cycle numbers", "Backlog and order trends matter",
+              "Capital intensity: look at EV/EBIT or FCF as well as EBITDA"],
+             [],
+             "Use mid-cycle or normalized earnings rather than a peak or trough year, and apply EV/EBITDA, plus EV/EBIT or free cash flow because these "
+             "businesses are capital-intensive. Backlog and order trends signal where the cycle is heading."),
+    _concept("c_consumer_metrics", "industry", 2, "Consumer and retail metrics",
+             "What operating metrics matter most for a retail company?",
+             ["Same-store sales growth", "Store count and new-store productivity", "Gross margin and inventory turns",
+              "Store-level (four-wall) EBITDA"],
+             [],
+             "Same-store (comparable) sales growth, store count and new-store productivity, gross margin, inventory turns, and store-level or "
+             "four-wall EBITDA, which show whether growth is coming from healthy existing stores or just from opening new ones."),
+    _concept("c_levfin_credit", "industry", 2, "Credit metrics",
+             "What credit metrics would a lender look at before financing a company?",
+             ["Leverage: debt / EBITDA", "Interest coverage: EBITDA / interest", "Free cash flow to debt and ability to repay",
+              "Covenants, collateral and the business's stability"],
+             [],
+             "Leverage (total and senior debt / EBITDA), interest coverage (EBITDA / interest), and free cash flow relative to debt to see how fast it "
+             "can repay, plus covenants, collateral and how stable and cyclical the business is."),
+    _concept("c_ecm_ipo", "industry", 1, "The IPO process",
+             "Walk me through the IPO process.",
+             ["Pick banks and do due diligence", "File the registration statement (S-1) with the SEC", "Roadshow to investors and build the order book",
+              "Price the offering, allocate shares and start trading (with a greenshoe)"],
+             [],
+             "The company picks underwriters, they do due diligence and draft the S-1 registration statement, which the SEC reviews. Then management "
+             "runs a roadshow to investors while the banks build the order book, the deal is priced and allocated, and the shares start trading, "
+             "often with a greenshoe option to stabilise the price."),
+    _concept("c_dcm_rates", "industry", 1, "Bond prices and rates",
+             "What happens to a bond's price when interest rates rise, and why?",
+             ["Price falls", "Its fixed coupon is now less attractive than new bonds", "The yield rises to match the market",
+              "Longer-maturity bonds move more (duration)"],
+             ["MKT_RATES_NO_EFFECT"],
+             "The price falls. Its fixed coupon is now less attractive than new bonds paying higher rates, so the price drops until its yield matches "
+             "the market. Longer-dated bonds fall more because more of their cash flows are discounted at the higher rate (duration)."),
+]
+
+# =========================================================================== FIT & BEHAVIORAL
+def _fit(tid: str, diff: int, title: str, question: str, key_points: list[str], mis: list[str], model: str, secs: int = 120) -> Template:
+    return Template(id=tid, skill="fit", difficulty=diff, kind="behavioral", title=title,
+                    text=lambda p, q=question: q.replace("{group}", str(p.get("group", "this group"))),
+                    key_points=key_points, misconceptions=mis, explain=lambda p, v, a=model: a, target_seconds=secs)
+
+
+BEHAVIORAL = [
+    _fit("b_resume", 1, "Walk me through your resume", "Walk me through your resume.",
+         ["Clear structure: past, then present, then future", "Connects the steps with the reasons behind each choice",
+          "Builds to why investment banking now", "About two minutes, without reading the resume line by line"],
+         ["FIT_NO_STRUCTURE", "FIT_GENERIC"],
+         "A strong answer is a two-minute story, not a list: where you started and what drew you to business, the key steps and why you took each one, "
+         "what you learned that points to banking, and why this role is the logical next step now."),
+    _fit("b_why_ib", 1, "Why investment banking", "Why investment banking?",
+         ["Specific reasons (deal exposure, learning curve, working on strategic decisions)", "Evidence from your own experience",
+          "Realistic view of the job (hours, analytical work)", "Not mainly about money or prestige", "Link to longer-term goals"],
+         ["FIT_GENERIC", "FIT_MONEY_PRESTIGE"],
+         "Give two or three specific reasons, each backed by something you've done: a project where you enjoyed financial analysis, a deal you followed "
+         "closely, conversations with bankers. Show you understand the job's demands, and connect it to where you want to be in the long run."),
+    _fit("b_why_group", 2, "Why this group", "Why do you want to work in {group}?",
+         ["Knowledge of the group's sector or product", "A specific trend or recent deal in the space", "A personal connection or prior experience",
+          "How your skills fit the group's work"],
+         ["FIT_GENERIC", "FIT_NO_EVIDENCE"],
+         "Show you know what the group does and what's happening in its space (a trend or recent deal), why it genuinely interests you (a personal link or "
+         "prior experience), and how your background fits the work."),
+    _fit("b_why_firm", 2, "Why our firm", "Why our firm over the other banks you're talking to?",
+         ["Specific differentiators (deal flow, group strengths, culture)", "People you've met and what you learned from them",
+          "Fit between you and the firm", "Not generic praise"],
+         ["FIT_GENERIC"],
+         "Name concrete differentiators (group strengths, recent deals, culture), mention people you've spoken with and what stood out, and explain why that "
+         "fits you specifically. Avoid praise that could apply to any bank."),
+    _fit("b_deal", 2, "Tell me about a deal", "Tell me about a recent deal you've followed.",
+         ["Who, what and size (parties, value, consideration)", "Strategic rationale", "Valuation (multiple or premium paid)",
+          "Your own view: good deal or not, and why", "Key risks"],
+         ["FIT_NO_VIEW", "FIT_NO_EVIDENCE"],
+         "Cover the parties, size and consideration; the strategic rationale; the valuation (multiple or premium); then take a view on whether it creates "
+         "value and name the biggest risk. The view is what interviewers are really testing."),
+    _fit("b_team", 1, "Teamwork under pressure", "Tell me about a time you worked on a team under pressure.",
+         ["STAR structure: situation, task, action, result", "Your specific role and actions (\"I\", not just \"we\")",
+          "A concrete, ideally quantified result", "What you learned"],
+         ["FIT_NO_STRUCTURE", "FIT_NO_EVIDENCE"],
+         "Use STAR: set the situation and stakes briefly, explain your task, spend most of the time on what you personally did, give a concrete result, "
+         "and close with what you learned."),
+    _fit("b_weakness", 1, "Greatest weakness", "What's your greatest weakness?",
+         ["A real weakness, not a disguised strength", "Not disqualifying for the job", "A concrete example",
+          "Specific steps you're taking, with evidence of progress"],
+         ["FIT_FAKE_WEAKNESS", "FIT_NO_EVIDENCE"],
+         "Pick a genuine, non-fatal weakness, illustrate it with a real example, and spend most of the answer on what you're doing about it and the progress so far."),
+    _fit("b_leadership", 2, "Leading without authority", "Tell me about a time you had to lead or influence people without formal authority.",
+         ["STAR structure", "How you persuaded or aligned people", "A concrete result", "Reflection on your leadership style"],
+         ["FIT_NO_STRUCTURE", "FIT_NO_EVIDENCE"],
+         "Use STAR, focus on how you built buy-in (listening, data, small wins), give the outcome, and reflect on what it taught you about leading."),
+    _fit("b_pitch", 3, "Pitch me a stock", "Pitch me a stock you'd buy today.",
+         ["A clear thesis in one sentence", "Two or three supporting points with numbers", "Valuation: why it's mispriced",
+          "Catalysts and key risks"],
+         ["FIT_NO_VIEW", "FIT_NO_EVIDENCE"],
+         "State the thesis up front, support it with two or three data-backed points, show why the valuation is attractive versus peers or history, "
+         "and finish with catalysts and the main risk."),
+]
+
+NEW_NUMERIC = [ACC_REV_CASH, ACC_OPEX_CASH, ACC_INVENTORY, ACC_AP, ACC_DEFREV, EV_TSM, DCF_PV, LBO_BASIC,
+               FIG_PTBV, RE_CAP_RATE, RE_FFO, TMT_LTV, HC_RNPV, RX_WATERFALL, EN_EBITDAX]
+
 NUMERIC = [ACC_DA, ACC_WRITEDOWN, ACC_SBC, ACC_CAPEX, ACC_AR, ACC_DEBT, EV_BRIDGE, EV_IMPLIED_PRICE,
            EV_DEBT_CASH, DCF_UFCF, DCF_TV, DCF_WACC, DCF_CAPM, MA_STOCK, MA_CASH, MA_DEBT, MA_GOODWILL,
-           LBO_PAPER, LBO_IRR_RULE, MKT_RATES_WACC, MKT_RATES_LBO, MKT_RATES_MA]
+           LBO_PAPER, LBO_IRR_RULE, MKT_RATES_WACC, MKT_RATES_LBO, MKT_RATES_MA] + NEW_NUMERIC
 
-TEMPLATES: dict[str, Template] = {t.id: t for t in NUMERIC + CONCEPTUAL}
+TEMPLATES: dict[str, Template] = {t.id: t for t in NUMERIC + CONCEPTUAL + MORE_CONCEPTUAL + BEHAVIORAL}
 
 SKILLS = {
     "accounting": "Accounting",
-    "ev": "EV & equity value",
+    "ev": "EV & valuation",
     "dcf": "DCF & WACC",
     "ma": "M&A",
     "lbo": "LBO",
-    "markets": "Markets & rates",
+    "industry": "Group specifics",
+    "fit": "Fit & behavioral",
 }
+TECHNICAL = ["accounting", "ev", "dcf", "ma", "lbo"]
+LEVELS = {1: "Basic", 2: "Intermediate", 3: "Advanced"}
 
 SPECIALIST_FOR_SKILL = {
     "accounting": "accounting", "ev": "valuation", "dcf": "valuation",
-    "ma": "deals", "lbo": "deals", "markets": "markets",
+    "ma": "deals", "lbo": "deals", "markets": "markets", "industry": "industry", "fit": "fit",
 }
+
+# --------------------------------------------------------------------------- groups the candidate can target
+GROUPS = {
+    # coverage
+    "tmt": "Technology, Media & Telecom", "healthcare": "Healthcare", "fig": "Financial Institutions (FIG)",
+    "industrials": "Industrials", "consumer": "Consumer & Retail", "energy": "Energy, Power & Infrastructure",
+    "real_estate": "Real Estate & REITs",
+    # product
+    "ma": "M&A", "levfin": "Leveraged Finance / DCM", "ecm": "Equity Capital Markets", "restructuring": "Restructuring",
+    "sponsors": "Financial Sponsors", "generalist": "Generalist / not sure yet",
+}
+GROUP_KIND = {g: ("coverage" if g in ("tmt", "healthcare", "fig", "industrials", "consumer", "energy", "real_estate") else "product")
+              for g in GROUPS}
+# How much each technical area weighs in practice for each group (1 = normal). FIG de-emphasises EV/LBO.
+GROUP_WEIGHTS = {
+    "fig": {"ev": 0.6, "lbo": 0.4, "accounting": 1.4},
+    "levfin": {"lbo": 1.8, "dcf": 1.1, "ma": 0.7}, "sponsors": {"lbo": 2.0, "ma": 0.8},
+    "ma": {"ma": 1.8, "ev": 1.2}, "ecm": {"ma": 0.6, "lbo": 0.5, "ev": 1.3, "dcf": 1.2},
+    "restructuring": {"accounting": 1.3, "lbo": 1.2, "ma": 0.6}, "real_estate": {"lbo": 0.8},
+}
+
+# --------------------------------------------------------------------------- level, sub-skill and groups for every question
+# (level 1 Basic / 2 Intermediate / 3 Advanced, calibrated against how foundational each topic is in standard IB guides)
+SUBSKILLS: dict[str, tuple[str, str]] = {
+    "accounting.links": ("accounting", "How the statements link"),
+    "accounting.is_basics": ("accounting", "Simple income-statement items"),
+    "accounting.noncash": ("accounting", "Non-cash items (D&A, write-downs, SBC)"),
+    "accounting.working_capital": ("accounting", "Working capital (AR, AP, inventory, deferred revenue)"),
+    "accounting.capex": ("accounting", "Capex and PP&E"),
+    "accounting.debt": ("accounting", "Debt and interest"),
+    "accounting.taxes": ("accounting", "Deferred taxes"),
+    "ev.concepts": ("ev", "EV vs equity value"),
+    "ev.bridge": ("ev", "EV bridge"),
+    "ev.diluted_shares": ("ev", "Diluted shares (TSM)"),
+    "ev.multiples": ("ev", "Multiples and valuation methods"),
+    "dcf.time_value": ("dcf", "Time value of money"),
+    "dcf.process": ("dcf", "DCF walkthrough"),
+    "dcf.fcf": ("dcf", "Unlevered free cash flow"),
+    "dcf.discount_rate": ("dcf", "WACC and cost of equity"),
+    "dcf.terminal_value": ("dcf", "Terminal value"),
+    "dcf.rates": ("dcf", "Interest-rate sensitivity"),
+    "ma.rationale": ("ma", "Deal rationale and synergies"),
+    "ma.accretion": ("ma", "Accretion / dilution"),
+    "ma.purchase_accounting": ("ma", "Purchase accounting and goodwill"),
+    "ma.rates": ("ma", "Financing costs and rates"),
+    "lbo.concepts": ("lbo", "LBO concepts and candidates"),
+    "lbo.returns": ("lbo", "Returns math (MOIC, IRR)"),
+    "lbo.paper": ("lbo", "Paper LBO"),
+    "lbo.rates": ("lbo", "Rates and leverage"),
+    "industry.fig": ("industry", "Banks and FIG"), "industry.real_estate": ("industry", "Real estate and REITs"),
+    "industry.tmt": ("industry", "Software and TMT"), "industry.healthcare": ("industry", "Healthcare and biotech"),
+    "industry.energy": ("industry", "Energy"), "industry.restructuring": ("industry", "Restructuring"),
+    "industry.industrials": ("industry", "Industrials"), "industry.consumer": ("industry", "Consumer and retail"),
+    "industry.credit": ("industry", "Credit and leveraged finance"), "industry.capital_markets": ("industry", "Capital markets"),
+    "fit.story": ("fit", "Your story"), "fit.motivation": ("fit", "Why banking, group and firm"),
+    "fit.deal": ("fit", "Deal discussion"), "fit.experiences": ("fit", "Teamwork and leadership stories"),
+    "fit.self_awareness": ("fit", "Strengths and weaknesses"), "fit.markets_view": ("fit", "Market views and pitches"),
+}
+
+META: dict[str, tuple[int, str, list[str]]] = {
+    # accounting
+    "acc_rev_cash": (1, "accounting.is_basics", []), "acc_opex_cash": (1, "accounting.is_basics", []),
+    "acc_da": (1, "accounting.noncash", []), "acc_capex": (1, "accounting.capex", []),
+    "acc_inventory": (1, "accounting.working_capital", []), "c_acc_link": (1, "accounting.links", []),
+    "c_acc_addback": (1, "accounting.noncash", []), "c_wc_what": (1, "accounting.working_capital", []),
+    "acc_writedown": (2, "accounting.noncash", []), "acc_sbc": (2, "accounting.noncash", []),
+    "acc_ar": (2, "accounting.working_capital", []), "acc_ap": (2, "accounting.working_capital", []),
+    "acc_debt": (2, "accounting.debt", []),
+    "acc_defrev": (3, "accounting.working_capital", []), "c_acc_dtl": (3, "accounting.taxes", []),
+    # EV & valuation
+    "c_ev_vs_equity": (1, "ev.concepts", []), "c_val_methods": (1, "ev.multiples", []), "ev_bridge": (1, "ev.bridge", []),
+    "ev_debt_cash": (1, "ev.bridge", []), "c_ev_cash": (1, "ev.bridge", []),
+    "ev_implied_price": (2, "ev.multiples", []), "ev_tsm": (2, "ev.diluted_shares", []), "c_ev_multiples": (2, "ev.multiples", []),
+    "c_ev_negative": (3, "ev.concepts", []),
+    # DCF
+    "dcf_pv": (1, "dcf.time_value", []), "c_dcf_walk": (1, "dcf.process", []), "c_wacc_what": (1, "dcf.discount_rate", []),
+    "dcf_capm": (1, "dcf.discount_rate", []),
+    "dcf_ufcf": (2, "dcf.fcf", []), "dcf_wacc": (2, "dcf.discount_rate", []), "dcf_tv": (2, "dcf.terminal_value", []),
+    "c_dcf_wacc": (2, "dcf.terminal_value", []),
+    "mkt_rates_wacc": (3, "dcf.rates", []), "c_mkt_duration": (3, "dcf.rates", []),
+    # M&A
+    "c_ma_why": (1, "ma.rationale", []), "c_ma_synergies": (2, "ma.rationale", []), "c_ma_pe": (2, "ma.accretion", []),
+    "ma_stock": (2, "ma.accretion", []), "ma_cash": (2, "ma.accretion", []), "ma_debt": (2, "ma.accretion", []),
+    "c_mkt_rates_deals": (2, "ma.rates", []),
+    "ma_goodwill": (3, "ma.purchase_accounting", []), "mkt_rates_ma": (3, "ma.rates", []),
+    # LBO
+    "c_lbo_what": (1, "lbo.concepts", []), "c_lbo_candidate": (1, "lbo.concepts", []), "lbo_irr_rule": (1, "lbo.returns", []),
+    "lbo_basic": (1, "lbo.returns", []),
+    "c_lbo_leverage": (2, "lbo.concepts", []), "lbo_paper": (2, "lbo.paper", []),
+    "mkt_rates_lbo": (3, "lbo.rates", []),
+    # group specifics
+    "fig_ptbv": (2, "industry.fig", ["fig"]), "c_fig_no_ev": (2, "industry.fig", ["fig"]),
+    "re_cap_rate": (1, "industry.real_estate", ["real_estate"]), "re_ffo": (2, "industry.real_estate", ["real_estate"]),
+    "c_re_reit": (2, "industry.real_estate", ["real_estate"]),
+    "tmt_ltv": (2, "industry.tmt", ["tmt"]), "c_tmt_saas": (2, "industry.tmt", ["tmt"]),
+    "hc_rnpv": (2, "industry.healthcare", ["healthcare"]), "c_hc_biotech": (2, "industry.healthcare", ["healthcare"]),
+    "en_ebitdax": (2, "industry.energy", ["energy"]), "c_en_ep": (2, "industry.energy", ["energy"]),
+    "rx_waterfall": (3, "industry.restructuring", ["restructuring", "levfin"]), "c_rx_ch11": (3, "industry.restructuring", ["restructuring"]),
+    "c_ind_cyclical": (2, "industry.industrials", ["industrials"]), "c_consumer_metrics": (2, "industry.consumer", ["consumer"]),
+    "c_levfin_credit": (2, "industry.credit", ["levfin", "sponsors", "restructuring"]),
+    "c_ecm_ipo": (1, "industry.capital_markets", ["ecm"]), "c_dcm_rates": (1, "industry.capital_markets", ["levfin", "ecm"]),
+    # fit
+    "b_resume": (1, "fit.story", []), "b_why_ib": (1, "fit.motivation", []), "b_team": (1, "fit.experiences", []),
+    "b_weakness": (1, "fit.self_awareness", []), "b_why_group": (2, "fit.motivation", []), "b_why_firm": (2, "fit.motivation", []),
+    "b_deal": (2, "fit.deal", []), "b_leadership": (2, "fit.experiences", []), "b_pitch": (3, "fit.markets_view", []),
+}
+
+_SKILL_FOR_PREFIX = {"accounting": "accounting", "ev": "ev", "dcf": "dcf", "ma": "ma", "lbo": "lbo", "industry": "industry", "fit": "fit"}
+for _tid, (_lvl, _sub, _groups) in META.items():
+    _t = TEMPLATES[_tid]
+    if _t.skill == "markets":  # rate-shock questions keep the markets specialist but count toward their parent skill
+        _t.specialist = "markets"
+    _t.skill = SUBSKILLS[_sub][0]
+    _t.difficulty = _lvl
+    _t.subskill = _sub
+    _t.groups = _groups
+assert set(META) == set(TEMPLATES), sorted(set(TEMPLATES) ^ set(META))
+
+
+def eligible(t: Template, group: str | None) -> bool:
+    """A question is relevant if it's core (no group tag) or tagged with the candidate's group."""
+    return not t.groups or (group in t.groups)
 
 
 # --------------------------------------------------------------------------- instantiation
@@ -1047,7 +1667,7 @@ def build(template: Template, params: Params) -> Question:
         kind=template.kind, title=template.title, text=template.text(params), params=params,
         values=values, labels=template.labels, signatures=sigs, key_points=template.key_points,
         misconceptions=template.misconceptions, solution=template.explain(params, values),
-        target_seconds=template.target_seconds,
+        target_seconds=template.target_seconds, subskill=template.subskill,
     )
 
 

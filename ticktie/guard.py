@@ -95,7 +95,8 @@ def _variants(v: float) -> set[float]:
 def _allowed_set(values: list[float]) -> set[float]:
     s: set[float] = set()
     for v in values:
-        s |= _variants(v)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):  # skip text params (e.g. a group name)
+            s |= _variants(v)
     return s
 
 
@@ -123,7 +124,7 @@ def check_output(
         reasons.append("system-prompt leak (canary found)")
     nums = _numbers_in(message)
     allowed = _allowed_set(allowed_numbers) | {0.0, 1.0, 2.0, 3.0, 5.0, 10.0, 100.0}
-    forbid = _allowed_set([f for f in forbidden_numbers if abs(f) > 1e-9])
+    forbid = _allowed_set([f for f in forbidden_numbers if isinstance(f, (int, float)) and abs(f) > 1e-9])
     small_ints = {float(i) for i in range(0, 13)}  # step numbers, counts, "3 statements"
     for n in nums:
         if n in forbid and n not in small_ints and n not in _allowed_set(allowed_numbers):

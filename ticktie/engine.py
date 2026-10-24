@@ -15,13 +15,22 @@ import random
 import time
 
 from . import agents, bank, config, db, guard, llm, mastery
+from . import plan as planmod
 from .misconceptions import LIBRARY
 
 OPENERS = {
     "associate": "Hi, thanks for making time. We'll keep this conversational: a few technicals, and I'll dig into "
                  "your reasoning as we go. Talk me through your thinking out loud. First one:",
-    "vp": "Let's get into technicals. I'll move quickly and I'll push on anything vague, so be precise. Go:",
+    "vp": "Let's get into it. I'll move quickly and push on anything vague, so be precise. Go:",
+    "director": "Thanks for coming in. I want to get a sense of who you are and how you think, and we'll cover some "
+                "technicals along the way. Let's start:",
+    "md": "Good to meet you. I'm less interested in rehearsed answers than in how you think and why you're here. "
+          "Let's talk:",
 }
+DIAGNOSTIC_OPENER = ("This is your placement interview: about 10-20 questions across accounting, valuation, DCF, M&A, LBOs"
+                     "{group} and fit. Each skill starts at Basic and moves up as you get questions right. One attempt each, "
+                     "no notes. When it's done you'll get your level and a personal action plan.")
+DIAG_ACKS = {True: ["Good.", "Right.", "Noted, good.", "OK, that works."], False: ["Noted.", "OK, let's keep going.", "Got it, moving on."]}
 
 FALLBACKS = {
     "nudge": "Not quite. Take another look at {items} and walk me through that part again.",
@@ -33,6 +42,8 @@ FALLBACKS = {
     "redirect": "Let's keep this to the interview. Answer the question in front of you.",
 }
 
+GOALS = {"drill": 8, "mock": 10, "practice": 8}
+
 
 class BudgetExceeded(Exception):
     pass
@@ -43,38 +54,97 @@ def _rng(state: dict) -> random.Random:
     return random.Random(f"{state['seed']}-{state['turns']}-{len(state['asked'])}")
 
 
-def _mastery_p(pid: str) -> dict[str, float]:
-    return {k: v["p"] for k, v in db.mastery(pid).items()}
-
-
 def _active(pid: str) -> dict[str, int]:
     return {m["mid"]: m["hits"] for m in db.misconceptions(pid) if m["active"]}
 
 
+def levels_for(pid: str) -> dict[str, int]:
+    placed = db.get_profile_json(pid, "placement")
+    keys = db.mastery_all(pid)
+    return {s: mastery.current_level(s, int(placed.get(s, 0)), keys) for s in bank.SKILLS}
+
+
+def weak_subskills(pid: str, limit: int = 8) -> list[str]:
+    """Sub-skills with low mastery, plus those behind active misconceptions, weakest first."""
+    keys = db.mastery_all(pid)
+    scores: dict[str, float] = {}
+    for k, v in keys.items():
+        if k.startswith("sub:") and v["n"] > 0 and v["p"] < 0.55:
+            scores[k[4:]] = v["p"]
+    active = _active(pid)
+    for t in bank.TEMPLATES.values():
+        if any(m in active for m in t.misconceptions) and t.subskill:
+            scores[t.subskill] = min(scores.get(t.subskill, 1.0), 0.3)
+    return [k for k, _ in sorted(scores.items(), key=lambda kv: kv[1]) if k in bank.SUBSKILLS][:limit]
+
+
+def _intake(pid: str) -> dict:
+    return db.get_profile_json(pid, "intake")
+
+
+def _drill_target(pid: str, focus: str | None, level: int | None) -> dict:
+    """What a drill aims at: the next open plan task, else the weakest sub-skill, else the weakest skill."""
+    levels = levels_for(pid)
+    if focus in bank.SKILLS:
+        return {"skill": focus, "subskill": None, "level": level or mastery.target_level(levels.get(focus, 0)), "task": None}
+    plan = db.get_plan(pid)
+    if plan:
+        nxt = next((t for t in plan["tasks"] if not t["done"] and t["type"] == "drill"), None)
+        if nxt:
+            return {"skill": nxt["skill"], "subskill": nxt["subskill"], "level": nxt["level"], "task": nxt["id"]}
+    weak = weak_subskills(pid)
+    if weak:
+        sk = bank.SUBSKILLS[weak[0]][0]
+        return {"skill": sk, "subskill": weak[0], "level": max(levels.get(sk, 0), 1), "task": None}
+    sk = min(bank.TECHNICAL, key=lambda s: levels.get(s, 0))
+    return {"skill": sk, "subskill": None, "level": mastery.target_level(levels.get(sk, 0)), "task": None}
+
+
 def _pick(pid: str, state: dict, sid: str) -> bank.Question:
-    m = _mastery_p(pid)
-    act = _active(pid)
     rng = _rng(state)
-    tid = mastery.pick_next(state["mode"], m, act, state["asked"], rng, state.get("focus"))
-    t = bank.TEMPLATES[tid]
+    group = _intake(pid).get("group")
+    act = _active(pid)
+    asked = state["asked"]
+    mode = state["mode"]
+    if mode == "diagnostic":
+        d = state["diag"]
+        skill, lvl = d["skills"][d["i"]], d["level"]
+        t = mastery.pick_targeted(group, skill, lvl, None, asked, act, rng)
+        reason = f"Placement: {bank.SKILLS[skill]} at {bank.LEVELS[lvl]} level."
+    elif mode == "drill":
+        tg = state["target"]
+        t = mastery.pick_targeted(group, tg["skill"], tg["level"], tg["subskill"], asked, act, rng)
+        sub = bank.SUBSKILLS.get(tg["subskill"], ("", ""))[1]
+        reason = f"Drill target: {bank.SKILLS[tg['skill']]}" + (f" / {sub}" if sub else "") + f" at {bank.LEVELS[tg['level']]}."
+    elif mode == "practice":
+        focus = state.get("focus") or "accounting"
+        lvl = state.get("level") or mastery.target_level(levels_for(pid).get(focus, 0))
+        cands = mastery.pool(group, skill=focus, levels=(lvl,)) or mastery.pool(group, skill=focus)
+        t = mastery.choose(cands, asked, act, rng)
+        reason = f"Practice: {bank.SKILLS[focus]}, {bank.LEVELS[lvl]} only."
+    else:  # mock
+        levels = levels_for(pid)
+        t = mastery.pick_mock(group, state["persona"], levels, bank.GROUP_WEIGHTS.get(group, {}), asked, act, rng,
+                              state.get("focus"))
+        reason = (f"Mock with the {agents.PERSONAS[state['persona']][0]}: "
+                  f"{'fit question' if t.skill == 'fit' else bank.SKILLS[t.skill]} at {bank.LEVELS[t.difficulty]}.")
     hits = [x for x in t.misconceptions if x in act]
-    first_look = not any(bank.TEMPLATES[a].skill == t.skill for a in state["asked"])
-    if state["mode"] == "diagnostic" and first_look:
-        reason = f"Diagnostic sweep: first look at {bank.SKILLS[t.skill]}."
-    else:
-        reason = f"Weakest area: {bank.SKILLS[t.skill]} ({round(m[t.skill] * 100)}% mastery)."
-        if hits:
-            reason += " Re-tests active misconception: " + ", ".join(LIBRARY[h].name for h in hits) + "."
-    q = bank.instantiate(tid, rng)
-    state["asked"].append(tid)
+    if hits:
+        reason += " Re-tests: " + ", ".join(LIBRARY[h].name for h in hits) + "."
+    params = t.gen(rng)
+    if t.kind == "behavioral":
+        params = {"group": bank.GROUPS.get(group, "this group").split(" (")[0]
+                  if group and group != "generalist" else "investment banking"}
+    q = bank.build(t, params)
+    asked.append(t.id)
     state["current"] = {**q.to_state(), "whatif": False}
     state["attempts"] = 0
     state["followups"] = 0
     state["phase"] = "answer"
     state["first_verdict"] = None
     state["q_started"] = time.time()
-    db.add_event(sid, "Director", "pick", f"Picked \"{t.title}\" (difficulty {t.difficulty}).",
-                 {"template": tid, "reason": reason, "params": q.params})
+    db.add_event(sid, "Director", "pick", f"Picked \"{t.title}\" ({bank.LEVELS[t.difficulty]}).",
+                 {"template": t.id, "reason": reason, "params": q.params, "subskill": t.subskill})
     return q
 
 
@@ -103,6 +173,22 @@ def _budget_check(sid: str, pid: str, state: dict) -> None:
         raise BudgetExceeded("Slow down a little: one answer per second.")
 
 
+def _progress(state: dict) -> dict:
+    if state["mode"] == "diagnostic":
+        d = state["diag"]
+        done_sk = d["i"]
+        cur = d["skills"][min(d["i"], len(d["skills"]) - 1)]
+        return {"kind": "diagnostic", "skills_done": done_sk, "skills_total": len(d["skills"]),
+                "pct": round(100 * done_sk / len(d["skills"])), "answered": state.get("done_q", 0),
+                "label": "Placement complete" if state.get("complete") else
+                f"Placement: {bank.SKILLS[cur]} · {bank.LEVELS[d['level']]}",
+                "placed": dict(d["results"])}
+    goal = state.get("goal") or 8
+    done = state.get("done_q", 0)
+    return {"kind": state["mode"], "answered": done, "goal": goal, "pct": round(100 * min(done, goal) / goal),
+            "label": f"Question {min(done + 1, goal)} of {goal}" if not state.get("complete") else "Session complete"}
+
+
 def _public_session(sid: str) -> dict:
     s = db.session(sid)
     st = s["state"]
@@ -110,30 +196,99 @@ def _public_session(sid: str) -> dict:
     return {
         "id": sid, "mode": s["mode"], "persona": s["persona"], "persona_label": agents.PERSONAS[s["persona"]][0],
         "focus": s["focus"], "question": {**q.to_public(), "whatif": st["current"].get("whatif", False),
-                                          "attempt": st["attempts"] + 1, "phase": st["phase"]},
+                                          "attempt": st["attempts"] + 1, "phase": st["phase"],
+                                          "attempts_allowed": 1 if st["mode"] == "diagnostic" else config.MAX_ATTEMPTS_PER_QUESTION},
+        "progress": _progress(st), "complete": bool(st.get("complete")),
         "usage": db.session_usage(sid), "budget": config.SESSION_TOKEN_BUDGET, "ended": bool(s["ended"]),
     }
 
 
 # ---------------------------------------------------------------- public API
-def start_session(profile_id: str, mode: str, persona: str, focus: str | None) -> dict:
-    if mode not in ("diagnostic", "drill", "mixed"):
-        mode = "diagnostic"
+def save_intake(pid: str, intake: dict) -> dict:
+    try:
+        hours = float(intake.get("hours_per_week") or 5)
+    except (TypeError, ValueError):
+        hours = 5.0
+    clean = {
+        "group": intake.get("group") if intake.get("group") in bank.GROUPS else "generalist",
+        "stage": intake.get("stage") if intake.get("stage") in planmod.STAGES else "networking",
+        "interview_date": str(intake.get("interview_date") or "")[:10] or None,
+        "hours_per_week": max(1.0, min(hours, 40.0)),
+        "persona": intake.get("persona") if intake.get("persona") in agents.PERSONAS else "associate",
+    }
+    db.set_profile_json(pid, "intake", clean)
+    return clean
+
+
+def start_session(profile_id: str, mode: str, persona: str, focus: str | None, level: int | None = None) -> dict:
+    if mode not in ("diagnostic", "drill", "mock", "practice"):
+        mode = "mock"
     if persona not in agents.PERSONAS:
         persona = "associate"
     if focus not in bank.SKILLS:
         focus = None
-    state = {"seed": random.randrange(1_000_000), "mode": mode, "persona": persona, "focus": focus,
-             "asked": [], "turns": 0, "last_turn": 0.0}
+    if level not in (1, 2, 3):
+        level = None
+    if mode == "practice" and not focus:
+        focus = "accounting"
+    intake = _intake(profile_id)
+    group = intake.get("group")
+    state = {"seed": random.randrange(1_000_000), "mode": mode, "persona": persona, "focus": focus, "level": level,
+             "asked": [], "turns": 0, "last_turn": 0.0, "done_q": 0, "goal": GOALS.get(mode),
+             "levels_start": levels_for(profile_id)}
+    if mode == "diagnostic":
+        skills = mastery.diagnostic_skills(group)
+        state["diag"] = {"skills": skills, "i": 0, "level": mastery.first_level(group, skills[0]), "results": {},
+                         "fit_seen": 0, "fit_pass": 0}
+    if mode == "drill":
+        state["target"] = _drill_target(profile_id, focus, level)
     sid = db.create_session(profile_id, mode, persona, focus, state)
     db.add_event(sid, "Director", "start", f"Started a {mode} session with the {agents.PERSONAS[persona][0]}.",
-                 {"focus": focus})
+                 {"focus": focus, "level": level, "group": group, "target": state.get("target")})
     _pick(profile_id, state, sid)
     db.save_state(sid, state)
     out = _public_session(sid)
-    out["opener"] = OPENERS[persona]
+    if mode == "diagnostic":
+        gname = bank.GROUPS.get(group or "generalist", "")
+        out["opener"] = DIAGNOSTIC_OPENER.format(
+            group=f", {gname.split(' (')[0]} specifics" if group and group != "generalist" else "")
+    elif mode == "drill":
+        tg = state["target"]
+        sub = bank.SUBSKILLS.get(tg["subskill"], ("", ""))[1]
+        out["opener"] = (f"Targeted drill: {bank.SKILLS[tg['skill']]}" + (f", {sub}" if sub else "") +
+                         f", {bank.LEVELS[tg['level']]} level, {GOALS['drill']} questions. " + OPENERS[persona])
+    else:
+        out["opener"] = OPENERS[persona]
     out["events"] = db.events(sid)
     return out
+
+
+def _advance_diagnostic(pid: str, state: dict, passed: bool, sid: str) -> None:
+    """Adaptive placement: climb a skill's levels while answers are right, then move to the next skill."""
+    d = state["diag"]
+    skill = d["skills"][d["i"]]
+    group = _intake(pid).get("group")
+    placed = None
+    if skill == "fit":
+        d["fit_seen"] += 1
+        d["fit_pass"] += int(passed)
+        if d["fit_seen"] >= 2:
+            placed = d["fit_pass"]  # 0, 1 or 2
+    elif passed and d["level"] < 3 and mastery.pool(group, skill=skill, levels=(d["level"] + 1,)):
+        d["level"] += 1
+    else:
+        placed = d["level"] if passed else d["level"] - 1
+    if placed is not None:
+        placed = max(0, placed)
+        d["results"][skill] = placed
+        db.add_event(sid, "Director", "placement",
+                     f"Placed {bank.SKILLS[skill]} at {bank.LEVELS.get(placed, 'Foundations')}.",
+                     {"skill": skill, "level": placed})
+        d["i"] += 1
+        if d["i"] >= len(d["skills"]):
+            state["complete"] = True
+        else:
+            d["level"] = mastery.first_level(group, d["skills"][d["i"]])
 
 
 _INFLIGHT: set[str] = set()  # sessions with a turn being graded right now
@@ -251,21 +406,37 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
         p_old = db.mastery(pid)[q.skill]["p"]
         p_new = mastery.bkt_update(p_old, final_verdict, q.kind)
         db.set_mastery(pid, q.skill, p_new)
+        # the same evidence also updates this level and this sub-skill
+        for key in (f"lvl:{q.skill}:{q.difficulty}", f"sub:{q.subskill}"):
+            db.set_key(pid, key, mastery.bkt_update(db.get_key(pid, key), final_verdict, q.kind))
         if final_verdict == "correct":
             for mid in q.misconceptions:
                 if mid not in mids:
                     db.record_misconception(pid, mid, False, None)
         db.add_event(sid, "Director", "mastery",
                      f"{bank.SKILLS[q.skill]} mastery {round(p_old * 100)}% -> {round(p_new * 100)}% ({final_verdict}).",
-                     {"skill": q.skill, "p_old": p_old, "p_new": p_new, "verdict": final_verdict})
+                     {"skill": q.skill, "p_old": p_old, "p_new": p_new, "verdict": final_verdict,
+                      "subskill": q.subskill, "level": q.difficulty})
+        if not state["current"].get("whatif"):
+            state["done_q"] = state.get("done_q", 0) + 1
+        if state["mode"] == "diagnostic":
+            _advance_diagnostic(pid, state, final_verdict in ("correct", "correct_unexplained"), sid)
+        elif state.get("goal") and state["done_q"] >= state["goal"] and action != "ack_whatif":
+            state["complete"] = True
     if state["phase"] == "answer" and state["first_verdict"] is None and verdict != "redirect":
         state["first_verdict"] = verdict
 
     # ---------- 6. interviewer message (LLM) through the output filters
     # A what-if follow-up is computed by the calculator first, so the interviewer can only introduce it.
     nq = bank.variation(q, _rng(state)) if action == "ack_whatif" else None
-    msg = await _interviewer_message(sid, state, q, verdict, action, checks, mids, wrapped, d,
-                                     followup=nq.text if nq else None)
+    if state["mode"] == "diagnostic" and action != "redirect":
+        # placement is a quick screen: a short neutral acknowledgement, no coaching mid-test (and no extra model call)
+        msg = _rng(state).choice(DIAG_ACKS[final_verdict in ("correct", "correct_unexplained")])
+        if state.get("complete"):
+            msg = "That's the placement done. Let's look at where you stand."
+    else:
+        msg = await _interviewer_message(sid, state, q, verdict, action, checks, mids, wrapped, d,
+                                         followup=nq.text if nq else None)
 
     # ---------- 7. advance the interview
     solution = q.solution if (action == "reveal" or resolved) else None
@@ -284,7 +455,7 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
         state["followups"] += 1
     elif action == "nudge":
         state["attempts"] += 1
-    elif action in ("ack_next", "reveal", "note_next"):
+    elif action in ("ack_next", "reveal", "note_next", "diag_next") and not state.get("complete"):
         next_q = _pick(pid, state, sid)
     db.save_state(sid, state)
 
@@ -319,6 +490,8 @@ async def _answer(sid: str, raw_text: str, seconds: float | None) -> dict:
         "session": _public_session(sid),
         "events": db.events(sid)[ev_start:],
         "next_question": next_q.to_public() if next_q else None,
+        "complete": bool(state.get("complete")),
+        "progress": _progress(state),
     }
 
 
@@ -377,6 +550,8 @@ def _choose_action(state: dict, q: bank.Question, verdict: str, explain_only: bo
     """(action, resolved?) - resolved means the question is finished and the map updates."""
     if verdict == "redirect":
         return "redirect", False
+    if state["mode"] == "diagnostic":
+        return "diag_next", True  # one attempt per placement question
     if explain_only:
         return ("ack_next" if verdict == "correct" else "note_next"), True
     if verdict == "correct":
@@ -472,22 +647,51 @@ async def end_session(sid: str) -> dict:
     if s["ended"] and s["debrief"]:
         return _report(sid)
     pid = s["profile_id"]
+    state = s["state"]
     ts = db.turns(sid)
+
+    # ---- placement (diagnostic) -> plan; drills and mocks tick off the plan
+    plan_event = None
+    if s["mode"] == "diagnostic":
+        results = dict(state.get("diag", {}).get("results", {}))
+        if results:
+            placed = {**db.get_profile_json(pid, "placement"), **results}
+            db.set_profile_json(pid, "placement", placed)
+            for sk, L in results.items():  # demonstrated levels count as achieved
+                for lvl in range(1, L + 1):
+                    db.set_key(pid, f"lvl:{sk}:{lvl}", max(db.get_key(pid, f"lvl:{sk}:{lvl}"), 0.8), n_inc=2)
+            await build_plan(pid, sid)
+            plan_event = "plan_created"
+    else:
+        plan = db.get_plan(pid)
+        if plan and state.get("done_q", 0) >= 3:
+            kind = "drill" if s["mode"] in ("drill", "practice") else "mock"
+            skill = (state.get("target") or {}).get("skill") or state.get("focus")
+            ticked = planmod.mark_done(plan, kind, skill if kind == "drill" else None)
+            if ticked:
+                db.save_plan(pid, plan)
+                plan_event = f"ticked: {ticked['title']}"
+                db.add_event(sid, "Director", "plan", f"Plan task completed: {ticked['title']}.", {"task": ticked})
+    levels_after = levels_for(pid)
+    db.snapshot(pid, levels_after)
+
     m_end = db.mastery(pid)
     summary = {
+        "mode": s["mode"],
         "questions": [{"title": t["question"][:80], "skill": bank.SKILLS.get(t["skill"], t["skill"]),
                        "verdict": t["verdict"], "misconceptions": t["misconceptions"] or [],
                        "evidence": (t["diagnosis"] or {}).get("diagnosis", {}).get("evidence_quote", ""),
                        "seconds": round(t["seconds"]) if t["seconds"] else None}
                       for t in ts if t["verdict"]],
         "misconceptions_seen": sorted({m for t in ts for m in (t["misconceptions"] or [])}),
-        "mastery_start": {bank.SKILLS[k]: round(v["p"] * 100) for k, v in s["mastery_start"].items()},
+        "mastery_start": {bank.SKILLS[k]: round(v["p"] * 100) for k, v in s["mastery_start"].items() if k in bank.SKILLS},
         "mastery_end": {bank.SKILLS[k]: round(v["p"] * 100) for k, v in m_end.items()},
+        "levels_end": {bank.SKILLS[k]: bank.LEVELS.get(v, "Foundations") for k, v in levels_after.items()},
     }
     debrief = None
     if summary["questions"]:
         try:
-            _budget_check(sid, pid, {**s["state"], "last_turn": 0})
+            _budget_check(sid, pid, {**state, "last_turn": 0})
             result, rec = await llm.run(agents.coach(), "Coach", json.dumps(summary, indent=1), session_id=sid)
             deb = result.output
             text = " ".join([deb.headline, *deb.strengths, deb.next_session,
@@ -507,9 +711,42 @@ async def end_session(sid: str) -> dict:
             db.add_event(sid, "Guard", "safety", "Coach skipped: " + str(e), {})
     if debrief is None:
         debrief = _fallback_debrief(summary)
+    debrief["plan_event"] = plan_event
     db.end_session(sid, debrief)
     db.add_event(sid, "Director", "end", "Session ended.", {})
     return _report(sid)
+
+
+async def build_plan(pid: str, sid: str | None = None) -> dict:
+    """Code computes the plan; the Planner agent only writes the plain-English summary of it."""
+    intake = _intake(pid)
+    levels = levels_for(pid)
+    plan = planmod.build(intake, levels, weak_subskills(pid))
+    facts = {k: plan[k] for k in ("group_name", "days_left", "hours_per_week", "overall_label", "target_label", "drills",
+                                  "mocks", "questions", "hours_planned", "hours_available", "compressed",
+                                  "minutes_per_practice_day")}
+    facts["skills"] = [{"skill": r["name"], "now": bank.LEVELS.get(r["current"], "Foundations"),
+                        "target": bank.LEVELS[r["target"]], "drills": r["drills"],
+                        "weak_subskills": [w["name"] for w in r["weak_subskills"]]} for r in plan["skills"]]
+    summary = None
+    try:
+        if sid:
+            result, rec = await llm.run(agents.planner(), "Planner", json.dumps(facts, indent=1), session_id=sid)
+            text = " ".join([result.output.headline, result.output.why, result.output.first_step])
+            oc = guard.check_output(text, _numbers_in_text(json.dumps(facts)) + [float(x) for x in range(0, 13)], [])
+            db.add_event(sid, "Planner", "llm", "Wrote the action-plan summary.", {"filter_ok": oc.ok, "reasons": oc.reasons}, rec)
+            if oc.ok:
+                summary = result.output.model_dump()
+    except Exception as e:  # the plan itself never depends on the model
+        if sid:
+            db.add_event(sid, "Guard", "safety", f"Planner summary skipped ({type(e).__name__}); used the computed summary.", {})
+    plan["summary"] = summary or {
+        "headline": f"You're at {plan['overall_label']} overall. Target: {plan['target_label']} in {plan['days_left']} days.",
+        "why": f"{plan['drills']} targeted drills and {plan['mocks']} mock interviews, about {plan['hours_planned']} hours in total.",
+        "first_step": f"Start with: {next((t['title'] for t in plan['tasks'] if not t['done']), 'a mock interview')}.",
+    }
+    db.save_plan(pid, plan)
+    return plan
 
 
 def _fallback_debrief(summary: dict) -> dict:
@@ -525,12 +762,21 @@ def _fallback_debrief(summary: dict) -> dict:
 
 def _report(sid: str) -> dict:
     s = db.session(sid)
+    pid = s["profile_id"]
     ts = db.turns(sid)
+    start_levels = s["state"].get("levels_start", {})
+    end_levels = levels_for(pid)
+    plan = db.get_plan(pid)
     return {
         "session": {"id": sid, "mode": s["mode"], "persona": s["persona"], "started": s["started"], "ended": s["ended"]},
         "debrief": s["debrief"],
         "mastery_start": s["mastery_start"],
-        "mastery_end": db.mastery(s["profile_id"]),
+        "mastery_end": db.mastery(pid),
+        "levels_start": start_levels, "levels_end": end_levels,
+        "level_ups": [{"skill": k, "name": bank.SKILLS[k], "from": bank.LEVELS.get(start_levels.get(k, 0), "Foundations"),
+                       "to": bank.LEVELS.get(v, "Foundations")} for k, v in end_levels.items() if v > start_levels.get(k, 0)],
+        "placement": s["state"].get("diag", {}).get("results") if s["mode"] == "diagnostic" else None,
+        "plan_progress": planmod.progress(plan) if plan else None,
         "turns": [{"question": t["question"], "verdict": t["verdict"], "skill": t["skill"],
                    "misconceptions": t["misconceptions"], "seconds": t["seconds"]} for t in ts],
         "usage": db.session_usage(sid),
@@ -540,18 +786,64 @@ def _report(sid: str) -> dict:
 
 def weakness_map(pid: str) -> dict:
     m = db.mastery(pid)
+    keys = db.mastery_all(pid)
     mis = db.misconceptions(pid)
     ts = db.profile_turns(pid)
+    levels = levels_for(pid)
     speed = {}
     for s in bank.SKILLS:
         secs = [t["seconds"] for t in ts if t["skill"] == s and t["seconds"]]
         speed[s] = round(sum(secs) / len(secs)) if secs else None
+    subs = {}
+    for sub, (sk, name) in bank.SUBSKILLS.items():
+        k = keys.get(f"sub:{sub}")
+        if k:
+            subs.setdefault(sk, []).append({"id": sub, "name": name, "p": k["p"], "n": k["n"]})
+    hist: dict[str, list] = {}
+    for h in db.history(pid):
+        hist.setdefault(h["key"], []).append({"ts": h["ts"], "p": h["p"], "level": h["level"]})
     return {
-        "skills": [{"key": k, "name": bank.SKILLS[k], "p": v["p"], "n": v["n"], "level": mastery.level(v["p"], v["n"]),
-                    "avg_seconds": speed[k]} for k, v in m.items()],
+        "skills": [{"key": k, "name": bank.SKILLS[k], "p": v["p"], "n": v["n"], "label": mastery.level(v["p"], v["n"]),
+                    "level": levels.get(k, 0), "level_name": bank.LEVELS.get(levels.get(k, 0), "Foundations"),
+                    "target": mastery.target_level(levels.get(k, 0)),
+                    "avg_seconds": speed[k], "subskills": sorted(subs.get(k, []), key=lambda x: x["p"]),
+                    "history": hist.get(k, [])} for k, v in m.items()],
         "misconceptions": [{"id": x["mid"], "name": LIBRARY[x["mid"]].name, "skill": LIBRARY[x["mid"]].skill,
                             "hits": x["hits"], "active": x["active"], "clean_streak": x["clean_streak"],
                             "fix": LIBRARY[x["mid"]].fix, "evidence": x["evidence"]}
                            for x in mis if x["mid"] in LIBRARY and x["hits"] > 0],
         "answered": len([t for t in ts if t["verdict"]]),
+    }
+
+
+def dashboard(pid: str) -> dict:
+    """Everything the home screen needs: level, plan progress, today's tasks, streak, skills, next step."""
+    intake = _intake(pid)
+    plan = db.get_plan(pid)
+    wm = weakness_map(pid)
+    with db.conn() as c:
+        days = [r["d"] for r in c.execute(
+            """SELECT DISTINCT date(s.started, 'unixepoch', 'localtime') d FROM sessions s
+               JOIN turns t ON t.session_id=s.id WHERE s.profile_id=? ORDER BY d DESC""", (pid,))]
+        n_sessions = c.execute("SELECT COUNT(*) n FROM sessions WHERE profile_id=? AND ended IS NOT NULL", (pid,)).fetchone()["n"]
+        diag_done = c.execute("SELECT COUNT(*) n FROM sessions WHERE profile_id=? AND mode='diagnostic' AND ended IS NOT NULL",
+                              (pid,)).fetchone()["n"] > 0
+    import datetime as _dt
+    streak, day = 0, _dt.date.today()
+    dayset = set(days)
+    if day.isoformat() not in dayset:
+        day -= _dt.timedelta(days=1)
+    while day.isoformat() in dayset:
+        streak += 1
+        day -= _dt.timedelta(days=1)
+    tech = [s["level"] for s in wm["skills"] if s["key"] in bank.TECHNICAL]
+    overall = int(sum(tech) / len(tech) + 0.5) if tech else 0
+    return {
+        "intake": intake, "needs_intake": not intake, "diagnostic_done": diag_done,
+        "overall_level": overall, "overall_label": bank.LEVELS.get(overall, "Foundations"),
+        "target_label": bank.LEVELS[mastery.target_level(overall)],
+        "plan": plan, "progress": planmod.progress(plan) if plan else None,
+        "streak": streak, "sessions": n_sessions, "answered": wm["answered"],
+        "skills": wm["skills"], "misconceptions": wm["misconceptions"],
+        "group_name": bank.GROUPS.get(intake.get("group", "generalist"), "Generalist"),
     }

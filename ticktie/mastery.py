@@ -1,8 +1,12 @@
-"""The weakness map: per-skill mastery (Bayesian knowledge tracing) and per-misconception tracking.
+"""The weakness map and question selection: all deterministic.
 
-All deterministic. The model never decides what to ask next or how well the
-candidate is doing. That keeps the agent from 'teaching to the test' by
-picking easy questions to make the scores look good.
+Three layers of mastery, each a Bayesian-knowledge-tracing estimate:
+* skill               e.g. "accounting"            the headline bar
+* level within skill  e.g. "lvl:accounting:2"      decides Basic / Intermediate / Advanced
+* sub-skill           e.g. "sub:accounting.noncash" what drills target
+
+The model never decides what to ask next or how well the candidate is doing,
+so it can't choose easy questions to make the numbers look good.
 """
 
 from __future__ import annotations
@@ -14,15 +18,14 @@ from . import bank
 P_INIT = 0.30
 P_LEARN = 0.12
 P_SLIP = 0.10
-P_GUESS = {"numeric": 0.10, "conceptual": 0.25}
+P_GUESS = {"numeric": 0.10, "conceptual": 0.25, "behavioral": 0.30}
+READY = 0.75             # a level counts as "achieved" at or above this
+MIN_EVIDENCE_FOR_READY = 3
 
-# How much each verdict counts as evidence of mastery (1 = clean correct).
-EVIDENCE = {
-    "correct": 1.0,
-    "correct_unexplained": 0.5,  # right number, couldn't explain it: memorised, not mastered
-    "incomplete": 0.4,
-    "incorrect": 0.0,
-}
+EVIDENCE = {"correct": 1.0, "correct_unexplained": 0.5, "incomplete": 0.4, "incorrect": 0.0}
+
+# How often each interviewer seniority asks fit/behavioral questions in a mock.
+FIT_SHARE = {"associate": 0.10, "vp": 0.25, "director": 0.50, "md": 0.70}
 
 
 def bkt_update(p: float, verdict: str, kind: str) -> float:
@@ -36,12 +39,8 @@ def bkt_update(p: float, verdict: str, kind: str) -> float:
     return round(post + (1 - post) * P_LEARN, 4)
 
 
-MIN_EVIDENCE_FOR_READY = 3
-
-
 def level(p: float, n: int = MIN_EVIDENCE_FOR_READY) -> str:
-    """Label for a mastery estimate. 'Interview-ready' needs at least 3 graded questions,
-    because one lucky answer shouldn't certify a skill."""
+    """Label for a mastery estimate. 'Interview-ready' needs at least 3 graded questions."""
     if p >= 0.80 and n >= MIN_EVIDENCE_FOR_READY:
         return "interview-ready"
     if p >= 0.80:
@@ -53,61 +52,102 @@ def level(p: float, n: int = MIN_EVIDENCE_FOR_READY) -> str:
     return "weak"
 
 
-def target_difficulty(p: float) -> int:
-    if p < 0.35:
-        return 1
-    if p < 0.65:
-        return 2
-    return 3
+def current_level(skill: str, placed: int, keys: dict[str, dict]) -> int:
+    """Highest level achieved: the placement, raised once a level's mastery is demonstrated (>= READY, n >= 2)."""
+    lvl = placed
+    for L in (1, 2, 3):
+        k = keys.get(f"lvl:{skill}:{L}")
+        if k and k["p"] >= READY and k["n"] >= 2 and L == lvl + 1:
+            lvl = L
+    return lvl
 
 
-def pick_next(
-    mode: str,
-    mastery: dict[str, float],
-    active_misconceptions: dict[str, int],
-    asked: list[str],
-    rng: random.Random,
-    focus: str | None = None,
-) -> str:
-    """Choose the next template id.
+def target_level(current: int) -> int:
+    return min(max(current, 0) + 1, 3)
 
-    diagnostic: cover every skill once, easiest first, so the map fills in quickly.
-    drill:      go after the weakest skill and the candidate's active misconceptions.
-    mixed:      like drill, but with some exploration across skills.
-    """
-    skills = list(bank.SKILLS)
-    if focus in skills:
-        skills = [focus]
 
-    if mode == "diagnostic":
-        untested = [s for s in skills if not any(bank.TEMPLATES[a].skill == s for a in asked)]
-        if untested:
-            skill = untested[0]
-            in_skill = [t for t in bank.TEMPLATES.values() if t.skill == skill]
-            # Prefer an easy numeric question; some skills (markets) only have harder ones.
-            pool = ([t for t in in_skill if t.kind == "numeric" and t.difficulty <= 2]
-                    or [t for t in in_skill if t.kind == "numeric"] or in_skill)
-            return min(pool, key=lambda t: (t.difficulty, rng.random())).id
-        mode = "drill"
+# --------------------------------------------------------------------------- selection
+def pool(group: str | None, skill: str | None = None, levels: tuple[int, ...] | None = None,
+         subskill: str | None = None, kinds: tuple[str, ...] | None = None) -> list[bank.Template]:
+    """Strict filter: only questions that match every constraint the candidate set."""
+    out = []
+    for t in bank.TEMPLATES.values():
+        if not bank.eligible(t, group):
+            continue
+        if skill and t.skill != skill:
+            continue
+        if levels and t.difficulty not in levels:
+            continue
+        if subskill and t.subskill != subskill:
+            continue
+        if kinds and t.kind not in kinds:
+            continue
+        if t.skill == "industry" and (not group or group == "generalist"):
+            continue
+        out.append(t)
+    return out
 
-    # Rank skills from weakest up; mixed mode sometimes explores a random skill.
-    ranked = sorted(skills, key=lambda s: mastery.get(s, P_INIT))
-    skill = ranked[0]
-    if mode == "mixed" and len(ranked) > 1 and rng.random() < 0.35:
-        skill = rng.choice(ranked[1:])
 
-    want = target_difficulty(mastery.get(skill, P_INIT))
-    cands = [t for t in bank.TEMPLATES.values() if t.skill == skill]
-    recent = set(asked[-4:])
+def choose(cands: list[bank.Template], asked: list[str], active: dict[str, int], rng: random.Random) -> bank.Template:
+    recent = set(asked[-6:])
 
     def score(t: bank.Template) -> tuple:
-        hits = sum(active_misconceptions.get(m, 0) for m in t.misconceptions)
-        return (
-            -min(hits, 3),                 # templates that re-test an active misconception first
-            t.id in recent,                # avoid immediate repeats (numbers change anyway)
-            abs(t.difficulty - want),      # then the right difficulty
-            asked.count(t.id),             # then least-asked
-            rng.random(),
-        )
+        hits = sum(active.get(m, 0) for m in t.misconceptions)
+        return (t.id in recent, -min(hits, 3), asked.count(t.id), rng.random())
 
-    return min(cands, key=score).id
+    return min(cands, key=score)
+
+
+def pick_targeted(group: str | None, skill: str, lvl: int, subskill: str | None, asked: list[str],
+                  active: dict[str, int], rng: random.Random) -> bank.Template:
+    """Best question for a (skill, level, sub-skill) target, relaxing constraints only if nothing fresh matches.
+
+    Numeric questions may repeat (the calculator draws new numbers each time); conceptual and
+    behavioral questions are never repeated within the last few questions, so the selector widens
+    the sub-skill or level before it would ask the same words twice."""
+    recent = set(asked[-8:])
+    for attempt in (
+        dict(skill=skill, levels=(lvl,), subskill=subskill),
+        dict(skill=skill, levels=(lvl,)),
+        dict(skill=skill, levels=(max(lvl - 1, 1), min(lvl + 1, 3))),
+        dict(skill=skill),
+    ):
+        cands = pool(group, **attempt)
+        fresh = [t for t in cands if t.kind == "numeric" and asked[-1:] != [t.id] or t.id not in recent]
+        if fresh:
+            return choose(fresh, asked, active, rng)
+    cands = pool(group, skill=skill) or list(bank.TEMPLATES.values())
+    return choose(cands, asked, active, rng)
+
+
+def pick_mock(group: str | None, persona: str, levels: dict[str, int], weights: dict[str, float],
+              asked: list[str], active: dict[str, int], rng: random.Random, focus: str | None = None) -> bank.Template:
+    """A mock interview: the interviewer's seniority sets the fit/technical mix; the group sets the technical mix."""
+    if focus:
+        lvl = target_level(levels.get(focus, 0))
+        return pick_targeted(group, focus, lvl, None, asked, active, rng)
+    if rng.random() < FIT_SHARE.get(persona, 0.2):
+        lvl = 1 if persona in ("associate", "vp") else rng.choice([1, 2, 2, 3])
+        return pick_targeted(group, "fit", lvl, None, asked, active, rng)
+    skills = list(bank.TECHNICAL)
+    if group and group != "generalist" and pool(group, skill="industry"):
+        skills.append("industry")
+    w = [weights.get(s, 1.0) * (1.4 if s == "industry" else 1.0) for s in skills]
+    skill = rng.choices(skills, weights=w)[0]
+    return pick_targeted(group, skill, target_level(levels.get(skill, 0)), None, asked, active, rng)
+
+
+# --------------------------------------------------------------------------- placement (diagnostic)
+def diagnostic_skills(group: str | None) -> list[str]:
+    order = ["accounting", "ev", "dcf", "ma", "lbo"]
+    if group and group != "generalist" and pool(group, skill="industry"):
+        order.append("industry")
+    order.append("fit")
+    return order
+
+
+def first_level(group: str | None, skill: str) -> int:
+    for L in (1, 2, 3):
+        if pool(group, skill=skill, levels=(L,)):
+            return L
+    return 1

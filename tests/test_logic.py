@@ -7,34 +7,44 @@ from ticktie.agents import Diagnosis, StatedValue
 from ticktie.engine import _adjudicate
 
 
-def test_selector_never_fails():
-    rng = random.Random(0)
-    for mode in ("diagnostic", "drill", "mixed"):
-        for focus in [None, *bank.SKILLS]:
-            asked: list[str] = []
-            m = {s: rng.random() for s in bank.SKILLS}
-            for _ in range(25):
-                tid = mastery.pick_next(mode, m, {"LBO_IRR_SIMPLE": 2}, asked, rng, focus)
-                assert tid in bank.TEMPLATES
-                if focus and mode != "diagnostic":
-                    assert bank.TEMPLATES[tid].skill == focus
-                asked.append(tid)
+def test_selection_is_strict_about_group_skill_and_level():
+    for group in bank.GROUPS:
+        for skill in bank.SKILLS:
+            for lvl in (1, 2, 3):
+                for t in mastery.pool(group, skill=skill, levels=(lvl,)):
+                    assert t.skill == skill and t.difficulty == lvl
+                    assert bank.eligible(t, group), (group, t.id)
+        for t in mastery.pool(group):  # never another group's specialist questions
+            assert not t.groups or group in t.groups
+    assert not mastery.pool("generalist", skill="industry")
 
 
-def test_diagnostic_sweeps_every_skill_first():
+def test_targeted_pick_respects_subskill_and_level():
     rng = random.Random(1)
-    asked: list[str] = []
-    m = {s: 0.3 for s in bank.SKILLS}
-    for _ in range(len(bank.SKILLS)):
-        asked.append(mastery.pick_next("diagnostic", m, {}, asked, rng))
-    assert {bank.TEMPLATES[a].skill for a in asked} == set(bank.SKILLS)
+    for sub, (skill, _) in bank.SUBSKILLS.items():
+        for group in ("generalist", "fig", "tmt", "real_estate", "restructuring"):
+            cands = mastery.pool(group, skill=skill, subskill=sub)
+            if not cands:
+                continue
+            lvl = cands[0].difficulty
+            t = mastery.pick_targeted(group, skill, lvl, sub, [], {}, rng)
+            assert t.subskill == sub and t.difficulty == lvl
 
 
-def test_drill_targets_weakest_skill():
+def test_mock_mix_follows_interviewer_seniority():
     rng = random.Random(2)
-    m = {s: 0.9 for s in bank.SKILLS}
-    m["lbo"] = 0.1
-    assert bank.TEMPLATES[mastery.pick_next("drill", m, {}, [], rng)].skill == "lbo"
+    levels = {s: 1 for s in bank.SKILLS}
+    share = {}
+    for persona in ("associate", "md"):
+        fits = sum(mastery.pick_mock("tmt", persona, levels, {}, [], {}, rng).skill == "fit" for _ in range(400))
+        share[persona] = fits / 400
+    assert share["associate"] < 0.2 and share["md"] > 0.55
+
+
+def test_every_group_has_a_diagnostic_path():
+    for group in bank.GROUPS:
+        for skill in mastery.diagnostic_skills(group):
+            assert mastery.pool(group, skill=skill, levels=(mastery.first_level(group, skill),))
 
 
 def test_bkt_moves_the_right_way():
@@ -101,3 +111,15 @@ def test_output_filter_blocks_invented_numbers_but_allows_question_numbers():
 def test_one_answer_cannot_certify_a_skill():
     assert mastery.level(0.9, 1) == "solid"
     assert mastery.level(0.9, 3) == "interview-ready"
+
+
+def test_word_questions_are_not_repeated_in_a_drill():
+    rng = random.Random(5)
+    asked: list[str] = []
+    for _ in range(8):
+        t = mastery.pick_targeted("tmt", "fit", 1, "fit.experiences", asked, {}, rng)
+        asked.append(t.id)
+    words = [a for a in asked if bank.TEMPLATES[a].kind != "numeric"]
+    for i in range(1, len(words)):
+        assert words[i] != words[i - 1]
+    assert len(set(asked)) >= 4

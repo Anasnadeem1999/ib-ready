@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import agents, bank, config, db, engine, llm
+from . import plan as planmod
 from .misconceptions import LIBRARY
 
 WEB = config.REPO_ROOT / "web"
@@ -86,7 +87,12 @@ def meta() -> dict:
     return {
         "skills": bank.SKILLS,
         "personas": {k: v[0] for k, v in agents.PERSONAS.items()},
-        "modes": {"diagnostic": "Diagnostic", "drill": "Targeted drill", "mixed": "Mixed"},
+        "modes": {"diagnostic": "Placement diagnostic", "drill": "Targeted drill", "mock": "Mock interview",
+                  "practice": "Free practice"},
+        "levels": bank.LEVELS,
+        "groups": [{"id": k, "name": v, "kind": bank.GROUP_KIND[k]} for k, v in bank.GROUPS.items()],
+        "stages": planmod.STAGES,
+        "subskills": {k: {"skill": v[0], "name": v[1]} for k, v in bank.SUBSKILLS.items()},
         "prices": config.PRICE_PER_M,
         "limits": {"session_tokens": config.SESSION_TOKEN_BUDGET, "attempts": config.MAX_ATTEMPTS_PER_QUESTION,
                    "followups": config.MAX_FOLLOWUPS_PER_QUESTION, "answer_chars": config.MAX_ANSWER_CHARS},
@@ -96,20 +102,44 @@ def meta() -> dict:
 
 
 # ---------------------------------------------------------------- profile + sessions (signed in)
+class IntakeIn(BaseModel):
+    group: str = "generalist"
+    stage: str = "networking"
+    interview_date: str | None = None
+    hours_per_week: float = 5
+    persona: str = "associate"
+
+
+@app.post("/api/intake")
+def intake(body: IntakeIn, prof: dict = Depends(current_profile)) -> dict:
+    return engine.save_intake(prof["id"], body.model_dump())
+
+
+@app.get("/api/dashboard")
+def dashboard(prof: dict = Depends(current_profile)) -> dict:
+    return engine.dashboard(prof["id"])
+
+
+@app.post("/api/plan/rebuild")
+async def rebuild_plan(prof: dict = Depends(current_profile)) -> dict:
+    return await engine.build_plan(prof["id"])
+
+
 @app.get("/api/map")
 def profile_map(prof: dict = Depends(current_profile)) -> dict:
     return engine.weakness_map(prof["id"])
 
 
 class SessionIn(BaseModel):
-    mode: str = "diagnostic"
+    mode: str = "mock"
     persona: str = "associate"
     focus: str | None = None
+    level: int | None = None
 
 
 @app.post("/api/session")
 def start(body: SessionIn, prof: dict = Depends(current_profile)) -> dict:
-    return engine.start_session(prof["id"], body.mode, body.persona, body.focus)
+    return engine.start_session(prof["id"], body.mode, body.persona, body.focus, body.level)
 
 
 class AnswerIn(BaseModel):
@@ -187,8 +217,7 @@ def club() -> dict:
         lib = LIBRARY.get(m["mid"])
         m["name"] = lib.name if lib else m["mid"]
         m["skill"] = bank.SKILLS.get(lib.skill, "General") if lib else ""
-    for k in s["skills"]:
-        k["name"] = bank.SKILLS.get(k["skill"], k["skill"])
+    s["skills"] = [dict(k, name=bank.SKILLS[k["skill"]]) for k in s["skills"] if k["skill"] in bank.SKILLS]
     return s
 
 

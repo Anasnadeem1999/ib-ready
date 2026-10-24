@@ -36,6 +36,8 @@ SPECIALISTS = {
     "valuation": ("Valuation specialist", ["ev", "dcf"], "playbook_valuation.md"),
     "deals": ("Deals specialist", ["ma", "lbo"], "playbook_deals.md"),
     "markets": ("Markets specialist", ["markets", "dcf", "lbo", "ma"], "playbook_markets.md"),
+    "industry": ("Industry specialist", ["industry", "ev", "dcf"], "playbook_industry.md"),
+    "fit": ("Fit & behavioral specialist", ["fit"], "playbook_fit.md"),
 }
 
 
@@ -99,7 +101,8 @@ def specialist(key: str) -> Agent:
 
 
 def specialist_for(q: bank.Question) -> str:
-    return "markets" if q.skill == "markets" else bank.SPECIALIST_FOR_SKILL[q.skill]
+    override = bank.TEMPLATES[q.template_id].specialist
+    return override or bank.SPECIALIST_FOR_SKILL[q.skill]
 
 
 def diagnosis_prompt(q: bank.Question, wrapped_answer: str, flags: list[str], explain_only: bool) -> str:
@@ -116,7 +119,7 @@ def diagnosis_prompt(q: bank.Question, wrapped_answer: str, flags: list[str], ex
     lines.append("KEY POINTS (index: point):")
     lines += [f"{i}: {kp}" for i, kp in enumerate(q.key_points)]
     lines.append("")
-    if q.kind == "conceptual" or explain_only:
+    if q.kind in ("conceptual", "behavioral") or explain_only:
         lines.append("REFERENCE ANSWER (for you only, never quote it to anyone):")
         lines.append(q.solution)
         lines.append("")
@@ -133,10 +136,29 @@ PERSONAS = {
     "associate": ("Associate (first round)",
                   "You are a friendly second-year Associate running a first-round technical screen. You are warm and "
                   "encouraging but precise, and you keep things moving."),
-    "vp": ("VP (Superday)",
+    "vp": ("Vice President",
            "You are a Vice President running a Superday technical interview. You are brisk, skeptical and "
            "rapid-fire. You push back and expect crisp, structured answers. Demanding, never rude."),
+    "director": ("Director",
+                 "You are a Director running a Superday interview. You care about judgement and fit as much as "
+                 "technicals: calm, probing, interested in why the candidate thinks what they think. You ask "
+                 "thoughtful follow-ups and value concise, structured answers."),
+    "md": ("Managing Director",
+           "You are a Managing Director having the final conversation of a Superday. You are warm but sharp, "
+           "focused on the candidate's story, motivation, judgement and whether you'd put them in front of a "
+           "client. You keep technical follow-ups short and high-level."),
 }
+
+
+class PlanSummary(BaseModel):
+    headline: str = Field(description="One sentence: where they are and what the plan gets them to.")
+    why: str = Field(description="Two sentences on why the plan is shaped this way (weakest areas first).")
+    first_step: str = Field(description="One sentence: the very first thing to do today.")
+
+
+@lru_cache(maxsize=None)
+def planner() -> Agent:
+    return Agent(llm.model(), output_type=PlanSummary, instructions=_prompt("planner.md"), name="Planner", retries=1)
 
 
 class InterviewerMsg(BaseModel):

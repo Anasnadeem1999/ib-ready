@@ -45,8 +45,8 @@ _ALL = [
         "which is just the tax saving.",
     ),
     Misconception(
-        "ACC_CAPEX_EXPENSED", "accounting", "Runs capex through the income statement",
-        "Buying PP&E lowers net income right away.",
+        "ACC_CAPEX_EXPENSED", "accounting", "Expenses a purchase right away (capex or inventory)",
+        "Buying PP&E or inventory lowers net income right away.",
         "Capex is capitalised: it shows up in investing cash flow and as PP&E on the "
         "balance sheet. It reaches the income statement only over time, through "
         "depreciation.",
@@ -248,6 +248,116 @@ _ALL = [
         "More of a growth company's value sits in distant cash flows and the terminal "
         "value. A higher discount rate cuts the present value of far-off cash much more, "
         "so long-duration equities fall more when rates rise.",
+    ),
+    # ---------------- Accounting: working capital ----------------
+    Misconception(
+        "ACC_AP_IGNORED", "accounting", "Forgets the accounts payable adjustment",
+        "An expense that hasn't been paid yet is treated as if it reduced cash.",
+        "An unpaid expense raises accounts payable. On the cash flow statement the AP increase is added back, "
+        "so cash rises by the tax saving even though net income falls.",
+    ),
+    Misconception(
+        "ACC_DEFREV_AS_REVENUE", "accounting", "Books a customer prepayment as revenue",
+        "Cash received in advance shows up as revenue right away.",
+        "A prepayment for future service is a liability (deferred revenue), not revenue. Net income is unchanged "
+        "until the service is delivered; cash and deferred revenue both rise.",
+    ),
+    # ---------------- EV: diluted shares ----------------
+    Misconception(
+        "EV_TSM_BASIC", "ev", "Uses basic shares instead of diluted shares",
+        "Equity value uses only basic shares outstanding.",
+        "In-the-money options add shares. Use the treasury stock method: add the options, then subtract the "
+        "shares the company could buy back with the exercise proceeds.",
+    ),
+    Misconception(
+        "EV_TSM_ALL_OPTIONS", "ev", "Counts every option without the buyback",
+        "Adds all options to the share count.",
+        "The treasury stock method assumes exercise proceeds (options x strike) buy back shares at the current price, "
+        "so the net new shares are options - (options x strike / price).",
+    ),
+    # ---------------- DCF: time value ----------------
+    Misconception(
+        "DCF_SIMPLE_DISCOUNT", "dcf", "Discounts with simple instead of compound interest",
+        "PV = cash / (1 + rate x years).",
+        "Discounting compounds: PV = cash / (1 + r)^n. Each year's discount builds on the last.",
+    ),
+    # ---------------- Group specifics ----------------
+    Misconception(
+        "FIG_PTBV_NO_GW", "industry", "Uses book value instead of tangible book value",
+        "P/TBV is calculated on total book value, with goodwill still in.",
+        "Tangible book value strips out goodwill and intangibles, because a bank's loss-absorbing capital is tangible. "
+        "P/TBV = market cap / (book equity - goodwill - intangibles).",
+    ),
+    Misconception(
+        "FIG_USES_EV", "industry", "Values a bank on EV/EBITDA",
+        "Applies EV and EBITDA to a bank.",
+        "For banks, debt and interest are the raw material of the business, not financing, so EV and EBITDA are "
+        "meaningless. Use equity-value metrics: P/E, P/BV, P/TBV, and dividend discount models.",
+    ),
+    Misconception(
+        "RE_FFO_GAIN", "industry", "Leaves gains on property sales in FFO",
+        "FFO = net income + real-estate depreciation.",
+        "FFO adds back real-estate depreciation and removes gains on property sales, because those gains aren't "
+        "recurring operating cash flow.",
+    ),
+    Misconception(
+        "TMT_LTV_NO_MARGIN", "industry", "Calculates LTV on revenue instead of gross profit",
+        "LTV = annual revenue per customer / churn.",
+        "Customer lifetime value should use gross profit, not revenue: LTV = revenue per customer x gross margin / churn.",
+    ),
+    Misconception(
+        "HC_RNPV_UNWEIGHTED", "industry", "Ignores the probability of approval",
+        "Values a pipeline drug at its full approved-case NPV.",
+        "Risk-adjusted NPV weights the approved-case value by the probability of approval; costs that are spent "
+        "regardless stay unweighted.",
+    ),
+    Misconception(
+        "RX_PRO_RATA", "industry", "Splits value pro rata, ignoring priority",
+        "All creditors recover the same percentage.",
+        "Recoveries follow the absolute priority waterfall: secured claims are paid in full first, and only the value "
+        "that's left flows to unsecured creditors, then to equity.",
+    ),
+    Misconception(
+        "EN_EBITDA_ONLY", "industry", "Uses EBITDA instead of EBITDAX for E&P",
+        "Values an oil & gas producer on EV/EBITDA.",
+        "E&P companies using successful-efforts accounting expense exploration, so peers use EBITDAX (adding "
+        "exploration expense back) to compare like with like.",
+    ),
+    # ---------------- Fit & behavioral ----------------
+    Misconception(
+        "FIT_NO_STRUCTURE", "fit", "No clear structure",
+        "Rambles chronologically without a beginning, middle and end.",
+        "Use a structure the listener can follow: past to present to future for your story, and STAR (situation, task, "
+        "action, result) for experiences. Keep it to about two minutes.",
+    ),
+    Misconception(
+        "FIT_GENERIC", "fit", "Generic answer that could apply to anyone",
+        "\"I like fast-paced environments and working with smart people.\"",
+        "Interviewers have heard the generic version hundreds of times. Anchor every claim in something only you can "
+        "say: a specific experience, a person you spoke with, a deal you followed.",
+    ),
+    Misconception(
+        "FIT_NO_EVIDENCE", "fit", "Claims without evidence or results",
+        "States strengths or actions without a concrete example or outcome.",
+        "Back each claim with a concrete example and a result, ideally quantified, so the interviewer can believe it.",
+    ),
+    Misconception(
+        "FIT_MONEY_PRESTIGE", "fit", "Money or prestige as the main reason",
+        "The motivation sounds like pay, exit options or brand.",
+        "Lead with what you want to learn and do (deal exposure, the steep learning curve, working on strategic "
+        "decisions) and tie it to your own past experiences.",
+    ),
+    Misconception(
+        "FIT_NO_VIEW", "fit", "Describes a deal without taking a view",
+        "Summarises the news but never says whether it was a good deal.",
+        "Bankers want judgement: give the rationale, the valuation (multiple or premium), and a clear view of whether it "
+        "creates value and the key risk.",
+    ),
+    Misconception(
+        "FIT_FAKE_WEAKNESS", "fit", "Disguises a strength as a weakness",
+        "\"I work too hard\" or \"I'm a perfectionist.\"",
+        "Pick a real, non-disqualifying weakness, show a concrete example, and explain the specific steps you're taking "
+        "and the progress you've made.",
     ),
     # ---------------- Generic ----------------
     Misconception(
