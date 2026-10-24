@@ -1,7 +1,9 @@
 # IB Ready: an IB interview coach that finds out *why* you got it wrong
 
 **Run it:** locally from a fresh clone in about 3 minutes (below). No hosted copy; `render.yaml` is a ready one-click Render blueprint.
-**Report and slides:** [`docs/report.html`](docs/report.html) and [`docs/slides.html`](docs/slides.html) (self-contained; open by double-click).
+
+**Report and slides (open in any browser):** [report](https://anasnadeem1999.github.io/ib-ready/report.html) · [slides](https://anasnadeem1999.github.io/ib-ready/slides.html). The same self-contained files are in `docs/` (download and double-click; GitHub's file view shows HTML as code).
+
 **Author:** Anas Nadeem (Yale SOM, MGT 409 AI Foundations for Managers, Fall 2026)
 
 IB Ready (code name and package: `ticktie`, "Tick & Tie") runs mock investment banking interviews: accounting, EV, DCF, M&A, LBOs, group specifics and fit. **Code checks every number you say.** For each question, deterministic calculators compute the right answer *and* the exact wrong answer each common misconception produces, so a mistake is matched to its cause, not guessed at by the model. Each question uses new numbers, so you can't memorise answers. A short placement interview sets your level per skill, the app builds a dated action plan up to your interview, a weakness map steers every drill at your weakest spot, and every technical answer is checked for length so you learn to answer concisely. You can type or speak your answers.
@@ -12,8 +14,8 @@ You need Python 3.10+ (3.12 recommended) and an API key.
 
 1. Clone the repo and enter it:
    ```bash
-   git clone https://github.com/Anasnadeem1999/tick-and-tie.git
-   cd tick-and-tie
+   git clone https://github.com/Anasnadeem1999/ib-ready.git
+   cd ib-ready
    ```
 2. The key: put `PORTKEY_API_KEY=your-key-here` in a `.env` file **in this folder or in the folder above it**. The app checks both; the first non-empty value wins, so an empty `.env` copied from `.env.example` here does no harm.
 3. Create a virtual environment and install. No activation needed (this avoids PowerShell's execution-policy error):

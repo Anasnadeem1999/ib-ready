@@ -35,7 +35,8 @@ sys.path.insert(0, str(ROOT))
 from ticktie import bank, config, engine  # noqa: E402
 from ticktie.misconceptions import LIBRARY  # noqa: E402
 
-REPO_URL = "https://github.com/Anasnadeem1999/tick-and-tie"
+REPO_URL = "https://github.com/Anasnadeem1999/ib-ready"
+PAGES_URL = "https://anasnadeem1999.github.io/ib-ready"
 APP_URL = (DOCS / "app_url.txt").read_text().strip() if (DOCS / "app_url.txt").exists() else None
 PRICE = config.PRICE_PER_M  # gpt-6-luna, USD per 1M tokens (Lecture 11)
 NAME = config.APP_NAME
@@ -484,6 +485,7 @@ def build() -> str:
 <div class="meta">
   <div><b>GitHub repo:</b> <a href="{REPO_URL}">{REPO_URL}</a></div>
   <div><b>App:</b> {app_link}</div>
+  <div><b>Report and slides online:</b> <a href="{PAGES_URL}/report.html">{PAGES_URL}/report.html</a> · <a href="{PAGES_URL}/slides.html">slides</a></div>
   <div class="oneliner">{esc(NAME)} runs mock investment banking interviews in which code checks every number you say, names the exact
   misconception behind each mistake, coaches you to answer concisely, and turns what it finds into a day-by-day plan up to your interview date.</div>
 </div>
