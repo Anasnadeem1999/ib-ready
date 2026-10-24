@@ -86,8 +86,8 @@ start knowing nothing about banking, so the tool must also teach the vocabulary.
 <h3>The person behind it</h3>
 <p>Anas (Yale SOM MBA, recruiting for investment banking) prepares for technicals with the Finance Club&#x27;s technical-session prep guides, Breaking Into Wall Street and Wall Street Prep questions, the 400 Questions IB guide, second-year MBA students as mock-interview partners, Yale&#x27;s Career Development Office coaches, and an AI chat assistant. Anas spends roughly 15 hours a week on technicals and has paid nothing for any of it, because Yale provides these resources. In Anas&#x27;s words, nothing frustrates them about it so far.</p>
 <div class='story'><h4>Where my prep falls short, in Anas's words</h4><p>My resources don&#x27;t fail me on content. Where they fall short is diagnosis. After using them, two things are clear to me:</p><ol><li>My recurring mistake: my answers run too long. I usually know the material, but I give long answers where a short, structured one would do.</li><li>What I should do with my next hour: solidify my foundations. Before adding more advanced material, I need to deepen and lock in the core concepts.</li></ol><p>None of my current resources gets me there efficiently:</p><ul><li>They teach what to say, not how briefly to say it. The question banks and guides give model answers, but none of them flags when my answer is too long or shows me how to cut it down.</li><li>Finding my weak spots took about two hours. I only saw these patterns after two hours of practice and reflection. Nothing pointed them out to me as I went.</li></ul><p>That is the gap IB Ready is built to close. It should spot my weak points within a session rather than after two hours, and turn them into a focused plan for the next hour of practice.</p></div>
-<p><b>The data agrees.</b> The first pilot user, Vishal, answered 6 accounting questions correctly in the app, and
-<b>5 of those 6 correct answers ran longer than the target</b> the app now sets (the target is about
+<p><b>The data agrees.</b> Across both pilot users, 12 technical answers were graded correct, and
+<b>8 of those 12 correct answers ran longer than the target</b> the app now sets (the target is about
 1.75&times; the length of the model answer). Knowing the material isn't the problem. Saying it in an interviewer's time is, and nothing in today's
 prep flags it. <b>Why care:</b> the real pain is diagnosis, not practice. A candidate who says "depreciation goes up $10, so net income
 falls $10" doesn't need another question. They need to hear <i>"you forgot the tax shield"</i>, get tested on it again tomorrow with
@@ -277,7 +277,7 @@ $0.50 output (Lecture 11).</p>
 <p>Per graded answer: <b>9,212 input tokens (7,958 cached) and 292 output tokens</b>.
 The placement interview is cheaper ($0.0035 for the whole placement), because the interviewer stays silent and code writes the short
 acknowledgements. The specialist's long, unchanging playbook comes first in its prompt, so the gateway's automatic prompt cache serves most of it
-at a tenth of the price. The real pilot users' sessions cost $0.00045 per graded answer (19 calls), in
+at a tenth of the price. The real pilot users' sessions cost $0.00029 per graded answer (44 calls), in
 line with the demo.</p>
 <h3>Per user and at scale</h3>
 <p>Assumption: an active recruiter does 3 practice sessions a week (12 a month) in recruiting season. Hosting uses Render's
@@ -327,16 +327,20 @@ If a bank or club wanted to screen applicants with it, that would need human ove
 <h3>Pilot with real users</h3>
 
         <table><tr><th>Pilot users</th><td>2 (Anas, Vishal): real people recruiting for banking, not test accounts</td></tr>
-        <tr><th>Sessions started / with graded answers</th><td>8 / 3</td></tr>
-        <tr><th>Graded answers</th><td>8 (6 correct)</td></tr>
-        <tr><th>Median time per answer</th><td>91 seconds</td></tr>
-        <tr><th>Real cost of the whole pilot</th><td>$0.0036 (19 model calls)</td></tr></table>
+        <tr><th>Sessions started / with graded answers</th><td>10 / 5</td></tr>
+        <tr><th>Graded answers</th><td>29 (13 correct)</td></tr>
+        <tr><th>Median time per answer</th><td>40 seconds</td></tr>
+        <tr><th>Real cost of the whole pilot</th><td>$0.0085 (44 model calls)</td></tr></table>
 <p><b>Before and after, on one user.</b> In the placement, Vishal explained why depreciation is added back on the cash flow statement and was graded <i>incorrect</i>: the specialist matched <code>ACC_NONCASH_AS_CASH</code> (&ldquo;Treats a non-cash expense as cash&rdquo;). The plan sent Vishal to an accounting drill on that weak spot, with a result of <b>6 of 6</b> questions correct, including the same add-back question again and three depreciation walks with fresh numbers.</p>
-<div class="pending">PENDING: in-app survey from the pilot users (rating, time to find weak spots, quote with consent)</div>
+<table>
+        <tr><th>Usefulness rating</th><td>9.5 / 10 (n = 2)</td></tr>
+        <tr><th>Compared with how they prep today</th><td>Much better: 2</td></tr>
+        <tr><th>Found a weak spot they didn't know about</th><td>Yes: 1, Partly: 1</td></tr>
+        <tr><th>Time to find those weak spots with usual prep</th><td>More than 3 hours: 1, 1–3 hours: 1</td></tr></table><blockquote>&ldquo;I liked how effectively the answers are evaluated and detailed feedback on strengths and weaknesses is provided right after.&rdquo; <cite>Anas</cite></blockquote><blockquote>&ldquo;I liked the comprehensive nature of the generalist diagnostic test, but something that really stood out to me was the way the test judged behavior questions because there is never right or wrong answer to that. It was great seeing it provide such good feedback on this.&rdquo; <cite>Vishal</cite></blockquote>
 <h3>Time and quality compared with how it's done today</h3>
 <table><tr><th></th><th>Today</th><th>With IB Ready</th><th>Source</th></tr>
-<tr><td>Time to find your weak spots</td><td>About 2 hours of practice and reflection</td><td>Named on the answer that shows it (median answer: 91 seconds); a placement takes about 15 minutes</td><td>Anas (pilot notes); pilot logs</td></tr>
-<tr><td>Feedback on answer length</td><td>None from guides or banks</td><td>Every technical answer, with a trend across sessions</td><td>Pilot: 5 of 6 correct answers were too long</td></tr>
+<tr><td>Time to find your weak spots</td><td>About 2 hours of practice and reflection (Anas); in the survey: Anas: More than 3 hours; Vishal: 1–3 hours</td><td>Named on the answer that shows it (median answer: 40 seconds); a placement takes about 15 minutes</td><td>Pilot notes, survey and logs</td></tr>
+<tr><td>Feedback on answer length</td><td>None from guides or banks</td><td>Every technical answer, with a trend across sessions</td><td>Pilot: 8 of 12 correct answers were too long</td></tr>
 <tr><td>Correct answers wrongly marked wrong</td><td>20%&ndash;47% with a plain LLM grader</td><td>0%</td><td>Evals, Section 3</td></tr>
 <tr><td>Cost of a diagnosed mock session</td><td>$100&ndash;$300 (one coached hour), or a scarce free slot</td><td>$0.0042 in AI tokens</td><td>Coach rates; measured</td></tr>
 <tr><td>Availability</td><td>When a second-year or coach is free</td><td>Any time, on a phone, by voice or text</td><td></td></tr></table>
@@ -350,7 +354,7 @@ actually get wrong instead of re-teaching what they already know.</p>
 <h2>8. Limits and next steps</h2>
 <p><b>What doesn't work yet.</b></p>
 <ul>
-<li><b>Pilot size:</b> two real users over one weekend shows the loop works on real speech. It doesn't show interview outcomes.</li>
+<li><b>Pilot size:</b> two real users over one weekend show the loop works on real answers and that they valued it. That doesn't show interview outcomes, and both know the developer.</li>
 <li><b>Coverage:</b> 107 templates (50 numeric, 46 conceptual, 11 fit), mostly Coffee-chat and First-round level; Superday-level questions and Excel modelling tests are thin.</li>
 <li><b>Evaluation:</b> I wrote the labeled sets, so they are cleaner than real speech. The 72 misconceptions are hand-built, and a mistake the library doesn't know is graded without a name.</li>
 <li><b>Voice:</b> the browser's speech recogniser mishears some long numbers, and it doesn't work in Firefox.</li>

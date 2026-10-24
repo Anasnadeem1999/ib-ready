@@ -418,6 +418,10 @@ def build() -> str:
     else:
         before_after, pilot_table = "", pending("pilot sessions with real users")
     survey_rows = [f for f in fb]
+    time_dist = "; ".join(f"{f['person']}: {f['time_to_find']}" for f in survey_rows if f.get("time_to_find"))
+    ratings_all = [f["rating"] for f in survey_rows if f.get("rating")]
+    mean_rating = statistics.mean(ratings_all) if ratings_all else None
+    n_better = sum(1 for f in survey_rows if (f.get("vs_current") or "").endswith("better"))
     if survey_rows:
         ratings = [f["rating"] for f in survey_rows if f.get("rating")]
         def dist(field: str) -> str:
@@ -507,7 +511,7 @@ start knowing nothing about banking, so the tool must also teach the vocabulary.
 <h3>The person behind it</h3>
 <p>{esc(prep_today)}</p>
 {story_html}
-<p><b>The data agrees.</b> The first pilot user, Vishal, answered {len(long_correct)} accounting questions correctly in the app, and
+<p><b>The data agrees.</b> Across both pilot users, {len(long_correct)} technical answers were graded correct, and
 <b>{n_long_correct} of those {len(long_correct)} correct answers ran longer than the target</b> the app now sets (the target is about
 1.75&times; the length of the model answer). Knowing the material isn't the problem. Saying it in an interviewer's time is, and nothing in today's
 prep flags it. <b>Why care:</b> the real pain is diagnosis, not practice. A candidate who says "depreciation goes up $10, so net income
@@ -665,7 +669,7 @@ If a bank or club wanted to screen applicants with it, that would need human ove
 {survey_html}
 <h3>Time and quality compared with how it's done today</h3>
 <table><tr><th></th><th>Today</th><th>With {esc(NAME)}</th><th>Source</th></tr>
-<tr><td>Time to find your weak spots</td><td>About {notes.get('anas_hours_to_find_weak_spots', '?')} hours of practice and reflection</td><td>Named on the answer that shows it (median answer: {f'{med_secs:.0f} seconds' if med_secs else 'n/a'}); a placement takes about 15 minutes</td><td>Anas (pilot notes); pilot logs</td></tr>
+<tr><td>Time to find your weak spots</td><td>About {notes.get('anas_hours_to_find_weak_spots', '?')} hours of practice and reflection (Anas); in the survey: {esc(time_dist) or 'n/a'}</td><td>Named on the answer that shows it (median answer: {f'{med_secs:.0f} seconds' if med_secs else 'n/a'}); a placement takes about 15 minutes</td><td>Pilot notes, survey and logs</td></tr>
 <tr><td>Feedback on answer length</td><td>None from guides or banks</td><td>Every technical answer, with a trend across sessions</td><td>Pilot: {n_long_correct} of {len(long_correct)} correct answers were too long</td></tr>
 <tr><td>Correct answers wrongly marked wrong</td><td>{pct(fa_lo)}&ndash;{pct(fa_hi)} with a plain LLM grader</td><td>{pct(tt.get('false_alarms_on_correct', 0))}</td><td>Evals, Section 3</td></tr>
 <tr><td>Cost of a diagnosed mock session</td><td>$100&ndash;$300 (one coached hour), or a scarce free slot</td><td>{usd(per_session_cost, 4)} in AI tokens</td><td>Coach rates; measured</td></tr>
@@ -680,7 +684,7 @@ actually get wrong instead of re-teaching what they already know.</p>
 <h2>8. Limits and next steps</h2>
 <p><b>What doesn't work yet.</b></p>
 <ul>
-<li><b>Pilot size:</b> two real users over one weekend shows the loop works on real speech. It doesn't show interview outcomes.</li>
+<li><b>Pilot size:</b> two real users over one weekend show the loop works on real answers and that they valued it. That doesn't show interview outcomes, and both know the developer.</li>
 <li><b>Coverage:</b> {n_templates} templates ({kinds['numeric']} numeric, {kinds['conceptual']} conceptual, {kinds['behavioral']} fit), mostly Coffee-chat and First-round level; Superday-level questions and Excel modelling tests are thin.</li>
 <li><b>Evaluation:</b> I wrote the labeled sets, so they are cleaner than real speech. The {len(LIBRARY)} misconceptions are hand-built, and a mistake the library doesn't know is graded without a name.</li>
 <li><b>Voice:</b> the browser's speech recogniser mishears some long numbers, and it doesn't work in Firefox.</li>

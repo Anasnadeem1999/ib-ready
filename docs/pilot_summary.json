@@ -1,5 +1,6 @@
 {
  "source": [
+  "ticktie.db",
   "ticktie.db"
  ],
  "people": {
@@ -11,9 +12,154 @@
      "started": 1792811232.224121,
      "ended": null,
      "graded": 0
+    },
+    {
+     "mode": "diagnostic",
+     "persona": "associate",
+     "started": 1792862702.4883747,
+     "ended": 1792863213.577678,
+     "graded": 11
     }
    ],
-   "answers": []
+   "answers": [
+    {
+     "session_mode": "diagnostic",
+     "template_id": "acc_dividend",
+     "skill": "accounting",
+     "kind": "numeric",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 39,
+     "words": 92,
+     "ts": 1792862747.9738696
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "acc_defrev",
+     "skill": "accounting",
+     "kind": "numeric",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 54,
+     "words": 120,
+     "ts": 1792862806.5346699
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_acc_dtl",
+     "skill": "accounting",
+     "kind": "conceptual",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [],
+     "seconds": 51,
+     "words": 97,
+     "ts": 1792862860.6986878
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "ev_bridge_basic",
+     "skill": "ev",
+     "kind": "numeric",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 33,
+     "words": 40,
+     "ts": 1792862897.488682
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "ev_tsm",
+     "skill": "ev",
+     "kind": "numeric",
+     "verdict": "incorrect",
+     "error_type": "conceptual",
+     "misconceptions": [
+      "EV_TSM_BASIC"
+     ],
+     "seconds": 60,
+     "words": 113,
+     "ts": 1792862963.4351695
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_dcf_tv_methods",
+     "skill": "dcf",
+     "kind": "conceptual",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [],
+     "seconds": 36,
+     "words": 78,
+     "ts": 1792863048.771963
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_ma_why",
+     "skill": "ma",
+     "kind": "conceptual",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [],
+     "seconds": 26,
+     "words": 45,
+     "ts": 1792863077.6498117
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_lbo_candidate",
+     "skill": "lbo",
+     "kind": "conceptual",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [],
+     "seconds": 27,
+     "words": 48,
+     "ts": 1792863107.3547044
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_ind_backlog",
+     "skill": "industry",
+     "kind": "conceptual",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [],
+     "seconds": 21,
+     "words": 39,
+     "ts": 1792863130.383486
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "b_why_firm",
+     "skill": "fit",
+     "kind": "behavioral",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 36,
+     "words": 96,
+     "ts": 1792863169.3040485
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "b_team",
+     "skill": "fit",
+     "kind": "behavioral",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [
+      "FIT_NO_STRUCTURE",
+      "FIT_NO_EVIDENCE"
+     ],
+     "seconds": 36,
+     "words": 97,
+     "ts": 1792863207.8068542
+    }
+   ]
   },
   "Vishal": {
    "sessions": [
@@ -65,6 +211,13 @@
      "started": 1792818840.8075445,
      "ended": 1792819461.7649984,
      "graded": 6
+    },
+    {
+     "mode": "diagnostic",
+     "persona": "vp",
+     "started": 1792863357.7383926,
+     "ended": 1792863843.856812,
+     "graded": 10
     }
    ],
    "answers": [
@@ -167,6 +320,130 @@
      "seconds": 149,
      "words": 132,
      "ts": 1792819433.9538143
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "acc_ebitda_build",
+     "skill": "accounting",
+     "kind": "numeric",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 50,
+     "words": 94,
+     "ts": 1792863413.4892685
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "acc_ar",
+     "skill": "accounting",
+     "kind": "numeric",
+     "verdict": "incorrect",
+     "error_type": "conceptual",
+     "misconceptions": [
+      "ACC_AR_IGNORED"
+     ],
+     "seconds": 73,
+     "words": 94,
+     "ts": 1792863490.3684149
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "ev_bridge_basic",
+     "skill": "ev",
+     "kind": "numeric",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 27,
+     "words": 56,
+     "ts": 1792863523.058591
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_ev_multiples",
+     "skill": "ev",
+     "kind": "conceptual",
+     "verdict": "correct",
+     "error_type": "none",
+     "misconceptions": [],
+     "seconds": 41,
+     "words": 114,
+     "ts": 1792863566.6260364
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_ev_negative",
+     "skill": "ev",
+     "kind": "conceptual",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [],
+     "seconds": 34,
+     "words": 93,
+     "ts": 1792863603.9895787
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_wacc_what",
+     "skill": "dcf",
+     "kind": "conceptual",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [],
+     "seconds": 32,
+     "words": 94,
+     "ts": 1792863638.0960195
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_ma_consideration",
+     "skill": "ma",
+     "kind": "conceptual",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [],
+     "seconds": 49,
+     "words": 130,
+     "ts": 1792863691.04811
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_lbo_what",
+     "skill": "lbo",
+     "kind": "conceptual",
+     "verdict": "incorrect",
+     "error_type": "conceptual",
+     "misconceptions": [
+      "LBO_NO_LEVER_LOGIC"
+     ],
+     "seconds": 23,
+     "words": 36,
+     "ts": 1792863716.7646754
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "c_ib_role",
+     "skill": "fit",
+     "kind": "behavioral",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [],
+     "seconds": 38,
+     "words": 59,
+     "ts": 1792863758.0677793
+    },
+    {
+     "session_mode": "diagnostic",
+     "template_id": "b_why_ib",
+     "skill": "fit",
+     "kind": "behavioral",
+     "verdict": "incomplete",
+     "error_type": "incomplete",
+     "misconceptions": [],
+     "seconds": 77,
+     "words": 135,
+     "ts": 1792863838.0444453
     }
    ]
   }
@@ -323,7 +600,230 @@
    "cached_tokens": 0,
    "output_tokens": 118,
    "cost_usd": 0.0001702
+  },
+  {
+   "person": "Anas",
+   "actor": "Accounting specialist",
+   "input_tokens": 7003,
+   "cached_tokens": 6317,
+   "output_tokens": 252,
+   "cost_usd": 0.00025777
+  },
+  {
+   "person": "Anas",
+   "actor": "Accounting specialist",
+   "input_tokens": 7120,
+   "cached_tokens": 6377,
+   "output_tokens": 256,
+   "cost_usd": 0.00026607
+  },
+  {
+   "person": "Anas",
+   "actor": "Accounting specialist",
+   "input_tokens": 3458,
+   "cached_tokens": 3022,
+   "output_tokens": 114,
+   "cost_usd": 0.00013082
+  },
+  {
+   "person": "Anas",
+   "actor": "Valuation specialist",
+   "input_tokens": 7030,
+   "cached_tokens": 6426,
+   "output_tokens": 226,
+   "cost_usd": 0.00023766
+  },
+  {
+   "person": "Anas",
+   "actor": "Valuation specialist",
+   "input_tokens": 7225,
+   "cached_tokens": 6522,
+   "output_tokens": 208,
+   "cost_usd": 0.00023952
+  },
+  {
+   "person": "Anas",
+   "actor": "Valuation specialist",
+   "input_tokens": 3565,
+   "cached_tokens": 3097,
+   "output_tokens": 107,
+   "cost_usd": 0.00013127
+  },
+  {
+   "person": "Anas",
+   "actor": "Deals specialist",
+   "input_tokens": 3411,
+   "cached_tokens": 3053,
+   "output_tokens": 94,
+   "cost_usd": 0.00011333
+  },
+  {
+   "person": "Anas",
+   "actor": "Deals specialist",
+   "input_tokens": 3429,
+   "cached_tokens": 3053,
+   "output_tokens": 106,
+   "cost_usd": 0.00012113
+  },
+  {
+   "person": "Anas",
+   "actor": "Industry specialist",
+   "input_tokens": 3735,
+   "cached_tokens": 0,
+   "output_tokens": 101,
+   "cost_usd": 0.000424
+  },
+  {
+   "person": "Anas",
+   "actor": "Fit & behavioral specialist",
+   "input_tokens": 3831,
+   "cached_tokens": 3442,
+   "output_tokens": 126,
+   "cost_usd": 0.00013632
+  },
+  {
+   "person": "Anas",
+   "actor": "Fit & behavioral specialist",
+   "input_tokens": 3859,
+   "cached_tokens": 3442,
+   "output_tokens": 111,
+   "cost_usd": 0.00013162
+  },
+  {
+   "person": "Anas",
+   "actor": "Planner",
+   "input_tokens": 1162,
+   "cached_tokens": 0,
+   "output_tokens": 137,
+   "cost_usd": 0.0001847
+  },
+  {
+   "person": "Anas",
+   "actor": "Coach",
+   "input_tokens": 3624,
+   "cached_tokens": 1861,
+   "output_tokens": 255,
+   "cost_usd": 0.00032241
+  },
+  {
+   "person": "Vishal",
+   "actor": "Accounting specialist",
+   "input_tokens": 7114,
+   "cached_tokens": 6368,
+   "output_tokens": 278,
+   "cost_usd": 0.00027728
+  },
+  {
+   "person": "Vishal",
+   "actor": "Accounting specialist",
+   "input_tokens": 7043,
+   "cached_tokens": 6351,
+   "output_tokens": 222,
+   "cost_usd": 0.00024371
+  },
+  {
+   "person": "Vishal",
+   "actor": "Valuation specialist",
+   "input_tokens": 7065,
+   "cached_tokens": 6445,
+   "output_tokens": 215,
+   "cost_usd": 0.00023395
+  },
+  {
+   "person": "Vishal",
+   "actor": "Valuation specialist",
+   "input_tokens": 3580,
+   "cached_tokens": 3097,
+   "output_tokens": 124,
+   "cost_usd": 0.00014127
+  },
+  {
+   "person": "Vishal",
+   "actor": "Valuation specialist",
+   "input_tokens": 3512,
+   "cached_tokens": 3097,
+   "output_tokens": 121,
+   "cost_usd": 0.00013297
+  },
+  {
+   "person": "Vishal",
+   "actor": "Valuation specialist",
+   "input_tokens": 3521,
+   "cached_tokens": 3097,
+   "output_tokens": 117,
+   "cost_usd": 0.00013187
+  },
+  {
+   "person": "Vishal",
+   "actor": "Deals specialist",
+   "input_tokens": 3601,
+   "cached_tokens": 3053,
+   "output_tokens": 122,
+   "cost_usd": 0.00014633
+  },
+  {
+   "person": "Vishal",
+   "actor": "Deals specialist",
+   "input_tokens": 3427,
+   "cached_tokens": 3053,
+   "output_tokens": 108,
+   "cost_usd": 0.00012193
+  },
+  {
+   "person": "Vishal",
+   "actor": "Fit & behavioral specialist",
+   "input_tokens": 3842,
+   "cached_tokens": 3442,
+   "output_tokens": 96,
+   "cost_usd": 0.00012242
+  },
+  {
+   "person": "Vishal",
+   "actor": "Fit & behavioral specialist",
+   "input_tokens": 3929,
+   "cached_tokens": 3442,
+   "output_tokens": 118,
+   "cost_usd": 0.00014212
+  },
+  {
+   "person": "Vishal",
+   "actor": "Planner",
+   "input_tokens": 1134,
+   "cached_tokens": 0,
+   "output_tokens": 141,
+   "cost_usd": 0.0001839
+  },
+  {
+   "person": "Vishal",
+   "actor": "Coach",
+   "input_tokens": 3488,
+   "cached_tokens": 1861,
+   "output_tokens": 279,
+   "cost_usd": 0.00032081
   }
  ],
- "feedback": []
+ "feedback": [
+  {
+   "person": "Anas",
+   "ts": 1792863327.0149822,
+   "rating": 9,
+   "vs_current": "Much better",
+   "found_new": "Yes",
+   "time_to_find": "More than 3 hours",
+   "prep_today": "BIWS guide.",
+   "consent": 1,
+   "quote": "I liked how effectively the answers are evaluated and detailed feedback on strengths and weaknesses is provided right after."
+  },
+  {
+   "person": "Vishal",
+   "ts": 1792863964.6798239,
+   "rating": 10,
+   "vs_current": "Much better",
+   "found_new": "Partly",
+   "time_to_find": "1\u20133 hours",
+   "prep_today": "Had a mock interview today.",
+   "consent": 1,
+   "quote": "I liked the comprehensive nature of the generalist diagnostic test, but something that really stood out to me was the way the test judged behavior questions because there is never right or wrong answer to that. It was great seeing it provide such good feedback on this."
+  }
+ ]
 }

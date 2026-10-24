@@ -38,7 +38,7 @@ def build() -> str:
     story = F["story"] or {}
     fb = F["fb"]
     quotes = [f for f in fb if f.get("quote")][:2]
-    quote_html = "".join(f'<blockquote>&ldquo;{esc(q["quote"])}&rdquo;<cite>{esc(q["person"])}, pilot user</cite></blockquote>' for q in quotes)
+    quote_html = "<div class='grid2' style='gap:14px'>" + "".join(f'<blockquote>&ldquo;{esc(q["quote"])}&rdquo;<cite>{esc(q["person"])}, pilot user</cite></blockquote>' for q in quotes) + "</div>"
     if not quote_html:
         quote_html = '<div class="pending">PENDING pilot quote (with consent)</div>'
     v_drill = [a for a in people.get("Vishal", {}).get("answers", []) if a["session_mode"] != "diagnostic" and a["skill"] == "accounting"]
@@ -184,10 +184,10 @@ def build() -> str:
 <section>
   <h2>Impact: real users</h2>
   <div class="kpis">
-    <div><b>{len(people)}</b><span>pilot users recruiting for IB</span></div>
+    <div><b>{F['mean_rating']:.1f}/10</b><span>usefulness ({len(people)} pilot users, {len(F['p_answers'])} graded answers)</span></div>
+    <div><b>{F['n_better']}/{len(F['fb'])}</b><span>say "much better" than how they prep today</span></div>
     <div><b>{sum(a['verdict'] == 'correct' for a in v_drill)}/{len(v_drill)}</b><span>right in the drill after the placement named the mistake</span></div>
     <div><b>{F['n_long_correct']}/{len(F['long_correct'])}</b><span>correct answers that were too long: now flagged</span></div>
-    <div><b>2 h → 1 answer</b><span>to find a weak spot (pilot notes; logs)</span></div>
   </div>
   {quote_html}
   <p class="small">For a finance club: unlimited diagnosed mocks for 100 recruiters at about {usd(F['club_total_year'], 0)} a year, and an anonymized view of the most common mistakes to target workshops.</p>
