@@ -119,6 +119,7 @@ def build() -> str:
   .flow div b {{ display: block; color: var(--p2); font-size: 1.15em; }}
   .pending {{ border: 3px dashed var(--rose); color: var(--rose); padding: 14px; border-radius: 12px; font-weight: 700; font-size: .6em; }}
   .reveal .progress, .reveal .controls {{ color: var(--p); }}
+  .reveal a {{ color: var(--p); text-decoration: underline; }}
   .reveal .slide-number {{ background: transparent; color: var(--muted); font-size: 14px; }}
 </style></head><body>
 <div class="reveal"><div class="slides">
@@ -130,7 +131,8 @@ def build() -> str:
   <p style="font-size:1.08em;margin:.1em 0 .6em">Practice investment banking interviews.<br>Learn <em>why</em> you got it wrong. Get a plan.</p>
   <p><span class="pill">Code-checked math</span><span class="pill">Named mistakes</span><span class="pill">Concise-answer coaching</span><span class="pill">Day-by-day plan</span></p>
   <p class="muted small" style="margin-top:1em">Anas Nadeem · Yale SOM · MGT 409 AI Foundations for Managers · Final project<br>
-  {R.REPO_URL.replace('https://', '')} · report and slides: {R.PAGES_URL.replace('https://', '')}</p>
+  GitHub repo (public): <a href="{R.REPO_URL}">{R.REPO_URL}</a><br>
+  Clone: <code style="background:#fff;padding:2px 8px;border-radius:6px">git clone {R.REPO_URL}.git</code></p>
 </section>
 
 <!-- 2 Problem -->
@@ -240,7 +242,9 @@ def build() -> str:
     <div class="card"><h3>Not there yet</h3><p>Two pilot users over one weekend, not interview outcomes · {len(R.bank.TEMPLATES)} question templates, few at Superday level · runs locally (Render blueprint ready)</p></div>
     <div class="card"><h3>With another month</h3><p>Four-week Finance Club pilot measuring retest accuracy and answer length · grade a photographed paper LBO (vision) · spaced repetition · Postgres + Render deploy</p></div>
   </div>
-  <p style="margin-top:1.2em;font-size:.9em"><em>Try it:</em> {R.REPO_URL.replace('https://', '')} <span class="muted small">· runs locally in about 2 minutes</span></p>
+  <div class="card" style="margin-top:1em"><h3>Try it: the GitHub repo is public</h3>
+  <p style="font-size:.62em"><a href="{R.REPO_URL}">{R.REPO_URL}</a><br>
+  <code style="background:#f1eef9;padding:2px 8px;border-radius:6px">git clone {R.REPO_URL}.git</code> · then follow the README (runs locally in about 2 minutes)</p></div>
 </section>
 
 </div></div>

@@ -606,7 +606,8 @@ def build() -> str:
   <h1>{esc(NAME)}: an investment banking interview coach that finds out <em>why</em> you got it wrong</h1>
   <div class="byline">Anas Nadeem · Yale SOM · MGT 409 AI Foundations for Managers · Final project · October 2026</div>
   <div class="links">
-    <b>GitHub repo</b><a href="{REPO_URL}">{REPO_URL}</a>
+    <b>GitHub repo</b><span><a href="{REPO_URL}">{REPO_URL}</a> &nbsp;(public)</span>
+    <b>Clone</b><code>git clone {REPO_URL}.git</code>
     <b>Report + slides</b><span><a href="{PAGES_URL}/report.html">{PAGES_URL}/report.html</a> · <a href="{PAGES_URL}/slides.html">slides</a></span>
     <b>The app</b><span>{app_line}</span>
   </div>
